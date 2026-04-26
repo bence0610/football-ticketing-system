@@ -1,0 +1,2 @@
+- [KTE Jegyportál – Project Context](project_kte_jegyportal.md) — which epics need UI, which Paper pages exist, project background
+- [KTE Jegyportál – Design System](design_system_kte.md) — full palette, typography scale, spacing, and component patterns for all KTE pages
