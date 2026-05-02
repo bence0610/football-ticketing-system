@@ -2,7 +2,7 @@
 
 **Project:** KTE Jegyportál (Kecskeméti TE Official Ticketing Platform)
 **Status:** In Progress
-**Overall Completion:** 54% (37 / 68 tasks completed)
+**Overall Completion:** 79% (54 / 68 tasks completed)
 
 ---
 
@@ -12,8 +12,8 @@
 |---|---|
 | Total Epics | 10 |
 | Total User Stories | 68 |
-| Completed Stories | 37 |
-| Completion | 54% |
+| Completed Stories | 54 |
+| Completion | 79% |
 
 ---
 
@@ -27,9 +27,9 @@
 | E4 | Shopping Cart & Seat Reservation | 5 | DONE |
 | E5 | Authentication & User Profile | 7 | DONE |
 | E6 | Checkout & Stripe Payment | 6 | DONE |
-| E7 | E-ticket Generation & Email Delivery | 5 | Pending |
-| E8 | Loyalty Points System | 6 | Pending |
-| E9 | Season Pass Loan Flow | 6 | Pending |
+| E7 | E-ticket Generation & Email Delivery | 5 | DONE |
+| E8 | Loyalty Points System | 6 | DONE |
+| E9 | Season Pass Loan Flow | 6 | DONE |
 | E10 | Advanced Features (Waitlist, AI Chatbot, Weather, Admin) | 14 | Pending |
 
 ---
@@ -41,7 +41,7 @@
 | Iteration 1 – Foundation | E1 | DONE |
 | Iteration 2 – Public Landing & Map | E2, E3 | DONE |
 | Iteration 3 – Cart, Auth & Checkout | E4, E5, E6 | DONE |
-| Iteration 4 – Tickets, Loyalty & Pass Loan | E7, E8, E9 | Pending |
+| Iteration 4 – Tickets, Loyalty & Pass Loan | E7, E8, E9 | DONE |
 | Iteration 5 – Advanced Features | E10 | Pending |
 
 ---
@@ -765,16 +765,16 @@
 
 ---
 
-### KTE-038 – QR Code Generation Service
+### KTE-038 – QR Code Generation Service ✅ DONE
 
 **User Story:** As a backend developer, I want a service that generates a unique QR code for each purchased ticket, so that tickets can be scanned at the stadium gate.
 
 **Acceptance Criteria:**
-- [ ] `QrCodeService.generate(ticketId)` produces a unique QR code as a base64 PNG
-- [ ] QR code encodes: ticketId, matchId, seatId, userId (JWT-signed payload)
-- [ ] QR code is stored in the `Ticket` entity (base64 or file path)
-- [ ] QR code can be regenerated if corrupted (admin action)
-- [ ] Unit tests validate QR code generation output
+- [x] `QrCodeService.generate(ticketId)` produces a unique QR code as a base64 PNG
+- [x] QR code encodes: ticketId, matchId, seatId, userId (JWT-signed payload)
+- [x] QR code is stored in the `Ticket` entity (base64 or file path)
+- [x] QR code can be regenerated if corrupted (admin action)
+- [x] Unit tests validate QR code generation output
 
 **Story Points:** 3
 **Priority:** 🔴 Critical
@@ -783,15 +783,15 @@
 
 ---
 
-### KTE-039 – E-ticket PDF / HTML Generation
+### KTE-039 – E-ticket PDF / HTML Generation ✅ DONE
 
 **User Story:** As a user, I want my e-ticket to be a well-formatted document with match details, seat info, and QR code, so that I can easily present it at the gate.
 
 **Acceptance Criteria:**
-- [ ] E-ticket contains: KTE logo, match name, date, sector, row, seat number, QR code
-- [ ] Generated as HTML (inline CSS for email compatibility) or PDF
-- [ ] Ticket template is consistent with KTE branding (colors, fonts)
-- [ ] Accessible (alt text on images)
+- [x] E-ticket contains: KTE logo, match name, date, sector, row, seat number, QR code
+- [x] Generated as HTML (inline CSS for email compatibility) or PDF
+- [x] Ticket template is consistent with KTE branding (colors, fonts)
+- [x] Accessible (alt text on images)
 
 **Story Points:** 2
 **Priority:** 🔴 Critical
@@ -800,16 +800,16 @@
 
 ---
 
-### KTE-040 – Email Delivery via Nodemailer
+### KTE-040 – Email Delivery via Nodemailer ✅ DONE
 
 **User Story:** As a user, I want to receive my e-ticket by email after successful payment, so that I always have a copy even if the app is unavailable.
 
 **Acceptance Criteria:**
-- [ ] `EmailService` configured with Nodemailer + SMTP credentials from env vars
-- [ ] After payment webhook success, e-ticket email is sent within 30 seconds
-- [ ] Email subject: "Your KTE Tickets – [Match Name]"
-- [ ] Email contains HTML ticket(s) as inline or attachment
-- [ ] Failed email sends are logged and retried once after 60 seconds
+- [x] `EmailService` configured with Nodemailer + SMTP credentials from env vars
+- [x] After payment webhook success, e-ticket email is sent within 30 seconds
+- [x] Email subject: "Your KTE Tickets – [Match Name]"
+- [x] Email contains HTML ticket(s) as inline or attachment
+- [x] Failed email sends are logged and retried once after 60 seconds
 
 **Story Points:** 3
 **Priority:** 🔴 Critical
@@ -818,15 +818,15 @@
 
 ---
 
-### KTE-041 – E-ticket View in User Profile
+### KTE-041 – E-ticket View in User Profile ✅ DONE
 
 **User Story:** As a logged-in user, I want to view and download my e-tickets from my profile, so that I have access to them without checking my email.
 
 **Acceptance Criteria:**
-- [ ] Profile page active tickets section shows QR code image per ticket
-- [ ] "Download Ticket" button downloads the ticket as PDF or image
-- [ ] QR code is fetched from `GET /api/tickets/:id/qr`
-- [ ] Past tickets show QR codes but are visually marked as "Used" or "Expired"
+- [x] Profile page active tickets section shows QR code image per ticket
+- [x] "Download Ticket" button downloads the ticket as PDF or image
+- [x] QR code is fetched from `GET /api/tickets/:id/qr`
+- [x] Past tickets show QR codes but are visually marked as "Used" or "Expired"
 
 **Story Points:** 2
 **Priority:** 🟠 High
@@ -835,15 +835,15 @@
 
 ---
 
-### KTE-042 – Ticket Status Management API
+### KTE-042 – Ticket Status Management API ✅ DONE
 
 **User Story:** As a backend developer, I want ticket status transitions (active → used → expired) managed via API, so that the system can track which tickets have been scanned.
 
 **Acceptance Criteria:**
-- [ ] `PATCH /api/tickets/:id/scan` marks ticket as `used` (admin/gate scanner role required)
-- [ ] `GET /api/tickets/:id` returns current ticket status
-- [ ] Expired tickets (match date passed) are automatically set to `expired` via a scheduled job
-- [ ] Status transitions are logged in the ticket entity with timestamp
+- [x] `PATCH /api/tickets/:id/scan` marks ticket as `used` (admin/gate scanner role required)
+- [x] `GET /api/tickets/:id` returns current ticket status
+- [x] Expired tickets (match date passed) are automatically set to `expired` via a scheduled job
+- [x] Status transitions are logged in the ticket entity with timestamp
 
 **Story Points:** 3
 **Priority:** 🟡 Medium
@@ -862,16 +862,16 @@
 
 ---
 
-### KTE-043 – Loyalty Points Engine (Backend)
+### KTE-043 – Loyalty Points Engine (Backend) ✅ DONE
 
 **User Story:** As a backend developer, I want a `LoyaltyService` that awards points for defined events, so that the loyalty program runs automatically without manual intervention.
 
 **Acceptance Criteria:**
-- [ ] Points awarded: registration +100, profile completion +50, ticket purchase +50/ticket, season pass +500, pass loan +25
-- [ ] Each award creates a `LoyaltyTransaction` record (userId, points, reason, createdAt)
-- [ ] Current tier calculated from total points: Kék (0–499), Ezüst (500–1999), Arany (2000–4999), KTE Legenda (5000+)
-- [ ] Tier is stored on the `User` entity and updated after each transaction
-- [ ] Unit tests cover each point-awarding event
+- [x] Points awarded: registration +100, profile completion +50, ticket purchase +50/ticket, season pass +500, pass loan +25
+- [x] Each award creates a `LoyaltyTransaction` record (userId, points, reason, createdAt)
+- [x] Current tier calculated from total points: Kék (0–499), Ezüst (500–1999), Arany (2000–4999), KTE Legenda (5000+)
+- [x] Tier is stored on the `User` entity and updated after each transaction
+- [x] Unit tests cover each point-awarding event
 
 **Story Points:** 3
 **Priority:** 🟠 High
@@ -880,15 +880,15 @@
 
 ---
 
-### KTE-044 – Loyalty Points API Endpoints
+### KTE-044 – Loyalty Points API Endpoints ✅ DONE
 
 **User Story:** As a frontend developer, I want loyalty API endpoints, so that the profile page and loyalty dashboard can display accurate points data.
 
 **Acceptance Criteria:**
-- [ ] `GET /api/loyalty/me` returns: totalPoints, tier, nextTierPoints, transactions (last 20)
-- [ ] `GET /api/loyalty/tiers` returns tier definitions (name, minPoints, benefits)
-- [ ] All endpoints protected by `JwtAuthGuard`
-- [ ] Tier upgrade event returned as a flag in response for frontend notification
+- [x] `GET /api/loyalty/me` returns: totalPoints, tier, nextTierPoints, transactions (last 20)
+- [x] `GET /api/loyalty/tiers` returns tier definitions (name, minPoints, benefits)
+- [x] All endpoints protected by `JwtAuthGuard`
+- [x] Tier upgrade event returned as a flag in response for frontend notification
 
 **Story Points:** 2
 **Priority:** 🟠 High
@@ -897,16 +897,16 @@
 
 ---
 
-### KTE-045 – Loyalty Dashboard UI
+### KTE-045 – Loyalty Dashboard UI ✅ DONE
 
 **User Story:** As a logged-in user, I want a loyalty points dashboard, so that I can see my current tier, points breakdown, and what rewards I am entitled to.
 
 **Acceptance Criteria:**
-- [ ] Dashboard shows: current tier badge with color, total points, progress bar to next tier
-- [ ] Tier benefits listed for current and next tier
-- [ ] Transaction history table: date, reason, points earned/spent
-- [ ] Tier upgrade is celebrated with a toast notification when detected
-- [ ] Dashboard accessible from profile page navigation
+- [x] Dashboard shows: current tier badge with color, total points, progress bar to next tier
+- [x] Tier benefits listed for current and next tier
+- [x] Transaction history table: date, reason, points earned/spent
+- [x] Tier upgrade is celebrated with a toast notification when detected
+- [x] Dashboard accessible from profile page navigation
 
 **Story Points:** 3
 **Priority:** 🟠 High
@@ -915,16 +915,16 @@
 
 ---
 
-### KTE-046 – Tier-Based Discount at Checkout
+### KTE-046 – Tier-Based Discount at Checkout ✅ DONE
 
 **User Story:** As a loyalty tier member, I want my tier discount automatically applied at checkout, so that I receive the benefit of my loyalty status without manual coupon codes.
 
 **Acceptance Criteria:**
-- [ ] Backend reads user's tier at checkout and applies: Ezüst 5%, Arany 10%, KTE Legenda 15%
-- [ ] Discounted price shown on checkout page before payment
-- [ ] Discount is applied server-side in the Stripe PaymentIntent amount
-- [ ] Discount label shown in order summary: "Arany Member Discount: -10%"
-- [ ] No discount applied for Kék tier
+- [x] Backend reads user's tier at checkout and applies: Ezüst 5%, Arany 10%, KTE Legenda 15%
+- [x] Discounted price shown on checkout page before payment
+- [x] Discount is applied server-side in the Stripe PaymentIntent amount
+- [x] Discount label shown in order summary: "Arany Member Discount: -10%"
+- [x] No discount applied for Kék tier
 
 **Story Points:** 2
 **Priority:** 🟡 Medium
@@ -933,15 +933,15 @@
 
 ---
 
-### KTE-047 – Loyalty Points for Profile Completion
+### KTE-047 – Loyalty Points for Profile Completion ✅ DONE
 
 **User Story:** As a registered user, I want to earn 50 loyalty points when I complete my profile, so that I am incentivized to provide my details.
 
 **Acceptance Criteria:**
-- [ ] Profile completion means: name, phone number, and profile picture set
-- [ ] `PATCH /api/users/me` triggers point award if all required fields are now set for the first time
-- [ ] Award is idempotent (not repeated if profile is edited again)
-- [ ] Toast notification informs user of points earned after save
+- [x] Profile completion means: name, phone number, and profile picture set
+- [x] `PATCH /api/users/me` triggers point award if all required fields are now set for the first time
+- [x] Award is idempotent (not repeated if profile is edited again)
+- [x] Toast notification informs user of points earned after save
 
 **Story Points:** 2
 **Priority:** 🟡 Medium
@@ -950,16 +950,16 @@
 
 ---
 
-### KTE-048 – Season-End Points Carryover Job
+### KTE-048 – Season-End Points Carryover Job ✅ DONE
 
 **User Story:** As a developer, I want a scheduled job that carries over 50% of loyalty points at the end of each season, so that the loyalty program resets partially for the next season.
 
 **Acceptance Criteria:**
-- [ ] Cron job runs on a configurable date (default: end of football season, ~June 30)
-- [ ] Each user's points are reduced to 50% and a `LoyaltyTransaction` is recorded (reason: "Season carryover")
-- [ ] Tier is recalculated after carryover
-- [ ] Job is idempotent (safe to re-run)
-- [ ] Job execution is logged
+- [x] Cron job runs on a configurable date (default: end of football season, ~June 30)
+- [x] Each user's points are reduced to 50% and a `LoyaltyTransaction` is recorded (reason: "Season carryover")
+- [x] Tier is recalculated after carryover
+- [x] Job is idempotent (safe to re-run)
+- [x] Job execution is logged
 
 **Story Points:** 2
 **Priority:** 🟢 Low
@@ -976,16 +976,16 @@
 
 ---
 
-### KTE-049 – Season Pass Entity & API
+### KTE-049 – Season Pass Entity & API ✅ DONE
 
 **User Story:** As a backend developer, I want `SeasonPass` and `PassLoan` entities with CRUD endpoints, so that the pass loan flow has a proper data foundation.
 
 **Acceptance Criteria:**
-- [ ] `SeasonPass` entity: userId, seatId, validFrom, validTo, status (active/suspended)
-- [ ] `PassLoan` entity: fromUserId, toUserId, matchId, status (pending/active/completed/cancelled)
-- [ ] `GET /api/season-passes/me` returns user's active passes
-- [ ] `POST /api/season-passes/:id/loans` creates a new loan request
-- [ ] All endpoints protected by `JwtAuthGuard`
+- [x] `SeasonPass` entity: userId, seatId, validFrom, validTo, status (active/suspended)
+- [x] `PassLoan` entity: fromUserId, toUserId, matchId, status (pending/active/completed/cancelled)
+- [x] `GET /api/season-passes/me` returns user's active passes
+- [x] `POST /api/season-passes/:id/loans` creates a new loan request
+- [x] All endpoints protected by `JwtAuthGuard`
 
 **Story Points:** 3
 **Priority:** 🟠 High
@@ -994,16 +994,16 @@
 
 ---
 
-### KTE-050 – Loan QR Code Generation
+### KTE-050 – Loan QR Code Generation ✅ DONE
 
 **User Story:** As a season pass holder, I want to generate a one-time QR code for a specific match loan, so that the recipient can access the seat without physical handover.
 
 **Acceptance Criteria:**
-- [ ] `POST /api/season-passes/:id/loans/:loanId/qr` generates a signed, one-time QR code
-- [ ] QR code encodes: loanId, matchId, seatId, recipientUserId
-- [ ] QR code expires after the match start time
-- [ ] Generating a new QR for the same loan invalidates the previous one
-- [ ] QR code is returned as base64 PNG
+- [x] `POST /api/season-passes/:id/loans/:loanId/qr` generates a signed, one-time QR code
+- [x] QR code encodes: loanId, matchId, seatId, recipientUserId
+- [x] QR code expires after the match start time
+- [x] Generating a new QR for the same loan invalidates the previous one
+- [x] QR code is returned as base64 PNG
 
 **Story Points:** 3
 **Priority:** 🟠 High
@@ -1012,16 +1012,16 @@
 
 ---
 
-### KTE-051 – Loan Initiation UI
+### KTE-051 – Loan Initiation UI ✅ DONE
 
 **User Story:** As a season pass holder, I want a UI to select a match and recipient for my pass loan, so that I can easily delegate my seat without leaving the app.
 
 **Acceptance Criteria:**
-- [ ] Pass loan flow accessible from the profile page (active passes section)
-- [ ] Step 1: Select match from a dropdown of upcoming matches
-- [ ] Step 2: Enter recipient's registered email address
-- [ ] Step 3: Review and confirm loan
-- [ ] Confirmation shows the generated QR code for the pass holder to share
+- [x] Pass loan flow accessible from the profile page (active passes section)
+- [x] Step 1: Select match from a dropdown of upcoming matches
+- [x] Step 2: Enter recipient's registered email address
+- [x] Step 3: Review and confirm loan
+- [x] Confirmation shows the generated QR code for the pass holder to share
 
 **Story Points:** 3
 **Priority:** 🟠 High
@@ -1030,15 +1030,15 @@
 
 ---
 
-### KTE-052 – Loan Email Notifications
+### KTE-052 – Loan Email Notifications ✅ DONE
 
 **User Story:** As both the lender and the recipient of a pass loan, I want to receive email notifications, so that we are both informed about the loan status.
 
 **Acceptance Criteria:**
-- [ ] Lender receives email: "You have loaned your pass for [Match] to [RecipientName]"
-- [ ] Recipient receives email: "You have received a pass loan for [Match]" with QR code attached
-- [ ] Both emails sent within 60 seconds of loan confirmation
-- [ ] Email uses Nodemailer (same `EmailService` as tickets)
+- [x] Lender receives email: "You have loaned your pass for [Match] to [RecipientName]"
+- [x] Recipient receives email: "You have received a pass loan for [Match]" with QR code attached
+- [x] Both emails sent within 60 seconds of loan confirmation
+- [x] Email uses Nodemailer (same `EmailService` as tickets)
 
 **Story Points:** 2
 **Priority:** 🟠 High
@@ -1047,15 +1047,15 @@
 
 ---
 
-### KTE-053 – Automatic Loan Release After Match
+### KTE-053 – Automatic Loan Release After Match ✅ DONE
 
 **User Story:** As a developer, I want loan records automatically closed after a match ends, so that the season pass reverts to the holder without manual action.
 
 **Acceptance Criteria:**
-- [ ] Cron job runs every hour and sets `PassLoan.status = completed` for loans where the match has ended
-- [ ] `SeasonPass` status returns to `active` after loan completion
-- [ ] Loyalty points (+25) awarded to lender upon loan completion
-- [ ] Job is idempotent and logged
+- [x] Cron job runs every hour and sets `PassLoan.status = completed` for loans where the match has ended
+- [x] `SeasonPass` status returns to `active` after loan completion
+- [x] Loyalty points (+25) awarded to lender upon loan completion
+- [x] Job is idempotent and logged
 
 **Story Points:** 2
 **Priority:** 🟡 Medium
@@ -1064,15 +1064,15 @@
 
 ---
 
-### KTE-054 – Loan Cancellation Flow
+### KTE-054 – Loan Cancellation Flow ✅ DONE
 
 **User Story:** As a season pass holder, I want to cancel an active loan before the match, so that I can reclaim my seat if my plans change.
 
 **Acceptance Criteria:**
-- [ ] `DELETE /api/season-passes/:id/loans/:loanId` cancels a pending or active loan
-- [ ] Cancellation only allowed before match kickoff
-- [ ] Recipient is notified by email of the cancellation
-- [ ] Loan status set to `cancelled` and loyalty points for the loan are reversed
+- [x] `DELETE /api/season-passes/:id/loans/:loanId` cancels a pending or active loan
+- [x] Cancellation only allowed before match kickoff
+- [x] Recipient is notified by email of the cancellation
+- [x] Loan status set to `cancelled` and loyalty points for the loan are reversed
 
 **Story Points:** 2
 **Priority:** 🟡 Medium
@@ -1323,9 +1323,9 @@
 | E4 – Cart & Reservation | 5 | 5 | 100% |
 | E5 – Auth & Profile | 7 | 7 | 100% |
 | E6 – Checkout & Payment | 6 | 6 | 100% |
-| E7 – E-ticket & Email | 5 | 0 | 0% |
-| E8 – Loyalty System | 6 | 0 | 0% |
-| E9 – Season Pass Loan | 6 | 0 | 0% |
+| E7 – E-ticket & Email | 5 | 5 | 100% |
+| E8 – Loyalty System | 6 | 6 | 100% |
+| E9 – Season Pass Loan | 6 | 6 | 100% |
 | E10 – Advanced Features | 9 | 0 | 0% |
 | Post-POC | 5 | 0 | 0% |
-| **TOTAL** | **68** | **37** | **54%** |
+| **TOTAL** | **68** | **54** | **79%** |
