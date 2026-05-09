@@ -232,7 +232,7 @@ interface CartRow extends CartItem {
     `,
   ],
 })
-export class CartPage {
+export class CartPageComponent {
   private readonly cart = inject(CartFacade);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);

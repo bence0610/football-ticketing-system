@@ -171,7 +171,7 @@ interface ConfirmationState {
     `,
   ],
 })
-export class ConfirmationPage implements OnInit {
+export class ConfirmationPageComponent implements OnInit {
   private readonly router = inject(Router);
 
   protected readonly state = signal<ConfirmationState | null>(null);

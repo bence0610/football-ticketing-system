@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import {
-  AfterViewChecked,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -249,7 +248,7 @@ import { ChatbotStore } from './state/chatbot.signals';
     `,
   ],
 })
-export class ChatbotPanelComponent implements AfterViewChecked {
+export class ChatbotPanelComponent {
   protected readonly store = inject(ChatbotStore);
 
   @Output() readonly closed = new EventEmitter<void>();
@@ -268,11 +267,6 @@ export class ChatbotPanelComponent implements AfterViewChecked {
       this.store.typing();
       queueMicrotask(() => this.scrollToBottom());
     });
-  }
-
-  ngAfterViewChecked(): void {
-    // No-op here; effect handles scroll. The lifecycle hook is kept
-    // for cases where Angular pre-renders before the effect fires.
   }
 
   protected useSuggestion(text: string): void {

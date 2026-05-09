@@ -1,10 +1,10 @@
 import { Routes } from '@angular/router';
-import { AdminPage } from './admin.page';
+import { AdminPageComponent } from './admin.page';
 
 export const ADMIN_ROUTES: Routes = [
   {
     path: '',
-    component: AdminPage,
+    component: AdminPageComponent,
     children: [
       {
         path: '',
@@ -14,13 +14,13 @@ export const ADMIN_ROUTES: Routes = [
       {
         path: 'revenue',
         loadComponent: () =>
-          import('./revenue/revenue-stats.page').then((m) => m.RevenueStatsPage),
+          import('./revenue/revenue-stats.page').then((m) => m.RevenueStatsPageComponent),
         title: 'Admin - Bevételi statisztikák',
       },
       {
         path: 'heatmap',
         loadComponent: () =>
-          import('./heatmap/seat-heatmap.page').then((m) => m.SeatHeatmapPage),
+          import('./heatmap/seat-heatmap.page').then((m) => m.SeatHeatmapPageComponent),
         title: 'Admin - Foglaltsági heatmap',
       },
     ],

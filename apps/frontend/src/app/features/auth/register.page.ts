@@ -208,7 +208,7 @@ const passwordMatchValidator = (group: AbstractControl): ValidationErrors | null
     `,
   ],
 })
-export class RegisterPage {
+export class RegisterPageComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);

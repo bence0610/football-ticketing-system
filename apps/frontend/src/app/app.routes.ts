@@ -24,35 +24,35 @@ export const APP_ROUTES: Routes = [
       {
         path: 'cart',
         loadComponent: () =>
-          import('./features/cart/cart.page').then((m) => m.CartPage),
+          import('./features/cart/cart.page').then((m) => m.CartPageComponent),
         title: 'Kosár',
       },
       {
         path: 'checkout',
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./features/checkout/checkout.page').then((m) => m.CheckoutPage),
+          import('./features/checkout/checkout.page').then((m) => m.CheckoutPageComponent),
         title: 'Fizetés',
       },
       {
         path: 'checkout/confirmation',
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./features/checkout/confirmation.page').then((m) => m.ConfirmationPage),
+          import('./features/checkout/confirmation.page').then((m) => m.ConfirmationPageComponent),
         title: 'Rendelés visszaigazolva',
       },
       {
         path: 'login',
         canActivate: [guestGuard],
         loadComponent: () =>
-          import('./features/auth/login.page').then((m) => m.LoginPage),
+          import('./features/auth/login.page').then((m) => m.LoginPageComponent),
         title: 'Bejelentkezés',
       },
       {
         path: 'register',
         canActivate: [guestGuard],
         loadComponent: () =>
-          import('./features/auth/register.page').then((m) => m.RegisterPage),
+          import('./features/auth/register.page').then((m) => m.RegisterPageComponent),
         title: 'Regisztráció',
       },
       {

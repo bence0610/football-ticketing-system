@@ -151,7 +151,7 @@ const REFRESH_MS = 60_000;
     `,
   ],
 })
-export class SeatHeatmapPage implements OnInit, OnDestroy {
+export class SeatHeatmapPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(AdminApiService);
   private readonly matchesApi = inject(MatchesApiService);
   private readonly destroyRef = inject(DestroyRef);

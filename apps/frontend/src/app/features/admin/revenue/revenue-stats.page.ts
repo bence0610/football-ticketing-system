@@ -137,7 +137,7 @@ import { RevenueSummaryCardComponent } from '../components/revenue-summary-card.
     `,
   ],
 })
-export class RevenueStatsPage implements OnInit {
+export class RevenueStatsPageComponent implements OnInit {
   private readonly api = inject(AdminApiService);
 
   protected readonly loading = signal(true);

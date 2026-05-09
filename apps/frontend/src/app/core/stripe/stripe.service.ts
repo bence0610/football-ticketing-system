@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Stripe, StripeElements, loadStripe } from '@stripe/stripe-js';
 import { environment } from '../../../environments/environment';
 

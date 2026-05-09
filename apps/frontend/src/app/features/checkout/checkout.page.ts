@@ -302,7 +302,7 @@ const MAX_RETRY_ATTEMPTS = 3;
     `,
   ],
 })
-export class CheckoutPage implements OnInit, AfterViewInit, OnDestroy {
+export class CheckoutPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly cart = inject(CartFacade);
   protected readonly auth = inject(AuthService);
   private readonly paymentsApi = inject(PaymentsApiService);

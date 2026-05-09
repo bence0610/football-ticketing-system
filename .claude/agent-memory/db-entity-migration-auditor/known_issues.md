@@ -1,21 +1,30 @@
 ---
-name: Known Issues — 2026-05-09 Audit (Final Re-audit)
-description: All 7 previously reported issues are resolved; one cosmetic comment mislabel remains (no SQL impact)
+name: Known Issues — 2026-05-09 Audit (Post-migration-run)
+description: All schema discrepancies resolved; all 4 migrations applied to the database; schema is fully in sync.
 type: project
 ---
 
-## Status: CLEAN — Final audit 2026-05-09 PASS
+## Status: CLEAN — 2026-05-09 PASS (all migrations applied)
 
-### All Issues Resolved
+### Root Cause of `profile_completed_at` Error
+The column was NOT missing from any migration file. `1714400000000-Iteration4Schema.ts` correctly
+defines it. The database had only had `InitialSchema1714050000000` applied (1 of 4 migrations).
+Running `npm run migration:run` from `apps/backend` applied the 3 pending migrations.
 
-- W1: `IDX_users_email_unique` orphaned index — FIXED by FixSchemaDiscrepancies migration `up()` DROP INDEX
-- W2: `IDX_tickets_qr` orphaned named index — FIXED: `@Index('IDX_tickets_qr', ['qrCode'], { unique: true })` on ticket.entity.ts; inline `unique: true` removed from `qr_code` column
-- W3: `IDX_season_passes_qr` orphaned named index — FIXED: `@Index('IDX_season_passes_qr', ['qrCode'], { unique: true })` on season-pass.entity.ts; inline `unique: true` removed from `qr_code` column
-- W4: `pass_loans.qr_jti` missing `unique: true` in entity — FIXED: `unique: true` added to `@Column` in pass-loan.entity.ts line 50
-- I1/W8: `tickets.scanned_by_user_id` missing FK — FIXED: `fk_tickets_scanned_by` added in FixSchemaDiscrepancies; `@ManyToOne` + `@JoinColumn` added to ticket.entity.ts
-- NEW-1: `ticket.entity.ts` `qr_jti` had inline `unique: true` duplicating migration unique index — FIXED: removed inline `unique: true` from `@Column` at line 58
-- NEW-2: `user.entity.ts` `email` had inline `unique: true` duplicating class-level `@Index` — FIXED: removed inline `unique: true` from `@Column` at line 24
+### All Migrations Now Applied (database state as of 2026-05-09)
+1. `InitialSchema1714050000000` — baseline schema (was already applied)
+2. `Iteration4Schema1714400000000` — profile_completed_at, tickets expansion, loyalty_transactions expansion, pass_loans expansion
+3. `FixSchemaDiscrepancies1714500000000` — drops IDX_users_email_unique, adds fk_tickets_scanned_by
+4. `Iteration5Schema1714600000000` — waitlist composite indexes
 
-### Remaining (Non-SQL, Informational Only)
+### Previously Resolved Code-Level Issues (still valid)
+- W1: IDX_users_email_unique orphaned index — handled in migration 3 above
+- W2: IDX_tickets_qr orphaned named index — FIXED in entity
+- W3: IDX_season_passes_qr orphaned named index — FIXED in entity
+- W4: pass_loans.qr_jti missing unique: true — FIXED in entity (class-level @Index)
+- I1/W8: tickets.scanned_by_user_id missing FK — FIXED in migration 3 above
+- NEW-1: ticket.entity.ts qr_jti inline unique: true removed
+- NEW-2: user.entity.ts email inline unique: true removed
 
-- NEW-3: `1714500000000-FixSchemaDiscrepancies.ts` JSDoc comment labels the FK fix as "I1" but the original audit classified the missing FK as "W8". Comment-only cosmetic issue, no SQL impact. Not worth a migration change.
+### Remaining Non-SQL Informational
+- FixSchemaDiscrepancies JSDoc labels the FK fix as "I1" but original audit called it "W8". Cosmetic only.

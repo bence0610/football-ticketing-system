@@ -152,7 +152,7 @@ import { AuthService } from '../../core/auth/auth.service';
     `,
   ],
 })
-export class LoginPage {
+export class LoginPageComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
