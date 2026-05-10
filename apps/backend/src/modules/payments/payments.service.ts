@@ -12,8 +12,10 @@ import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import Stripe from 'stripe';
 import { DataSource, In, Repository } from 'typeorm';
-import { StripeConfig } from '../../config';
+import { LoyaltyConfig, StripeConfig } from '../../config';
 import {
+  LoyaltyTransactionSource,
+  LoyaltyTransactionType,
   Match,
   Seat,
   Ticket,
@@ -22,6 +24,8 @@ import {
 } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { SeatLockService } from '../../redis/seat-lock.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
+import { QrService } from '../qr/qr.service';
 import {
   CreatePaymentIntentDto,
   PaymentIntentResponseDto,
@@ -41,6 +45,7 @@ export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
   private readonly currency: string;
   private readonly webhookSecret: string;
+  private readonly loyaltyConfig: LoyaltyConfig;
 
   constructor(
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe,
@@ -50,11 +55,14 @@ export class PaymentsService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly seatLockService: SeatLockService,
     private readonly dataSource: DataSource,
+    private readonly loyaltyService: LoyaltyService,
+    private readonly qrService: QrService,
     configService: ConfigService,
   ) {
     const stripeConfig = configService.getOrThrow<StripeConfig>('stripe');
     this.currency = stripeConfig.currency;
     this.webhookSecret = stripeConfig.webhookSecret;
+    this.loyaltyConfig = configService.getOrThrow<LoyaltyConfig>('loyalty');
   }
 
   async createPaymentIntent(
@@ -156,20 +164,71 @@ export class PaymentsService {
   }
 
   /**
-   * Idempotently turn a successful PaymentIntent into Ticket rows and release
-   * the corresponding Redis locks.
+   * Idempotently turn a successful PaymentIntent into Ticket rows, award
+   * loyalty points, and release the corresponding Redis locks.
+   *
+   * Each created ticket is given a freshly generated `qrJti` so it satisfies
+   * the NOT NULL constraint on `tickets.qr_jti` and so QR generation works
+   * out-of-the-box from the user's profile page.
+   *
+   * Loyalty points are awarded after the transaction commits to keep the
+   * award idempotent through the LoyaltyService's `(source, referenceId)`
+   * uniqueness — repeat webhook deliveries for the same PaymentIntent are
+   * safe.
    */
   private async handlePaymentSuccess(intent: Stripe.PaymentIntent): Promise<void> {
-    const userId = intent.metadata.userId;
-    const matchId = intent.metadata.matchId;
-    const seatIds = (intent.metadata.seatIds ?? '').split(',').filter(Boolean);
-    const ownerTokens = (intent.metadata.ownerTokens ?? '').split(',').filter(Boolean);
+    await this.finalizePaymentIntent(intent);
+  }
 
-    if (!userId || !matchId || seatIds.length === 0) {
-      this.logger.error(
-        `payment_intent.succeeded missing metadata: ${JSON.stringify(intent.metadata)}`,
+  /**
+   * Frontend-driven counterpart to the Stripe webhook for {@code payment_intent.succeeded}.
+   *
+   * Called by the checkout page immediately after `stripe.confirmPayment()`
+   * resolves with `paymentIntent.status === 'succeeded'`. In development the
+   * Stripe CLI listener can be flaky, so relying solely on the webhook leaves
+   * the user staring at an empty profile. This endpoint authoritatively
+   * retrieves the PaymentIntent server-side to verify it really succeeded
+   * (the client cannot fabricate a `succeeded` status), then runs the same
+   * idempotent finalization logic as the webhook.
+   *
+   * Idempotency: if tickets already exist for this PaymentIntent (e.g. the
+   * webhook beat us to it), no duplicates are created — the existing rows
+   * are returned and `alreadyProcessed` is set to true.
+   *
+   * The webhook handler still works as a fallback / source of truth.
+   */
+  async confirmPaymentAndCreateTicket(
+    paymentIntentId: string,
+    userId: string,
+  ): Promise<{ alreadyProcessed: boolean; ticketIds: string[] }> {
+    if (!paymentIntentId) {
+      throw new BadRequestException('Hiányzó paymentIntentId.');
+    }
+
+    let intent: Stripe.PaymentIntent;
+    try {
+      intent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown error';
+      this.logger.warn(`Stripe paymentIntents.retrieve failed for ${paymentIntentId}: ${message}`);
+      throw new BadRequestException(`A fizetési szándék nem található: ${message}`);
+    }
+
+    if (intent.status !== 'succeeded') {
+      this.logger.warn(
+        `confirmPaymentAndCreateTicket called for ${paymentIntentId} with status=${intent.status}`,
       );
-      return;
+      throw new BadRequestException(
+        `A fizetés még nem sikerült (státusz: ${intent.status}).`,
+      );
+    }
+
+    const intentUserId = intent.metadata.userId;
+    if (intentUserId && intentUserId !== userId) {
+      this.logger.warn(
+        `User ${userId} attempted to confirm payment ${paymentIntentId} owned by ${intentUserId}.`,
+      );
+      throw new BadRequestException('A fizetés nem ehhez a felhasználóhoz tartozik.');
     }
 
     const existing = await this.ticketRepository.find({
@@ -177,61 +236,145 @@ export class PaymentsService {
       select: ['id'],
     });
     if (existing.length > 0) {
-      this.logger.log(`PaymentIntent ${intent.id} already produced tickets — skipping.`);
-      return;
+      this.logger.log(
+        `confirmPaymentAndCreateTicket: ${paymentIntentId} already processed (${existing.length} ticket(s)).`,
+      );
+      return { alreadyProcessed: true, ticketIds: existing.map((t) => t.id) };
     }
 
-    const match = await this.matchRepository.findOne({ where: { id: matchId } });
-    if (!match) {
-      this.logger.error(`PaymentIntent ${intent.id} references missing match ${matchId}`);
-      return;
+    const created = await this.finalizePaymentIntent(intent);
+    return { alreadyProcessed: false, ticketIds: created.map((t) => t.id) };
+  }
+
+  /**
+   * Shared finalization path used by both the Stripe webhook
+   * ({@link handlePaymentSuccess}) and the frontend-driven confirm endpoint
+   * ({@link confirmPaymentAndCreateTicket}). Whichever path arrives first
+   * persists the tickets; the other path observes the existing rows and
+   * runs only the idempotent post-steps (lock release, loyalty award).
+   */
+  private async finalizePaymentIntent(intent: Stripe.PaymentIntent): Promise<Ticket[]> {
+    const userId = intent.metadata.userId;
+    const matchId = intent.metadata.matchId;
+    const seatIds = (intent.metadata.seatIds ?? '').split(',').filter(Boolean);
+    const ownerTokens = (intent.metadata.ownerTokens ?? '').split(',').filter(Boolean);
+
+    if (!userId || !matchId || seatIds.length === 0) {
+      this.logger.error(
+        `PaymentIntent ${intent.id} missing metadata: ${JSON.stringify(intent.metadata)}`,
+      );
+      return [];
     }
 
-    const seats = await this.seatRepository.find({ where: { id: In(seatIds) } });
-    const seatById = new Map(seats.map((s) => [s.id, s]));
-    const basePrice = Number(match.basePrice);
-
-    await this.dataSource.transaction(async (em) => {
-      for (const seatId of seatIds) {
-        const seat = seatById.get(seatId);
-        if (!seat) {
-          this.logger.error(`Seat ${seatId} missing while finalizing payment ${intent.id}`);
-          continue;
-        }
-        const price = Math.round(basePrice * Number(seat.priceModifier));
-        const ticket = em.create(Ticket, {
-          matchId,
-          seatId,
-          userId,
-          status: TicketStatus.PAID,
-          source: TicketSource.SINGLE,
-          pricePaid: price.toFixed(2),
-          currency: 'HUF',
-          qrCode: `KTE-${randomUUID()}`,
-          stripePaymentIntentId: intent.id,
-        });
-        await em.save(Ticket, ticket);
-      }
+    const existing = await this.ticketRepository.find({
+      where: { stripePaymentIntentId: intent.id },
+      select: ['id', 'userId'],
     });
+    let createdTickets: Ticket[];
+    if (existing.length > 0) {
+      this.logger.log(
+        `PaymentIntent ${intent.id} already produced tickets — running idempotent post-steps.`,
+      );
+      createdTickets = await this.ticketRepository.find({
+        where: { stripePaymentIntentId: intent.id },
+      });
+    } else {
+      const match = await this.matchRepository.findOne({ where: { id: matchId } });
+      if (!match) {
+        this.logger.error(`PaymentIntent ${intent.id} references missing match ${matchId}`);
+        return [];
+      }
 
-    // Release any seat lock the buyer owned.
+      const seats = await this.seatRepository.find({ where: { id: In(seatIds) } });
+      const seatById = new Map(seats.map((s) => [s.id, s]));
+      const basePrice = Number(match.basePrice);
+
+      createdTickets = await this.dataSource.transaction(async (em) => {
+        const persisted: Ticket[] = [];
+        for (const seatId of seatIds) {
+          const seat = seatById.get(seatId);
+          if (!seat) {
+            this.logger.error(`Seat ${seatId} missing while finalizing payment ${intent.id}`);
+            continue;
+          }
+          const price = Math.round(basePrice * Number(seat.priceModifier));
+          const ticket = em.create(Ticket, {
+            matchId,
+            seatId,
+            userId,
+            status: TicketStatus.PAID,
+            source: TicketSource.SINGLE,
+            pricePaid: price.toFixed(2),
+            currency: 'HUF',
+            qrCode: `KTE-${randomUUID()}`,
+            qrJti: this.qrService.generateJti(),
+            stripePaymentIntentId: intent.id,
+          });
+          const saved = await em.save(Ticket, ticket);
+          persisted.push(saved);
+        }
+        return persisted;
+      });
+    }
+
+    // Release any seat lock the buyer owned. Run regardless of whether the
+    // tickets were just created or already existed — repeat webhook deliveries
+    // must still cleanly release stale locks.
     await Promise.all(
       seatIds.map((seatId, idx) => {
         const ownerToken = ownerTokens[idx];
         if (!ownerToken) {
           return Promise.resolve(false);
         }
-        return this.seatLockService.release(matchId, seatId, ownerToken);
+        return this.seatLockService
+          .release(matchId, seatId, ownerToken)
+          .catch((error: unknown) => {
+            this.logger.warn(
+              `Seat lock release failed match=${matchId} seat=${seatId}: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+            return false;
+          });
       }),
     );
 
-    if (userId) {
+    try {
       await this.redis.del(RedisKeys.seatLockOwner(matchId, userId));
+    } catch (error) {
+      this.logger.warn(
+        `Failed to clear seat-lock-owner hash user=${userId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    // Award loyalty points (one EARN transaction per ticket). The service is
+    // idempotent through `(source, referenceId)`, so retried Stripe webhook
+    // deliveries do not double-credit the user.
+    for (const ticket of createdTickets) {
+      try {
+        await this.loyaltyService.award({
+          userId: ticket.userId,
+          type: LoyaltyTransactionType.EARN,
+          source: LoyaltyTransactionSource.TICKET_PURCHASE,
+          points: this.loyaltyConfig.ticketPointsPerTicket,
+          referenceId: `ticket:${ticket.id}`,
+          description: 'Jegyvásárlás bónusz',
+        });
+      } catch (error) {
+        this.logger.error(
+          `Loyalty award failed for ticket=${ticket.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
     }
 
     this.logger.log(
-      `Finalized payment ${intent.id}: created ${seatIds.length} ticket(s) for user ${userId}.`,
+      `Finalized payment ${intent.id}: ${createdTickets.length} ticket(s) PAID for user ${userId}, loyalty awarded.`,
     );
+    return createdTickets;
   }
 
   private async handlePaymentFailed(intent: Stripe.PaymentIntent): Promise<void> {

@@ -17,12 +17,14 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
+import { Store } from '@ngrx/store';
 import type { Stripe, StripeElements, StripePaymentElement } from '@stripe/stripe-js';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartFacade } from '../../core/cart/cart.facade';
 import { LoyaltyService } from '../../core/services/loyalty.service';
 import { StripeService } from '../../core/stripe/stripe.service';
+import { SeatsActions } from '../../state/seats';
 import {
   MatchWeatherForecast,
   PaymentIntentResponse,
@@ -311,6 +313,7 @@ export class CheckoutPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly stripeService = inject(StripeService);
   private readonly loyaltyService = inject(LoyaltyService);
   private readonly router = inject(Router);
+  private readonly store = inject(Store);
 
   protected readonly intent = signal<PaymentIntentResponse | null>(null);
   protected readonly weather = signal<MatchWeatherForecast | null>(null);
@@ -481,13 +484,35 @@ export class CheckoutPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       if (paymentIntent?.status === 'succeeded') {
-        const seats = this.cart.items().map((item) => ({
+        const items = this.cart.items();
+        const seats = items.map((item) => ({
           section: item.section,
           row: item.row,
           seatNumber: item.seatNumber,
           price: item.price,
         }));
         const totalPaid = this.cart.total();
+        // Frontend-driven fallback for the Stripe webhook: in development the
+        // CLI listener is sometimes delayed or missed entirely, leaving the
+        // user with no ticket. Hit /payments/confirm directly so the backend
+        // retrieves the PaymentIntent server-side and creates the Ticket rows.
+        // The endpoint is idempotent — if the webhook beat us to it, no
+        // duplicates are produced.
+        try {
+          await firstValueFrom(this.paymentsApi.confirmPayment(paymentIntent.id));
+        } catch (error) {
+          // Don't block the user on the redirect: the webhook is still likely
+          // to fire shortly. Surface the error so support can investigate, but
+          // continue navigation — the confirmation page polls /tickets/me.
+          console.error('[Checkout] /payments/confirm failed:', error);
+        }
+        // Refresh the seats slice so the stadium map shows the just-paid seats
+        // as SOLD on the next visit instead of the stale "locked" status carried
+        // over from the user's own seat-lock.
+        const matchId = items[0]?.matchId;
+        if (matchId) {
+          this.store.dispatch(SeatsActions.loadSeatsForMatch({ matchId }));
+        }
         this.cart.clearLocalOnly();
         void this.router.navigate(['/checkout/confirmation'], {
           state: {

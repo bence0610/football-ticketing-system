@@ -50,7 +50,10 @@
       "Bash(timeout 20 npx ts-node -r tsconfig-paths/register src/main.ts)",
       "Read(//tmp/**)",
       "Bash(taskkill //F //IM node.exe)",
-      "Bash(npx jest *)"
+      "Bash(npx jest *)",
+      "Bash(npx --no-install tsc -p apps/backend/tsconfig.app.json --noEmit)",
+      "Bash(npx --no-install tsc -p tsconfig.json --noEmit)",
+      "Bash(npx --no-install tsc -p tsconfig.app.json --noEmit)"
     ]
   }
 }

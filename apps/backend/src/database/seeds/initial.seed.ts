@@ -127,9 +127,8 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
   });
   if (!existingMatch) {
     const totalCapacity = await seatRepo.count({ where: { isActive: true } });
-    const kickoff = new Date();
-    kickoff.setDate(kickoff.getDate() + 14);
-    kickoff.setHours(19, 0, 0, 0);
+    // Budapest local time 19:00 on 2026-07-05 (UTC+2 in summer => 17:00 UTC)
+    const kickoff = new Date('2026-07-05T17:00:00.000Z');
 
     const match = matchRepo.create({
       id: randomUUID(),

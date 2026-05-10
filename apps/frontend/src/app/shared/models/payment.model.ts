@@ -19,6 +19,13 @@ export interface CreatePaymentIntentRequest {
   readonly seats: readonly { seatId: string; ownerToken: string }[];
 }
 
+export interface ConfirmPaymentResponse {
+  /** True if the Stripe webhook already finalized this PaymentIntent. */
+  readonly alreadyProcessed: boolean;
+  /** Ticket ids belonging to the PaymentIntent (existing or freshly created). */
+  readonly ticketIds: readonly string[];
+}
+
 export interface MatchWeatherForecast {
   readonly matchId: string;
   readonly city: string;
