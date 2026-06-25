@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -344,7 +343,7 @@ const MAX_RETRY_ATTEMPTS = 3;
     `,
   ],
 })
-export class SeasonPassPageComponent implements OnInit, AfterViewInit, OnDestroy {
+export class SeasonPassPageComponent implements OnInit, OnDestroy {
   protected readonly auth = inject(AuthService);
   private readonly seasonPassApi = inject(SeasonPassesService);
   private readonly stripeService = inject(StripeService);
@@ -387,10 +386,6 @@ export class SeasonPassPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   ngOnInit(): void {
     this.loadPrices();
-  }
-
-  ngAfterViewInit(): void {
-    // Payment element is mounted once a section is selected.
   }
 
   ngOnDestroy(): void {
