@@ -10,7 +10,7 @@
     "install:all": "npm install && npm install --workspace=apps/backend && npm install --workspace=apps/frontend",
     "start:backend": "npm exec --workspace=apps/backend -- ts-node -r tsconfig-paths/register src/main.ts",
     "start:frontend": "npm run start --workspace=apps/frontend",
-    "start:all": "concurrently -n backend,frontend,stripe -c blue,green,yellow \"npm:start:backend\" \"npm:start:frontend\" \"cd C:/Users/User/Downloads/stripe_1.40.9_windows_x86_64 && ./stripe.exe listen --forward-to localhost:3000/api/webhooks/stripe\"",
+    "start:all": "concurrently -n backend,frontend,stripe -c blue,green,yellow \"npm:start:backend\" \"npm:start:frontend\" \"cd C:/stripe && ./stripe.exe listen --forward-to localhost:3000/api/webhooks/stripe\"",
     "build:backend": "npm run build --workspace=apps/backend",
     "build:frontend": "npm run build --workspace=apps/frontend",
     "build:all": "npm run build:backend && npm run build:frontend",

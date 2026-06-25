@@ -46,7 +46,7 @@ export class SeasonPassResponseDto {
   @ApiProperty({ enum: SeasonPassStatus })
   status!: SeasonPassStatus;
 
-  @ApiProperty({ example: '2025/26' })
+  @ApiProperty({ example: '2026/2027' })
   seasonLabel!: string;
 
   @ApiProperty({ type: String })
@@ -57,6 +57,24 @@ export class SeasonPassResponseDto {
 
   @ApiProperty({ required: false })
   seatLabel?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'A szektor azonosítója, ha a bérlethez konkrét szék tartozik.',
+  })
+  section?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'A bérlet vásárlásának dátuma (createdAt).',
+  })
+  purchasedAt!: string;
+
+  @ApiProperty({ required: false, description: 'Fizetett ár forintban.' })
+  pricePaid?: string;
+
+  @ApiProperty({ required: false, default: 'HUF' })
+  currency?: string;
 
   @ApiProperty({ type: () => [PassLoanResponseDto] })
   loans!: PassLoanResponseDto[];

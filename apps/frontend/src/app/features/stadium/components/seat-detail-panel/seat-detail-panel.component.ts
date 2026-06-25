@@ -317,6 +317,8 @@ export class SeatDetailPanelComponent {
         return 'Foglalva';
       case 'sold':
         return 'Elkelt';
+      case 'season_pass':
+        return 'Bérletes';
       case 'disabled':
         return 'Inaktív';
       default:

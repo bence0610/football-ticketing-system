@@ -69,6 +69,22 @@ export const APP_ROUTES: Routes = [
         title: 'Hűség Dashboard',
       },
       {
+        path: 'season-pass',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./features/season-pass/season-pass.page').then((m) => m.SeasonPassPageComponent),
+        title: 'Bérlet vásárlás',
+      },
+      {
+        path: 'season-pass/confirmation',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/season-pass/confirmation.page').then(
+            (m) => m.SeasonPassConfirmationPageComponent,
+          ),
+        title: 'Sikeres bérletvásárlás',
+      },
+      {
         path: 'admin',
         canActivate: [adminGuard],
         loadChildren: () =>

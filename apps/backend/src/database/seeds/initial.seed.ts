@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { Match, MatchStatus, Competition } from '../entities/match.entity';
 import { Seat, SeatCategory } from '../entities/seat.entity';
+import { SeasonPassPrice } from '../entities/season-pass-price.entity';
 import { User, UserRole, LoyaltyTier } from '../entities/user.entity';
 
 const logger = new Logger('InitialSeed');
@@ -53,6 +54,7 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
   const matchRepo = dataSource.getRepository(Match);
   const seatRepo = dataSource.getRepository(Seat);
   const userRepo = dataSource.getRepository(User);
+  const seasonPassPriceRepo = dataSource.getRepository(SeasonPassPrice);
 
   // 1. Admin user
   const existingAdmin = await userRepo.findOne({ where: { email: 'admin@kte.hu' } });
@@ -121,32 +123,136 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
     logger.log(`Seats already present (${seatCount}), skipping seat seed.`);
   }
 
-  // 4. Demo match
-  const existingMatch = await matchRepo.findOne({
-    where: { homeTeam: 'Kecskeméti TE', awayTeam: 'Ferencvárosi TC' },
+  // 4. Mark past-season matches as FINISHED (idempotent housekeeping).
+  // The previous season's NB1 fixtures (e.g. KTE vs Ferencvárosi TC on 2026-07-05)
+  // are kept for historical reference but moved to FINISHED so they no longer
+  // appear in the on-sale listings.
+  const pastSeasonMatches = await matchRepo.find({
+    where: [{ homeTeam: 'Kecskeméti TE', awayTeam: 'Ferencvárosi TC' }],
   });
-  if (!existingMatch) {
-    const totalCapacity = await seatRepo.count({ where: { isActive: true } });
-    // Budapest local time 19:00 on 2026-07-05 (UTC+2 in summer => 17:00 UTC)
-    const kickoff = new Date('2026-07-05T17:00:00.000Z');
+  for (const past of pastSeasonMatches) {
+    if (past.status !== MatchStatus.FINISHED) {
+      past.status = MatchStatus.FINISHED;
+      await matchRepo.save(past);
+      logger.log(`Marked past-season match as finished: ${past.homeTeam} vs ${past.awayTeam}`);
+    }
+  }
+
+  // 5. Upcoming friendly matches (pre-season July 2026)
+  const totalCapacity = await seatRepo.count({ where: { isActive: true } });
+
+  interface FriendlyBlueprint {
+    homeTeam: string;
+    awayTeam: string;
+    competition: Competition;
+    venue: string;
+    kickoffAt: Date;
+    basePrice: string;
+    description: string;
+  }
+
+  // Budapest local time is CEST (UTC+2) in July => subtract 2 hours for UTC.
+  const upcomingMatches: FriendlyBlueprint[] = [
+    {
+      homeTeam: 'Kecskeméti TE',
+      awayTeam: 'Újpest FC',
+      competition: Competition.FRIENDLY,
+      venue: 'Széktói Stadion, Kecskemét',
+      // 2026-07-12 (Saturday) 18:00 local => 16:00 UTC
+      kickoffAt: new Date('2026-07-12T16:00:00.000Z'),
+      basePrice: '3500.00',
+      description:
+        'Felkészülési mérkőzés. KTE vs Újpest FC — nyári előszezoni teszt a Széktói Stadionban.',
+    },
+    {
+      homeTeam: 'Kecskeméti TE',
+      awayTeam: 'Paksi FC',
+      competition: Competition.FRIENDLY,
+      venue: 'Széktói Stadion, Kecskemét',
+      // 2026-07-26 (Sunday) 17:00 local => 15:00 UTC
+      kickoffAt: new Date('2026-07-26T15:00:00.000Z'),
+      basePrice: '3000.00',
+      description:
+        'Felkészülési mérkőzés. KTE vs Paksi FC — utolsó főpróba a bajnoki rajt előtt.',
+    },
+  ];
+
+  for (const blueprint of upcomingMatches) {
+    const existing = await matchRepo.findOne({
+      where: {
+        homeTeam: blueprint.homeTeam,
+        awayTeam: blueprint.awayTeam,
+        kickoffAt: blueprint.kickoffAt,
+      },
+    });
+    if (existing) {
+      logger.log(
+        `Friendly already present: ${blueprint.homeTeam} vs ${blueprint.awayTeam} at ${blueprint.kickoffAt.toISOString()}, skipping.`,
+      );
+      continue;
+    }
 
     const match = matchRepo.create({
       id: randomUUID(),
-      homeTeam: 'Kecskeméti TE',
-      awayTeam: 'Ferencvárosi TC',
-      competition: Competition.NB1,
-      venue: 'Széktói Stadion, Kecskemét',
-      kickoffAt: kickoff,
+      homeTeam: blueprint.homeTeam,
+      awayTeam: blueprint.awayTeam,
+      competition: blueprint.competition,
+      venue: blueprint.venue,
+      kickoffAt: blueprint.kickoffAt,
       status: MatchStatus.ON_SALE,
       capacity: totalCapacity,
-      basePrice: '4500.00',
-      description:
-        'NB1 hazai mérkőzés. KTE vs Ferencváros — szezon kiemelt találkozója a Széktói Stadionban.',
-      isSeasonPassEligible: true,
+      basePrice: blueprint.basePrice,
+      description: blueprint.description,
+      isSeasonPassEligible: false,
     });
     await matchRepo.save(match);
-    logger.log(`Created seed match: KTE vs FTC at ${kickoff.toISOString()}`);
-  } else {
-    logger.log('Seed match already present, skipping.');
+    logger.log(
+      `Created friendly: ${blueprint.homeTeam} vs ${blueprint.awayTeam} at ${blueprint.kickoffAt.toISOString()}`,
+    );
+  }
+
+  // 6. Season pass prices for 2026/2027 (idempotent per (section, seasonLabel))
+  interface SeasonPassPriceBlueprint {
+    section: string;
+    sectionLabel: string;
+    price: number;
+  }
+
+  const SEASON_LABEL = '2026/2027';
+  const SEASON_VALID_FROM = new Date('2026-07-01T00:00:00.000Z');
+  const SEASON_VALID_UNTIL = new Date('2027-06-30T00:00:00.000Z');
+
+  const seasonPassPriceBlueprints: SeasonPassPriceBlueprint[] = [
+    { section: 'VIP', sectionLabel: 'VIP szektor', price: 45000 },
+    { section: 'A', sectionLabel: 'A szektor', price: 30000 },
+    { section: 'B', sectionLabel: 'B szektor', price: 25000 },
+    { section: 'C', sectionLabel: 'C szektor', price: 20000 },
+  ];
+
+  for (const blueprint of seasonPassPriceBlueprints) {
+    const existing = await seasonPassPriceRepo.findOne({
+      where: { section: blueprint.section, seasonLabel: SEASON_LABEL },
+    });
+    if (existing) {
+      logger.log(
+        `Season pass price already present: ${blueprint.section} ${SEASON_LABEL}, skipping.`,
+      );
+      continue;
+    }
+    const row = seasonPassPriceRepo.create({
+      id: randomUUID(),
+      section: blueprint.section,
+      sectionLabel: blueprint.sectionLabel,
+      seasonLabel: SEASON_LABEL,
+      price: blueprint.price,
+      currency: 'HUF',
+      validFrom: SEASON_VALID_FROM,
+      validUntil: SEASON_VALID_UNTIL,
+      isActive: true,
+    });
+    await seasonPassPriceRepo.save(row);
+    logger.log(
+      `Created season pass price: ${blueprint.section} ${SEASON_LABEL} = ${blueprint.price} HUF`,
+    );
   }
 }

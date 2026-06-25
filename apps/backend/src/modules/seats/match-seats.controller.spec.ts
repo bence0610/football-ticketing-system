@@ -5,7 +5,16 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { MatchSeatsController } from './match-seats.controller';
 import { SeatsService } from './seats.service';
 import { SeatLockService } from '../../redis/seat-lock.service';
-import { Match, MatchStatus, Competition, Seat, SeatCategory, Ticket, TicketStatus } from '../../database/entities';
+import {
+  Competition,
+  Match,
+  MatchStatus,
+  Seat,
+  SeasonPass,
+  SeatCategory,
+  Ticket,
+  TicketStatus,
+} from '../../database/entities';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
 import { ConfigService } from '@nestjs/config';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
@@ -174,6 +183,10 @@ describe('MatchSeatsController – integration', () => {
       find: jest.fn().mockResolvedValue(tickets),
     };
 
+    const seasonPassRepoMock = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
     const redisMock = makeRedisMock(lockedSeatIds);
 
     // Default SeatLockService stub (acquire succeeds, release succeeds)
@@ -199,6 +212,7 @@ describe('MatchSeatsController – integration', () => {
         { provide: getRepositoryToken(Seat), useValue: seatRepoMock },
         { provide: getRepositoryToken(Ticket), useValue: ticketRepoMock },
         { provide: getRepositoryToken(Match), useValue: matchRepoMock },
+        { provide: getRepositoryToken(SeasonPass), useValue: seasonPassRepoMock },
         { provide: REDIS_CLIENT, useValue: redisMock },
         { provide: SeatLockService, useValue: seatLockServiceMock },
         {

@@ -32,16 +32,32 @@ import {
     @if (pass) {
       <mat-card class="pass-card">
         <mat-card-header>
-          <mat-card-title>Bérlet - {{ pass.seasonLabel }}</mat-card-title>
+          <mat-card-title>
+            Bérlet - {{ pass.seasonLabel }}
+            @if (pass.section) {
+              <span class="section-badge">{{ pass.section }} szektor</span>
+            }
+          </mat-card-title>
           <mat-card-subtitle>
             Érvényes: {{ pass.validFrom | date: 'mediumDate' : '' : 'hu' }} -
             {{ pass.validUntil | date: 'mediumDate' : '' : 'hu' }}
           </mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
+          @if (pass.section) {
+            <div class="row">
+              <span class="label">Szektor</span><span>{{ pass.section }}</span>
+            </div>
+          }
           <div class="row" *ngIf="pass.seatLabel">
             <span class="label">Hely</span><span>{{ pass.seatLabel }}</span>
           </div>
+          @if (pass.purchasedAt) {
+            <div class="row">
+              <span class="label">Vásárlás dátuma</span>
+              <span>{{ pass.purchasedAt | date: 'mediumDate' : '' : 'hu' }}</span>
+            </div>
+          }
 
           <h4 class="loan-heading">Kölcsönzések</h4>
           @if (pass.loans.length === 0) {
@@ -99,6 +115,15 @@ import {
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+      }
+      .section-badge {
+        margin-left: 8px;
+        padding: 2px 8px;
+        font-size: 12px;
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
       }
     `,
   ],

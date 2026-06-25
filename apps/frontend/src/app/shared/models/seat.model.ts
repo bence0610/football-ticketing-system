@@ -1,6 +1,6 @@
 export type SeatCategory = 'standard' | 'premium' | 'vip' | 'standing';
 
-export type SeatAvailability = 'available' | 'locked' | 'sold' | 'disabled';
+export type SeatAvailability = 'available' | 'locked' | 'sold' | 'season_pass' | 'disabled';
 
 export interface SeatStatus {
   readonly id: string;

@@ -3,16 +3,27 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Request } from 'express';
 import { SeasonPassesService } from './season-passes.service';
 import { CancelLoanDto, CreateLoanDto } from './dto/create-loan.dto';
+import { PurchaseSeasonPassDto } from './dto/purchase-season-pass.dto';
+import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-response.dto';
+import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
 import {
   PassLoanResponseDto,
   SeasonPassResponseDto,
@@ -53,6 +64,33 @@ function loanToDto(loan: PassLoan): PassLoanResponseDto {
 export class SeasonPassesController {
   constructor(private readonly seasonPassesService: SeasonPassesService) {}
 
+  @Get('prices')
+  @ApiOperation({
+    summary: 'Aktív szezon (2026/2027) bérletárainak listája szektoronként',
+  })
+  @ApiOkResponse({ type: [SeasonPassPriceDto] })
+  async listPrices(): Promise<SeasonPassPriceDto[]> {
+    return this.seasonPassesService.listPrices();
+  }
+
+  @Post('purchase')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Bérlet vásárlása az aktuális szezonra',
+    description:
+      'Stripe PaymentIntent létrehozása + szerveroldali megerősítés a megadott PaymentMethod-dal. Sikeres fizetés esetén SeasonPass jön létre és +500 hűségpont kerül jóváírásra.',
+  })
+  @ApiCreatedResponse({ type: PurchaseSeasonPassResponseDto })
+  async purchase(
+    @Body() body: PurchaseSeasonPassDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<PurchaseSeasonPassResponseDto> {
+    const userId = extractUserId(req);
+    return this.seasonPassesService.purchase(userId, body);
+  }
+
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
@@ -67,8 +105,21 @@ export class SeasonPassesController {
       validFrom: pass.validFrom.toISOString(),
       validUntil: pass.validUntil.toISOString(),
       seatLabel: seat,
+      section: pass.seat?.section,
+      purchasedAt: pass.createdAt.toISOString(),
+      pricePaid: pass.pricePaid,
+      currency: pass.currency,
       loans: loans.map(loanToDto),
     }));
+  }
+
+  @Get('my')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'A bejelentkezett felhasználó bérletei (alias a /me végpontra).' })
+  @ApiOkResponse({ type: [SeasonPassResponseDto] })
+  async listMineAlias(@Req() req: AuthenticatedRequest): Promise<SeasonPassResponseDto[]> {
+    return this.listMine(req);
   }
 
   @Post(':id/loans')

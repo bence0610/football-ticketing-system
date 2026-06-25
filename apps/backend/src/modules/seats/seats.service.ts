@@ -5,6 +5,8 @@ import { In, Repository } from 'typeorm';
 import {
   Match,
   Seat,
+  SeasonPass,
+  SeasonPassStatus,
   Ticket,
   TicketStatus,
 } from '../../database/entities';
@@ -32,6 +34,8 @@ export class SeatsService {
     private readonly ticketRepository: Repository<Ticket>,
     @InjectRepository(Match)
     private readonly matchRepository: Repository<Match>,
+    @InjectRepository(SeasonPass)
+    private readonly seasonPassRepository: Repository<SeasonPass>,
     @Inject(REDIS_CLIENT)
     private readonly redis: Redis,
   ) {}
@@ -72,10 +76,11 @@ export class SeatsService {
     );
 
     const lockedSeatIds = await this.fetchLockedSeatIds(matchId, seats.map((s) => s.id));
+    const seasonPassSeatIds = await this.fetchSeasonPassSeatIds();
 
     const basePrice = Number(match.basePrice);
     const seatStatuses: SeatStatusDto[] = seats.map((seat) =>
-      this.toSeatStatus(seat, basePrice, soldSeatIds, lockedSeatIds),
+      this.toSeatStatus(seat, basePrice, soldSeatIds, lockedSeatIds, seasonPassSeatIds),
     );
 
     const sectorSummary = this.buildSectorSummary(seatStatuses);
@@ -142,17 +147,45 @@ export class SeatsService {
     }
   }
 
+  /**
+   * Fetches the set of seat ids occupied by ACTIVE season passes. These
+   * seats are surfaced on the seat map with a distinct status so the
+   * UI can render them visually different (and disable click-to-buy).
+   * Gracefully degrades to an empty set if the lookup fails.
+   */
+  private async fetchSeasonPassSeatIds(): Promise<Set<string>> {
+    try {
+      const rows = await this.seasonPassRepository.find({
+        where: { status: SeasonPassStatus.ACTIVE },
+        select: ['seatId'],
+      });
+      return new Set(
+        rows
+          .map((r) => r.seatId)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to load season-pass seat ids: ${error instanceof Error ? error.message : error}`,
+      );
+      return new Set<string>();
+    }
+  }
+
   private toSeatStatus(
     seat: Seat,
     basePrice: number,
     soldSeatIds: Set<string>,
     lockedSeatIds: Set<string>,
+    seasonPassSeatIds: Set<string>,
   ): SeatStatusDto {
     let status: SeatAvailability;
     if (!seat.isActive) {
       status = SeatAvailability.DISABLED;
     } else if (soldSeatIds.has(seat.id)) {
       status = SeatAvailability.SOLD;
+    } else if (seasonPassSeatIds.has(seat.id)) {
+      status = SeatAvailability.SEASON_PASS;
     } else if (lockedSeatIds.has(seat.id)) {
       status = SeatAvailability.LOCKED;
     } else {

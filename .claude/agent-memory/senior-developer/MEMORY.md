@@ -5,3 +5,4 @@
 - [Iteration 4 scope](project_iteration_4_tickets_loyalty_loans.md) — Tickets/Loyalty/Pass-Loan (KTE-038..054 except KTE-051)
 - [Two payment flows](project_two_payment_flows.md) — PaymentsModule (active) vs CheckoutModule (legacy); frontend only calls PaymentsModule
 - [Payment webhook dependency](project_payment_webhook_dependency.md) — active flow only creates tickets via /api/payments/webhook; first thing to check on missing-ticket reports
+- [Season pass purchase flow](project_season_pass_purchase_flow.md) — separate Stripe path in SeasonPassesModule, SeasonPassPrice catalogue, seat-map 'season_pass' status

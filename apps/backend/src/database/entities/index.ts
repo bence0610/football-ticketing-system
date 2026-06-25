@@ -4,6 +4,7 @@ export * from './match.entity';
 export * from './seat.entity';
 export * from './ticket.entity';
 export * from './season-pass.entity';
+export * from './season-pass-price.entity';
 export * from './pass-loan.entity';
 export * from './loyalty-transaction.entity';
 export * from './waitlist.entity';

@@ -183,6 +183,21 @@ interface SeatRow {
         --seat-fg: #1f2937;
       }
 
+      .kte-seat--season_pass {
+        --seat-bg: #7e22ce;
+        --seat-fg: #ffffff;
+        background-image: repeating-linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 0.18) 0,
+          rgba(255, 255, 255, 0.18) 3px,
+          transparent 3px,
+          transparent 6px
+        );
+      }
+      .kte-seat--season-pass-taken {
+        /* Alternate class name kept for visual parity with existing CSS naming. */
+      }
+
       .kte-seat--disabled {
         --seat-bg: #ffffff;
         --seat-fg: #9ca3af;
@@ -280,6 +295,7 @@ export class SeatGridComponent implements OnChanges {
   protected seatClasses(seat: SeatStatus): Record<string, boolean> {
     return {
       [`kte-seat--${seat.status}`]: true,
+      'kte-seat--season-pass-taken': seat.status === 'season_pass',
       'kte-seat--accessible': seat.isAccessible,
       'kte-seat--selected': this.selectedSeat?.id === seat.id,
     };
@@ -301,6 +317,7 @@ export class SeatGridComponent implements OnChanges {
       available: 'Szabad',
       locked: 'Foglalás folyamatban',
       sold: 'Elkelt',
+      season_pass: 'Bérletes hely',
       disabled: 'Inaktív',
     };
     return `${seat.row}. sor / ${seat.number}. szék — ${labels[seat.status]}`;

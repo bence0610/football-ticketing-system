@@ -57,6 +57,7 @@ export class AppShellComponent {
   protected readonly navItems = signal<readonly NavItem[]>([
     { label: 'Kezdőlap', route: '/', icon: 'home', exact: true },
     { label: 'Stadion', route: '/stadium', icon: 'stadium' },
+    { label: 'Bérlet vásárlás', route: '/season-pass', icon: 'card_membership' },
     { label: 'Kosár', route: '/cart', icon: 'shopping_cart' },
     { label: 'Hűség', route: '/loyalty', icon: 'star', authOnly: true },
     { label: 'Admin', route: '/admin', icon: 'shield', authOnly: true },

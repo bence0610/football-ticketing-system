@@ -21,6 +21,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
           Elkelt
         </li>
         <li>
+          <span class="kte-legend__swatch kte-legend__swatch--season-pass"></span>
+          Bérletes
+        </li>
+        <li>
           <span class="kte-legend__swatch kte-legend__swatch--disabled"></span>
           Inaktív
         </li>
@@ -85,6 +89,18 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 
       .kte-legend__swatch--sold {
         background: #9ca3af;
+      }
+
+      .kte-legend__swatch--season-pass {
+        background:
+          repeating-linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.6) 0,
+            rgba(255, 255, 255, 0.6) 3px,
+            transparent 3px,
+            transparent 6px
+          ),
+          #7e22ce;
       }
 
       .kte-legend__swatch--disabled {

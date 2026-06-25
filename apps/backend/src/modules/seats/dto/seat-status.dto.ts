@@ -5,6 +5,7 @@ export enum SeatAvailability {
   AVAILABLE = 'available',
   LOCKED = 'locked',
   SOLD = 'sold',
+  SEASON_PASS = 'season_pass',
   DISABLED = 'disabled',
 }
 

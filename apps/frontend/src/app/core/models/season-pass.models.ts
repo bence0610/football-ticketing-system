@@ -30,6 +30,10 @@ export interface SeasonPassResponse {
   validFrom: string;
   validUntil: string;
   seatLabel?: string;
+  section?: string;
+  purchasedAt?: string;
+  pricePaid?: string;
+  currency?: string;
   loans: PassLoanResponse[];
 }
 
@@ -42,3 +46,27 @@ export const PASS_LOAN_STATUS_LABELS: Record<PassLoanStatus, string> = {
   cancelled: 'Visszavont',
   completed: 'Lezárt',
 };
+
+export interface SeasonPassPrice {
+  sectionId: string;
+  sectionName: string;
+  price: number;
+  currency: string;
+  seasonLabel: string;
+}
+
+export interface PurchaseSeasonPassPayload {
+  sectionId: string;
+  paymentMethodId?: string;
+}
+
+export interface PurchaseSeasonPassResponse {
+  paymentIntentId: string;
+  clientSecret: string | null;
+  status: string;
+  seasonPassId: string | null;
+  succeeded: boolean;
+  seasonLabel: string;
+  amount: number;
+  currency: string;
+}

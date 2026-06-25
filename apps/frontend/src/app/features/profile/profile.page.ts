@@ -164,7 +164,7 @@ const WAITLIST_POLL_MS = 5_000;
             }
           </mat-tab>
 
-          <mat-tab label="Bérletek ({{ passes().length }})">
+          <mat-tab label="Bérleteim ({{ passes().length }})">
             @if (loadingPasses()) {
               <div class="kte-profile__loader">
                 <mat-spinner diameter="32" />
