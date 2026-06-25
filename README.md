@@ -1,6 +1,6 @@
-# KTE Jegyportál
+# Football Ticketing System
 
-Hivatalos jegyértékesítési és bérletkezelő platform a Kecskeméti TE számára.
+Full-stack ticketing, season pass and loyalty platform for football clubs.
 
 ## Monorepo struktúra
 
@@ -29,12 +29,34 @@ Hivatalos jegyértékesítési és bérletkezelő platform a Kecskeméti TE szá
 
 ## Előfeltételek
 
-- Node.js >= 20.10
+- Node.js >= 24
 - npm >= 10
 - MySQL 8+ futó instance
 - Redis 7+ futó instance
 
+## Stripe CLI (fizetés teszteléshez)
+
+1. Töltsd le innen: https://github.com/stripe/stripe-cli/releases
+2. Csomagold ki ide: `C:\stripe`
+3. Futtasd: `stripe login`
+4. Futtasd: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
+5. A kapott `whsec_...` kulcsot másold be az `apps/backend/.env` fájlba `STRIPE_WEBHOOK_SECRET` értékeként
+
+## Teszt fizetés
+
+| Mező   | Érték               |
+| ------ | ------------------- |
+| Kártya | 4242 4242 4242 4242 |
+| Lejárat | 12/29              |
+| CVC    | 123                 |
+
 ## Indítás
+
+```powershell
+# Szolgáltatások indítása (admin PowerShell)
+net start mysql80
+net start redis
+```
 
 ```bash
 # Telepítés
@@ -65,7 +87,7 @@ npm run start:all
 | `npm run lint:all`       | ESLint mindkét appra                         |
 | `npm run test:all`       | Unit tesztek mindkét appra                   |
 | `npm run migration:run`  | TypeORM migrációk futtatása                  |
-| `npm run seed`           | Seed adat betöltése (1 mérkőzés + székek)    |
+| `npm run seed`           | Seed adat betöltése (2 mérkőzés + székek + szekciók) |
 
 ## CI
 

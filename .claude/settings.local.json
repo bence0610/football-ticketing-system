@@ -53,7 +53,8 @@
       "Bash(npx jest *)",
       "Bash(npx --no-install tsc -p apps/backend/tsconfig.app.json --noEmit)",
       "Bash(npx --no-install tsc -p tsconfig.json --noEmit)",
-      "Bash(npx --no-install tsc -p tsconfig.app.json --noEmit)"
+      "Bash(npx --no-install tsc -p tsconfig.app.json --noEmit)",
+      "Bash(Test-Path *)"
     ]
   }
 }
