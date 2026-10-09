@@ -58,7 +58,14 @@
       "Bash(rm C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/checkout.controller.ts C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/checkout.service.ts C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/checkout.module.ts C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/stripe-webhook.controller.ts C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/dto/create-payment-intent.dto.ts)",
       "Bash(rmdir C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/dto)",
       "Bash(rmdir C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout)",
-      "Bash(npm test *)"
+      "Bash(npm test *)",
+      "Bash(npx --no-install npm run lint)",
+      "Bash(npx --no-install npm run test -- --testPathPattern=payments.service)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(fuser -k 3000/tcp)",
+      "Bash(curl *)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/health\" -Method Get | ConvertTo-Json)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/health\" -Method Get | ConvertTo-Json -Depth 5)"
     ]
   }
 }

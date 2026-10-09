@@ -22,7 +22,7 @@ import { TicketQrDialogComponent } from './ticket-qr-dialog.component';
         <div class="status" [style.background]="statusColor">{{ statusLabel }}</div>
         <mat-card-header>
           <mat-card-title>{{ ticket.match.homeTeam }} - {{ ticket.match.awayTeam }}</mat-card-title>
-          <mat-card-subtitle>{{ ticket.match.kickoffAt | date: "EEEE, MMMM d, y 'klipp' HH:mm" : '' : 'hu' }}</mat-card-subtitle>
+          <mat-card-subtitle>{{ ticket.match.kickoffAt | date: "EEEE, MMMM d, y 'klipp' HH:mm" : '' : 'hu-HU' }}</mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
           <div class="row"><span class="label">Helyszín</span><span>{{ ticket.match.venue }}</span></div>

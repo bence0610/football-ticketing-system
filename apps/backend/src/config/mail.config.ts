@@ -20,7 +20,11 @@ export default registerAs(
     user: process.env.SMTP_USER ?? '',
     password: process.env.SMTP_PASS ?? '',
     from: process.env.SMTP_FROM ?? 'no-reply@kte.hu',
-    retryDelayMs: parseInt(process.env.EMAIL_RETRY_DELAY_MS ?? '60000', 10),
+    retryDelayMs: parseInt(
+      process.env.EMAIL_RETRY_DELAY_MS ??
+        (process.env.NODE_ENV === 'production' ? '60000' : '3000'),
+      10,
+    ),
     baseUrl: process.env.EMAIL_BASE_URL ?? process.env.FRONTEND_URL ?? 'http://localhost:4200',
   }),
 );

@@ -52,7 +52,7 @@ const STATUS_LABEL: Readonly<Record<WaitlistEntry['status'], string>> = {
           {{ entry.match?.homeTeam }} – {{ entry.match?.awayTeam }}
         </mat-card-title>
         <mat-card-subtitle>
-          {{ entry.match?.kickoffAt | date: "yyyy. MMM d. HH:mm" : '' : 'hu' }}
+          {{ entry.match?.kickoffAt | date: "yyyy. MMM d. HH:mm" : '' : 'hu-HU' }}
           @if (entry.match?.venue) {
             · {{ entry.match?.venue }}
           }

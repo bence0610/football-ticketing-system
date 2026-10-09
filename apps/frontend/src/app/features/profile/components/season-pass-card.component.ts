@@ -39,8 +39,8 @@ import {
             }
           </mat-card-title>
           <mat-card-subtitle>
-            Érvényes: {{ pass.validFrom | date: 'mediumDate' : '' : 'hu' }} -
-            {{ pass.validUntil | date: 'mediumDate' : '' : 'hu' }}
+            Érvényes: {{ pass.validFrom | date: 'mediumDate' : '' : 'hu-HU' }} -
+            {{ pass.validUntil | date: 'mediumDate' : '' : 'hu-HU' }}
           </mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
@@ -55,7 +55,7 @@ import {
           @if (pass.purchasedAt) {
             <div class="row">
               <span class="label">Vásárlás dátuma</span>
-              <span>{{ pass.purchasedAt | date: 'mediumDate' : '' : 'hu' }}</span>
+              <span>{{ pass.purchasedAt | date: 'mediumDate' : '' : 'hu-HU' }}</span>
             </div>
           }
 
@@ -70,7 +70,7 @@ import {
                   <div class="loan-meta">
                     {{ loan.borrowerEmail }}
                     &middot; {{ loanStatusLabel(loan) }}
-                    @if (loan.kickoffAt) { &middot; {{ loan.kickoffAt | date: 'short' : '' : 'hu' }} }
+                    @if (loan.kickoffAt) { &middot; {{ loan.kickoffAt | date: 'short' : '' : 'hu-HU' }} }
                   </div>
                 </div>
                 @if (canCancel(loan)) {

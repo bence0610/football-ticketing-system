@@ -60,7 +60,7 @@ interface CartRow extends CartItem {
               <mat-card-content>
                 <div class="kte-cart__row-info">
                   <strong>{{ row.homeTeam }} – {{ row.awayTeam }}</strong>
-                  <span>{{ row.kickoffAt | date: "yyyy. MMM d. HH:mm" : '' : 'hu' }}</span>
+                  <span>{{ row.kickoffAt | date: "yyyy. MMM d. HH:mm" : '' : 'hu-HU' }}</span>
                 </div>
                 <div class="kte-cart__row-seat">
                   <mat-chip-set>

@@ -26,7 +26,7 @@ import { MatchListItem } from '../../../../shared/models/match.model';
         @for (match of matches; track match.id) {
           <mat-option [value]="match.id">
             {{ match.homeTeam }} – {{ match.awayTeam }}
-            ({{ match.kickoffAt | date: "yyyy. MMM d. HH:mm" : '' : 'hu' }})
+            ({{ match.kickoffAt | date: "yyyy. MMM d. HH:mm" : '' : 'hu-HU' }})
           </mat-option>
         }
       </mat-select>

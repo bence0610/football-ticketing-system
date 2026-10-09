@@ -129,7 +129,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                       {{ option.match.homeTeam }} - {{ option.match.awayTeam }}
                     </div>
                     <div class="loan-dialog__match-meta">
-                      {{ option.match.kickoffAt | date: 'EEEE, MMM d. HH:mm' : '' : 'hu' }}
+                      {{ option.match.kickoffAt | date: 'EEEE, MMM d. HH:mm' : '' : 'hu-HU' }}
                       &middot; {{ option.match.venue }}
                     </div>
                   </div>
@@ -156,7 +156,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
               <mat-icon>sports_soccer</mat-icon>
               <span>
                 {{ match.homeTeam }} - {{ match.awayTeam }}
-                &middot; {{ match.kickoffAt | date: 'MMM d. HH:mm' : '' : 'hu' }}
+                &middot; {{ match.kickoffAt | date: 'MMM d. HH:mm' : '' : 'hu-HU' }}
               </span>
             </div>
           }
@@ -212,7 +212,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
               <div class="loan-dialog__summary-row">
                 <span class="loan-dialog__summary-label">DÁTUM ÉS HELYSZÍN</span>
                 <span class="loan-dialog__summary-value">
-                  {{ match.kickoffAt | date: 'yyyy. MMM d. HH:mm' : '' : 'hu' }}
+                  {{ match.kickoffAt | date: 'yyyy. MMM d. HH:mm' : '' : 'hu-HU' }}
                   &middot; {{ match.venue }}
                 </span>
               </div>

@@ -119,7 +119,7 @@ const WAITLIST_POLL_MS = 5_000;
                         {{ ticket.homeTeam }} – {{ ticket.awayTeam }}
                       </mat-card-title>
                       <mat-card-subtitle>
-                        {{ ticket.kickoffAt | date: "yyyy. MMM d. HH:mm" : '' : 'hu' }}
+                        {{ ticket.kickoffAt | date: "yyyy. MMM d. HH:mm" : '' : 'hu-HU' }}
                         · {{ ticket.venue }}
                       </mat-card-subtitle>
                     </mat-card-header>
@@ -151,7 +151,7 @@ const WAITLIST_POLL_MS = 5_000;
                     <mat-card-content>
                       <div class="kte-profile__history-meta">
                         <strong>{{ ticket.homeTeam }} – {{ ticket.awayTeam }}</strong>
-                        <span>{{ ticket.kickoffAt | date: "yyyy. MMM d." : '' : 'hu' }}</span>
+                        <span>{{ ticket.kickoffAt | date: "yyyy. MMM d." : '' : 'hu-HU' }}</span>
                       </div>
                       <div class="kte-profile__history-details">
                         <span>{{ ticket.section }} · sor {{ ticket.row }} · szék {{ ticket.seatNumber }}</span>

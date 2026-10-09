@@ -21,7 +21,7 @@ import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
       <ng-container matColumnDef="kickoff">
         <th mat-header-cell *matHeaderCellDef>Kezdés</th>
         <td mat-cell *matCellDef="let row">
-          {{ row.kickoffAt | date: "yyyy. MMM d." : '' : 'hu' }}
+          {{ row.kickoffAt | date: "yyyy. MMM d." : '' : 'hu-HU' }}
         </td>
       </ng-container>
 

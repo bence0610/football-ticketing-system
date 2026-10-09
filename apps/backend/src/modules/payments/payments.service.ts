@@ -375,20 +375,17 @@ export class PaymentsService {
       }
     }
 
-    // Dispatch the confirmation email. Multi-seat purchases by a single user
-    // must produce exactly one email, so we group by userId first. The whole
-    // block is defensively wrapped — a mail failure must never roll back or
-    // throw past payment finalization, and the webhook may fire multiple
-    // times so `confirmationEmailSentAt` acts as the idempotency guard.
-    try {
-      await this.sendConfirmationEmails(intent.id, createdTickets);
-    } catch (error) {
-      this.logger.error(
-        `Confirmation email dispatch failed for payment ${intent.id}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
+    // Schedule the confirmation email after this function returns so the
+    // webhook response is never held up by SMTP latency or retries.
+    setImmediate(() => {
+      this.sendConfirmationEmails(intent.id, createdTickets).catch((error: unknown) => {
+        this.logger.error(
+          `Confirmation email dispatch failed for payment ${intent.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      });
+    });
 
     this.logger.log(
       `Finalized payment ${intent.id}: ${createdTickets.length} ticket(s) PAID for user ${userId}, loyalty awarded.`,
@@ -451,7 +448,32 @@ export class PaymentsService {
         continue;
       }
 
+      // Acquire a per-user distributed lock so two concurrent webhook
+      // redeliveries of the same event cannot both send the email.
+      // TTL covers the maximum time needed: two send attempts + buffer.
+      const lockKey = RedisKeys.emailConfirmLock(paymentIntentId, userId);
+      const lockTtlSec = Math.ceil((this.mailConfig.retryDelayMs * 2) / 1000) + 30;
+      const lockAcquired = await this.redis.set(lockKey, '1', 'EX', lockTtlSec, 'NX');
+      if (!lockAcquired) {
+        this.logger.log(
+          `Confirmation email send already in progress user=${userId} payment=${paymentIntentId} — skipping`,
+        );
+        continue;
+      }
+
       try {
+        // Re-check the flag inside the lock to close the read→acquire race.
+        const recheck = await this.ticketRepository.find({
+          where: { stripePaymentIntentId: paymentIntentId, userId },
+          select: ['id', 'confirmationEmailSentAt'],
+        });
+        if (recheck.some((t) => t.confirmationEmailSentAt != null)) {
+          this.logger.log(
+            `Confirmation email skipped (already sent, re-check) user=${userId} payment=${paymentIntentId}`,
+          );
+          continue;
+        }
+
         const matchSummary = this.ticketRenderer.matchSummary(first.match);
         const sections = userTickets.map((t) => this.ticketRenderer.renderTicketSection(t));
         const qrImageDataUrls = await Promise.all(
@@ -499,6 +521,8 @@ export class PaymentsService {
             error instanceof Error ? error.message : String(error)
           }`,
         );
+      } finally {
+        await this.redis.del(lockKey).catch(() => undefined);
       }
     }
   }

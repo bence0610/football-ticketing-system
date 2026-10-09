@@ -96,7 +96,7 @@ import {
             <table mat-table [dataSource]="snapshot()!.recentTransactions" class="kte-tx-table">
               <ng-container matColumnDef="createdAt">
                 <th mat-header-cell *matHeaderCellDef>Dátum</th>
-                <td mat-cell *matCellDef="let tx">{{ tx.createdAt | date: 'short' : '' : 'hu' }}</td>
+                <td mat-cell *matCellDef="let tx">{{ tx.createdAt | date: 'short' : '' : 'hu-HU' }}</td>
               </ng-container>
               <ng-container matColumnDef="source">
                 <th mat-header-cell *matHeaderCellDef>Forrás</th>

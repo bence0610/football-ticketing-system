@@ -16,4 +16,7 @@ export const RedisKeys = {
   // Iteration 5 — Chatbot
   chatbotConversation: (conversationId: string): string => `chatbot:conv:${conversationId}`,
   chatbotContext: (): string => 'chatbot:context:upcoming-matches',
+  // Payments — confirmation email idempotency lock
+  emailConfirmLock: (paymentIntentId: string, userId: string): string =>
+    `email:confirm-lock:${paymentIntentId}:${userId}`,
 } as const;
