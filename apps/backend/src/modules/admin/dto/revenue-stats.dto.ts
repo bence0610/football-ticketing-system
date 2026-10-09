@@ -41,9 +41,15 @@ export class RevenueStatsDto {
   @ApiProperty({ type: RevenueSummaryDto })
   summary!: RevenueSummaryDto;
 
-  @ApiProperty({ type: [RevenueDailyPointDto], description: 'Napi bevétel idősor (utolsó 30 nap alapértelmezetten)' })
+  @ApiProperty({
+    type: [RevenueDailyPointDto],
+    description: 'Napi bevétel idősor (utolsó 30 nap alapértelmezetten)',
+  })
   daily!: RevenueDailyPointDto[];
 
-  @ApiProperty({ type: [RevenueByMatchDto], description: 'Bevétel meccs szerinti bontásban (top 10)' })
+  @ApiProperty({
+    type: [RevenueByMatchDto],
+    description: 'Bevétel meccs szerinti bontásban (top 10)',
+  })
   byMatch!: RevenueByMatchDto[];
 }

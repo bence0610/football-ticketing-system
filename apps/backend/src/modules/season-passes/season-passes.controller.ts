@@ -24,10 +24,7 @@ import { CancelLoanDto, CreateLoanDto } from './dto/create-loan.dto';
 import { PurchaseSeasonPassDto } from './dto/purchase-season-pass.dto';
 import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-response.dto';
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
-import {
-  PassLoanResponseDto,
-  SeasonPassResponseDto,
-} from './dto/season-pass-response.dto';
+import { PassLoanResponseDto, SeasonPassResponseDto } from './dto/season-pass-response.dto';
 import { PassLoan } from '../../database/entities';
 
 interface AuthenticatedRequest extends Request {

@@ -4,18 +4,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { In, MoreThan, Repository } from 'typeorm';
 import { ChatbotConfig } from '../../config';
-import {
-  Match,
-  MatchStatus,
-  Ticket,
-  TicketStatus,
-} from '../../database/entities';
+import { Match, MatchStatus, Ticket, TicketStatus } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 
-const ACTIVE_TICKET_STATUSES: TicketStatus[] = [
-  TicketStatus.PAID,
-  TicketStatus.PENDING_PAYMENT,
-];
+const ACTIVE_TICKET_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
 
 const UPCOMING_STATUSES: MatchStatus[] = [MatchStatus.ON_SALE, MatchStatus.SCHEDULED];
 
@@ -84,7 +76,9 @@ export class ChatbotContextService {
     const aggregates = await this.aggregateSold(matches.map((m) => m.id));
     const snapshot: ChatbotContextSnapshot = {
       generatedAt: new Date().toISOString(),
-      upcomingMatches: matches.map((match) => this.toSnapshot(match, aggregates.get(match.id) ?? 0)),
+      upcomingMatches: matches.map((match) =>
+        this.toSnapshot(match, aggregates.get(match.id) ?? 0),
+      ),
     };
 
     try {

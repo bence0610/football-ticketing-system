@@ -2,19 +2,11 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { In, Repository } from 'typeorm';
-import {
-  Match,
-  Seat,
-  Ticket,
-  TicketStatus,
-} from '../../database/entities';
+import { Match, Seat, Ticket, TicketStatus } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { MatchOccupancyDto, SectorOccupancyDto } from './dto/occupancy.dto';
 
-const ACTIVE_TICKET_STATUSES: TicketStatus[] = [
-  TicketStatus.PAID,
-  TicketStatus.PENDING_PAYMENT,
-];
+const ACTIVE_TICKET_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
 
 @Injectable()
 export class AdminOccupancyService {
@@ -51,7 +43,10 @@ export class AdminOccupancyService {
     });
     const soldSeatIds = new Set(tickets.map((t) => t.seatId));
 
-    const lockedSeatIds = await this.fetchLockedSeats(matchId, seats.map((s) => s.id));
+    const lockedSeatIds = await this.fetchLockedSeats(
+      matchId,
+      seats.map((s) => s.id),
+    );
 
     const sectorMap = new Map<string, SectorOccupancyDto>();
     for (const seat of seats) {
@@ -77,11 +72,13 @@ export class AdminOccupancyService {
       }
     }
 
-    const sectors = Array.from(sectorMap.values()).map((sector) => ({
-      ...sector,
-      occupancyPercent:
-        sector.total === 0 ? 0 : Math.round(((sector.sold + sector.locked) / sector.total) * 100),
-    })).sort((a, b) => a.section.localeCompare(b.section));
+    const sectors = Array.from(sectorMap.values())
+      .map((sector) => ({
+        ...sector,
+        occupancyPercent:
+          sector.total === 0 ? 0 : Math.round(((sector.sold + sector.locked) / sector.total) * 100),
+      }))
+      .sort((a, b) => a.section.localeCompare(b.section));
 
     const totalCapacity = sectors.reduce((acc, s) => acc + s.total, 0);
     const totalSold = sectors.reduce((acc, s) => acc + s.sold, 0);

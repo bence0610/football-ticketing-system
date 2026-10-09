@@ -11,7 +11,12 @@ import {
 } from '../../database/entities';
 import { LoyaltyConfig, MailConfig } from '../../config';
 import { EmailService } from '../email/email.service';
-import { definitionFor, tierForPoints, TIER_DEFINITIONS, TierDefinition } from './loyalty.constants';
+import {
+  definitionFor,
+  tierForPoints,
+  TIER_DEFINITIONS,
+  TierDefinition,
+} from './loyalty.constants';
 
 export interface AwardOptions {
   userId: string;
@@ -174,8 +179,9 @@ export class LoyaltyService {
     user.loyaltyTier = newTierDefinition.tier;
     await userRepo.save(user);
 
-    const tierUpgraded = TIER_DEFINITIONS.findIndex((t) => t.tier === newTierDefinition.tier)
-      > TIER_DEFINITIONS.findIndex((t) => t.tier === previousTier);
+    const tierUpgraded =
+      TIER_DEFINITIONS.findIndex((t) => t.tier === newTierDefinition.tier) >
+      TIER_DEFINITIONS.findIndex((t) => t.tier === previousTier);
 
     if (tierUpgraded) {
       // Fire-and-forget tier upgrade email. Never block the caller on SMTP.
@@ -209,7 +215,9 @@ export class LoyaltyService {
   }
 
   private isDuplicateKey(error: QueryFailedError): boolean {
-    const driverError = (error as QueryFailedError & { driverError?: { code?: string; errno?: number } }).driverError;
+    const driverError = (
+      error as QueryFailedError & { driverError?: { code?: string; errno?: number } }
+    ).driverError;
     return driverError?.code === 'ER_DUP_ENTRY' || driverError?.errno === 1062;
   }
 }

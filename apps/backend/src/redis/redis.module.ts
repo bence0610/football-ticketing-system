@@ -23,8 +23,12 @@ const redisProvider: Provider = {
       enableReadyCheck: true,
     });
 
-    client.on('connect', () => logger.log(`Connected to Redis at ${redisConfig.host}:${redisConfig.port}`));
-    client.on('error', (error: Error) => logger.error(`Redis error: ${error.message}`, error.stack));
+    client.on('connect', () =>
+      logger.log(`Connected to Redis at ${redisConfig.host}:${redisConfig.port}`),
+    );
+    client.on('error', (error: Error) =>
+      logger.error(`Redis error: ${error.message}`, error.stack),
+    );
     client.on('close', () => logger.warn('Redis connection closed'));
     client.on('reconnecting', () => logger.warn('Reconnecting to Redis...'));
 

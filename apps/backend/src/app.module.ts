@@ -20,7 +20,6 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { WeatherModule } from './modules/weather/weather.module';
 import { EmailModule } from './modules/email/email.module';
 import { QrModule } from './modules/qr/qr.module';
-import { CheckoutModule } from './modules/checkout/checkout.module';
 import { SeasonPassesModule } from './modules/season-passes/season-passes.module';
 
 @Module({
@@ -61,7 +60,6 @@ import { SeasonPassesModule } from './modules/season-passes/season-passes.module
     ChatbotModule,
     PaymentsModule,
     WeatherModule,
-    CheckoutModule,
     SeasonPassesModule,
   ],
 })

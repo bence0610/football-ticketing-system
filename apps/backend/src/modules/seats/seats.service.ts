@@ -11,17 +11,9 @@ import {
   TicketStatus,
 } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
-import {
-  MatchSeatsResponseDto,
-  SeatAvailability,
-  SeatStatusDto,
-  SectorSummaryDto,
-} from './dto';
+import { MatchSeatsResponseDto, SeatAvailability, SeatStatusDto, SectorSummaryDto } from './dto';
 
-const ACTIVE_TICKET_STATUSES: TicketStatus[] = [
-  TicketStatus.PAID,
-  TicketStatus.PENDING_PAYMENT,
-];
+const ACTIVE_TICKET_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
 
 @Injectable()
 export class SeatsService {
@@ -75,7 +67,10 @@ export class SeatsService {
         .map((ticket) => ticket.seatId),
     );
 
-    const lockedSeatIds = await this.fetchLockedSeatIds(matchId, seats.map((s) => s.id));
+    const lockedSeatIds = await this.fetchLockedSeatIds(
+      matchId,
+      seats.map((s) => s.id),
+    );
     const seasonPassSeatIds = await this.fetchSeasonPassSeatIds();
 
     const basePrice = Number(match.basePrice);

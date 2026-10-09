@@ -19,8 +19,6 @@ export class Iteration5Schema1714600000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP INDEX \`idx_waitlist_notified_at\` ON \`waitlist\``);
-    await queryRunner.query(
-      `DROP INDEX \`idx_waitlist_match_status_created\` ON \`waitlist\``,
-    );
+    await queryRunner.query(`DROP INDEX \`idx_waitlist_match_status_created\` ON \`waitlist\``);
   }
 }

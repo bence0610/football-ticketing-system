@@ -675,7 +675,7 @@
 **Acceptance Criteria:**
 - [x] `POST /api/payments/create-intent` creates a Stripe PaymentIntent with the cart total
 - [x] Returns `clientSecret` to the frontend
-- [x] Stripe webhook `POST /api/payments/webhook` listens for `payment_intent.succeeded` event
+- [x] Stripe webhook `POST /api/webhooks/stripe` listens for `payment_intent.succeeded` event
 - [x] Webhook signature is verified using Stripe signing secret
 - [x] On success, ticket records are created and seat locks released
 

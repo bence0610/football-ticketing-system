@@ -34,10 +34,12 @@ export class LoanReleaseJob {
     const completionGrace = new Date(now.getTime() - 4 * 60 * 60 * 1000);
 
     // 1) expire pending invitations
-    const expiredCount = await this.dataSource.getRepository(PassLoan).update(
-      { status: PassLoanStatus.PENDING, expiresAt: LessThan(now) },
-      { status: PassLoanStatus.EXPIRED },
-    );
+    const expiredCount = await this.dataSource
+      .getRepository(PassLoan)
+      .update(
+        { status: PassLoanStatus.PENDING, expiresAt: LessThan(now) },
+        { status: PassLoanStatus.EXPIRED },
+      );
     if (expiredCount.affected) {
       this.logger.log(`Pending loan invitations expired: ${expiredCount.affected}`);
     }
@@ -83,7 +85,10 @@ export class LoanReleaseJob {
     try {
       // Cast: @nestjs/schedule pins its own cron version which differs from the
       // workspace's cron — runtime-compatible, but TS types diverge.
-      this.schedulerRegistry.addCronJob('loanReleaseSweep', job as unknown as Parameters<SchedulerRegistry['addCronJob']>[1]);
+      this.schedulerRegistry.addCronJob(
+        'loanReleaseSweep',
+        job as unknown as Parameters<SchedulerRegistry['addCronJob']>[1],
+      );
       job.start();
       this.logger.log(
         `LoanReleaseJob registered cron="${this.cronConfig.loanReleaseExpression}" tz="${this.cronConfig.timezone}"`,

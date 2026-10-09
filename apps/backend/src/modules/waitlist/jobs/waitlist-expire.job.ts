@@ -47,9 +47,7 @@ export class WaitlistExpireJob {
         try {
           await this.notificationService.expireNotification(entry);
         } catch (error) {
-          this.logger.error(
-            `Failed to expire entry ${entry.id}: ${(error as Error).message}`,
-          );
+          this.logger.error(`Failed to expire entry ${entry.id}: ${(error as Error).message}`);
         }
       }
     } finally {

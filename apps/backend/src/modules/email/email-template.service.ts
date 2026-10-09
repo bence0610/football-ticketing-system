@@ -29,9 +29,14 @@ export class EmailTemplateService implements OnModuleInit {
       const filePath = resolve(__dirname, 'templates', fileName);
       try {
         const source = await fs.readFile(filePath, 'utf8');
-        this.compiled.set(name as EmailTemplateName, Handlebars.compile(source, { noEscape: false }));
+        this.compiled.set(
+          name as EmailTemplateName,
+          Handlebars.compile(source, { noEscape: false }),
+        );
       } catch (error) {
-        this.logger.error(`Failed to load email template ${name} (${filePath}): ${(error as Error).message}`);
+        this.logger.error(
+          `Failed to load email template ${name} (${filePath}): ${(error as Error).message}`,
+        );
         throw error;
       }
     }

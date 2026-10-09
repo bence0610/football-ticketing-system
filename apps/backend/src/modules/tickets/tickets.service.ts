@@ -7,46 +7,26 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
-import {
-  LoyaltyTransactionSource,
-  LoyaltyTransactionType,
-  Match,
-  Ticket,
-  TicketStatus,
-} from '../../database/entities';
-import { LoyaltyConfig, MailConfig } from '../../config';
-import { EmailService } from '../email/email.service';
-import { LoyaltyService } from '../loyalty/loyalty.service';
+import { DataSource, Repository } from 'typeorm';
+import { Ticket, TicketStatus } from '../../database/entities';
 import { QrService } from '../qr/qr.service';
-import { TicketRendererService } from './ticket-renderer.service';
 import { TicketScanResponseDto } from './dto/scan-ticket.dto';
 import { WaitlistNotificationService } from '../waitlist/waitlist-notification.service';
 
 @Injectable()
 export class TicketsService {
   private readonly logger = new Logger(TicketsService.name);
-  private readonly loyaltyConfig: LoyaltyConfig;
-  private readonly mailConfig: MailConfig;
 
   constructor(
     @InjectRepository(Ticket)
     private readonly ticketRepository: Repository<Ticket>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly qrService: QrService,
-    private readonly emailService: EmailService,
-    private readonly loyaltyService: LoyaltyService,
-    private readonly renderer: TicketRendererService,
-    private readonly configService: ConfigService,
     @Optional()
     @Inject(forwardRef(() => WaitlistNotificationService))
     private readonly waitlistNotifier?: WaitlistNotificationService,
-  ) {
-    this.loyaltyConfig = this.configService.getOrThrow<LoyaltyConfig>('loyalty');
-    this.mailConfig = this.configService.getOrThrow<MailConfig>('mail');
-  }
+  ) {}
 
   async count(): Promise<number> {
     return this.ticketRepository.count();
@@ -199,126 +179,5 @@ export class TicketsService {
     }
 
     return ticket;
-  }
-
-  /**
-   * Hook called by the Stripe webhook handler when a payment_intent succeeds.
-   * Marks all matching tickets as PAID, awards loyalty points, and dispatches
-   * the confirmation email. Designed to be safe to call multiple times -
-   * everything is idempotent.
-   */
-  async finalizePaidPaymentIntent(paymentIntentId: string): Promise<void> {
-    const tickets = await this.ticketRepository.find({
-      where: { stripePaymentIntentId: paymentIntentId },
-      relations: ['match', 'seat', 'user'],
-    });
-    if (tickets.length === 0) {
-      this.logger.warn(`No tickets found for paymentIntent=${paymentIntentId}; ignoring webhook.`);
-      return;
-    }
-
-    await this.dataSource.transaction(async (manager) => {
-      const ticketRepo = manager.getRepository(Ticket);
-      for (const ticket of tickets) {
-        if (ticket.status === TicketStatus.PENDING_PAYMENT) {
-          ticket.status = TicketStatus.PAID;
-          if (!ticket.qrJti) {
-            ticket.qrJti = this.qrService.generateJti();
-          }
-          await ticketRepo.save(ticket);
-        }
-      }
-    });
-
-    // Award loyalty points (one transaction per ticket; idempotent via referenceId).
-    for (const ticket of tickets) {
-      try {
-        await this.loyaltyService.award({
-          userId: ticket.userId,
-          type: LoyaltyTransactionType.EARN,
-          source: LoyaltyTransactionSource.TICKET_PURCHASE,
-          points: this.loyaltyConfig.ticketPointsPerTicket,
-          referenceId: `ticket:${ticket.id}`,
-          description: `Jegyvásárlás: ${ticket.match?.homeTeam ?? ''} - ${ticket.match?.awayTeam ?? ''}`,
-        });
-      } catch (error) {
-        this.logger.error(
-          `Loyalty award failed for ticket=${ticket.id}: ${(error as Error).message}`,
-        );
-      }
-    }
-
-    // Group by user (multi-ticket purchases) so each buyer gets one email.
-    const grouped = new Map<string, Ticket[]>();
-    for (const t of tickets) {
-      const list = grouped.get(t.userId) ?? [];
-      list.push(t);
-      grouped.set(t.userId, list);
-    }
-
-    for (const [userId, userTickets] of grouped) {
-      const userTicket = userTickets[0];
-      if (!userTicket.user || !userTicket.match) {
-        continue;
-      }
-      // Idempotency guard
-      const refresh = await this.ticketRepository.find({
-        where: { id: In(userTickets.map((t) => t.id)) },
-      });
-      const alreadySent = refresh.some(
-        (t) => t.confirmationEmailSentAt !== null && t.confirmationEmailSentAt !== undefined,
-      );
-      if (alreadySent) {
-        this.logger.log(`Confirmation email skipped (already sent) user=${userId}`);
-        continue;
-      }
-      void this.dispatchConfirmationEmail(userTickets).catch((error: Error) => {
-        this.logger.error(`Confirmation email dispatch failed user=${userId}: ${error.message}`);
-      });
-    }
-  }
-
-  private async dispatchConfirmationEmail(tickets: Ticket[]): Promise<void> {
-    const userTicket = tickets[0];
-    if (!userTicket.user || !userTicket.match) {
-      throw new Error('User or match relation missing on ticket');
-    }
-    const matchSummary = this.renderer.matchSummary(userTicket.match as Match);
-    const sections = tickets.map((t) => this.renderer.renderTicketSection(t));
-    const qrImageDataUrls = await Promise.all(
-      tickets.map(async (t) => {
-        const result = await this.qrService.generateForTicket(t.id, t.qrJti);
-        return {
-          ticketId: t.id,
-          seatLabel: t.seat ? this.renderer.formatSeat(t.seat) : '',
-          dataUrl: result.dataUrl,
-        };
-      }),
-    );
-
-    await this.emailService.send({
-      to: userTicket.user.email,
-      subject: `Jegy visszaigazolás - ${matchSummary.title}`,
-      template: 'ticket-confirmation',
-      context: {
-        recipientName: userTicket.user.firstName,
-        matchTitle: matchSummary.title,
-        matchVenue: matchSummary.venue,
-        matchKickoffLabel: matchSummary.kickoffLabel,
-        tickets: sections,
-        totalLabel: this.renderer.computeTotal(tickets),
-        ticketsUrl: `${this.mailConfig.baseUrl}/profile`,
-        qrImageDataUrls,
-      },
-      correlationId: `ticket-confirmation:${userTicket.stripePaymentIntentId ?? userTicket.id}`,
-    });
-
-    const sentAt = new Date();
-    await this.ticketRepository
-      .createQueryBuilder()
-      .update(Ticket)
-      .set({ confirmationEmailSentAt: sentAt })
-      .whereInIds(tickets.map((t) => t.id))
-      .execute();
   }
 }

@@ -6,7 +6,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import * as express from 'express';
-import { json, raw } from 'express';
+import { json } from 'express';
 import { AppModule } from './app.module';
 import { AppConfig } from './config';
 import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -41,7 +41,6 @@ async function bootstrap(): Promise<void> {
       next();
     },
   );
-  app.use('/api/payments/webhook', raw({ type: 'application/json' }));
   app.use(json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
 
@@ -82,7 +81,6 @@ async function bootstrap(): Promise<void> {
     .addTag('Chatbot')
     .addTag('Payments')
     .addTag('Weather')
-    .addTag('Checkout')
     .addTag('SeasonPasses')
     .build();
 

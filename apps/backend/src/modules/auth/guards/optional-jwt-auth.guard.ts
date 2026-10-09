@@ -12,10 +12,7 @@ import { AuthenticatedUser } from '../strategies/jwt.strategy';
  */
 @Injectable()
 export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
-  override handleRequest<TUser = AuthenticatedUser>(
-    err: unknown,
-    user: TUser | false,
-  ): TUser {
+  override handleRequest<TUser = AuthenticatedUser>(err: unknown, user: TUser | false): TUser {
     if (err || !user) {
       // Cast to TUser — downstream code expects `req.user` to be the
       // authenticated principal or undefined; we model the optional case as

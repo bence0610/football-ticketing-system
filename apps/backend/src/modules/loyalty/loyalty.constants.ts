@@ -18,9 +18,27 @@ export interface TierDefinition {
 
 export const TIER_DEFINITIONS: readonly TierDefinition[] = [
   { tier: LoyaltyTier.BRONZE, label: 'Kék', minPoints: 0, discountPercent: 0, color: '#4B8EC9' },
-  { tier: LoyaltyTier.SILVER, label: 'Ezüst', minPoints: 500, discountPercent: 5, color: '#AAAAAA' },
-  { tier: LoyaltyTier.GOLD, label: 'Arany', minPoints: 1500, discountPercent: 10, color: '#FFD700' },
-  { tier: LoyaltyTier.PLATINUM, label: 'KTE Legenda', minPoints: 3000, discountPercent: 15, color: '#C94B1E' },
+  {
+    tier: LoyaltyTier.SILVER,
+    label: 'Ezüst',
+    minPoints: 500,
+    discountPercent: 5,
+    color: '#AAAAAA',
+  },
+  {
+    tier: LoyaltyTier.GOLD,
+    label: 'Arany',
+    minPoints: 1500,
+    discountPercent: 10,
+    color: '#FFD700',
+  },
+  {
+    tier: LoyaltyTier.PLATINUM,
+    label: 'KTE Legenda',
+    minPoints: 3000,
+    discountPercent: 15,
+    color: '#C94B1E',
+  },
 ] as const;
 
 export function tierForPoints(points: number): TierDefinition {

@@ -77,7 +77,9 @@ export class EmailService implements OnModuleDestroy {
       this.logger.warn(
         `Email attempt ${attempt} failed (template=${request.template}, to=${request.to}); retrying in ${this.mailConfig.retryDelayMs}ms: ${err.message}`,
       );
-      await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, this.mailConfig.retryDelayMs));
+      await new Promise<void>((resolveDelay) =>
+        setTimeout(resolveDelay, this.mailConfig.retryDelayMs),
+      );
       await this.deliverWithRetry(request, html, attempt + 1);
     }
   }

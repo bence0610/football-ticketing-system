@@ -1,7 +1,9 @@
 import * as Joi from 'joi';
 
 export const envValidationSchema = Joi.object({
-  NODE_ENV: Joi.string().valid('development', 'test', 'staging', 'production').default('development'),
+  NODE_ENV: Joi.string()
+    .valid('development', 'test', 'staging', 'production')
+    .default('development'),
   PORT: Joi.number().port().default(3000),
   APP_NAME: Joi.string().default('KTE Jegyportal API'),
   APP_URL: Joi.string().uri().required(),

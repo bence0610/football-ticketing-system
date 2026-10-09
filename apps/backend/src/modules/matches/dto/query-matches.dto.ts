@@ -6,7 +6,8 @@ import { MatchStatus } from '../../../database/entities';
 export class QueryMatchesDto {
   @ApiPropertyOptional({
     enum: MatchStatus,
-    description: 'Szűrés meccs státuszra (scheduled, on_sale, sold_out, postponed, cancelled, finished).',
+    description:
+      'Szűrés meccs státuszra (scheduled, on_sale, sold_out, postponed, cancelled, finished).',
   })
   @IsOptional()
   @IsEnum(MatchStatus)

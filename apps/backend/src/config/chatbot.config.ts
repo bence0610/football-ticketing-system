@@ -15,9 +15,6 @@ export default registerAs(
     rateLimitAnon: parseInt(process.env.CHATBOT_RATE_LIMIT_ANON ?? '20', 10),
     historyTtlSeconds: parseInt(process.env.CHATBOT_HISTORY_TTL_SECONDS ?? '86400', 10),
     historyMaxMessages: parseInt(process.env.CHATBOT_HISTORY_MAX_MESSAGES ?? '20', 10),
-    contextCacheTtlSeconds: parseInt(
-      process.env.CHATBOT_CONTEXT_CACHE_TTL_SECONDS ?? '300',
-      10,
-    ),
+    contextCacheTtlSeconds: parseInt(process.env.CHATBOT_CONTEXT_CACHE_TTL_SECONDS ?? '300', 10),
   }),
 );

@@ -32,9 +32,15 @@ export class Iteration4Schema1714400000000 implements MigrationInterface {
     `);
     // Backfill qr_jti for existing rows so the unique constraint can be enforced.
     await queryRunner.query(`UPDATE \`tickets\` SET \`qr_jti\` = UUID() WHERE \`qr_jti\` IS NULL`);
-    await queryRunner.query(`ALTER TABLE \`tickets\` MODIFY COLUMN \`qr_jti\` varchar(36) NOT NULL`);
-    await queryRunner.query(`CREATE UNIQUE INDEX \`uq_tickets_qr_jti\` ON \`tickets\` (\`qr_jti\`)`);
-    await queryRunner.query(`CREATE INDEX \`idx_tickets_match_status\` ON \`tickets\` (\`match_id\`, \`status\`)`);
+    await queryRunner.query(
+      `ALTER TABLE \`tickets\` MODIFY COLUMN \`qr_jti\` varchar(36) NOT NULL`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX \`uq_tickets_qr_jti\` ON \`tickets\` (\`qr_jti\`)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX \`idx_tickets_match_status\` ON \`tickets\` (\`match_id\`, \`status\`)`,
+    );
 
     // -------------------- loyalty_transactions --------------------
     await queryRunner.query(`
@@ -63,8 +69,12 @@ export class Iteration4Schema1714400000000 implements MigrationInterface {
       ADD COLUMN \`cancellation_reason\` varchar(255) NULL AFTER \`cancelled_at\`,
       ADD COLUMN \`completed_at\` timestamp NULL AFTER \`cancellation_reason\`
     `);
-    await queryRunner.query(`CREATE UNIQUE INDEX \`uq_pass_loans_qr_jti\` ON \`pass_loans\` (\`qr_jti\`)`);
-    await queryRunner.query(`CREATE INDEX \`idx_pass_loans_status_match\` ON \`pass_loans\` (\`status\`, \`match_id\`)`);
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX \`uq_pass_loans_qr_jti\` ON \`pass_loans\` (\`qr_jti\`)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX \`idx_pass_loans_status_match\` ON \`pass_loans\` (\`status\`, \`match_id\`)`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -85,7 +95,9 @@ export class Iteration4Schema1714400000000 implements MigrationInterface {
     `);
 
     // loyalty_transactions
-    await queryRunner.query(`DROP INDEX \`uq_loyalty_source_reference\` ON \`loyalty_transactions\``);
+    await queryRunner.query(
+      `DROP INDEX \`uq_loyalty_source_reference\` ON \`loyalty_transactions\``,
+    );
     await queryRunner.query(`
       ALTER TABLE \`loyalty_transactions\`
       MODIFY COLUMN \`reference_id\` varchar(36) NULL

@@ -1,5 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { LoyaltyTier, LoyaltyTransactionSource, LoyaltyTransactionType } from '../../../database/entities';
+import {
+  LoyaltyTier,
+  LoyaltyTransactionSource,
+  LoyaltyTransactionType,
+} from '../../../database/entities';
 
 export class LoyaltyTierResponseDto {
   @ApiProperty({ enum: LoyaltyTier })

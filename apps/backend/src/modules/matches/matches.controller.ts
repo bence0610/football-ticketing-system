@@ -1,22 +1,7 @@
-import {
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  ParseUUIDPipe,
-  Query,
-} from '@nestjs/common';
-import {
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { Controller, Get, NotFoundException, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MatchesService } from './matches.service';
-import {
-  MatchDetailDto,
-  MatchListItemDto,
-  QueryMatchesDto,
-} from './dto';
+import { MatchDetailDto, MatchListItemDto, QueryMatchesDto } from './dto';
 
 @ApiTags('Matches')
 @Controller('matches')

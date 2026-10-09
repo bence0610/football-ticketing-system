@@ -98,9 +98,11 @@ function makeMatchRepoMock(matches: Match[]) {
   };
   return {
     createQueryBuilder: jest.fn().mockReturnValue(qb),
-    findOne: jest.fn().mockImplementation(({ where: { id } }) =>
-      Promise.resolve(matches.find((m) => m.id === id) ?? null),
-    ),
+    findOne: jest
+      .fn()
+      .mockImplementation(({ where: { id } }) =>
+        Promise.resolve(matches.find((m) => m.id === id) ?? null),
+      ),
     _qb: qb, // expose for per-test overrides
   };
 }
@@ -116,9 +118,7 @@ function makeTicketRepoMock(tickets: Ticket[]) {
       // Aggregate by matchId — mirrors the SQL GROUP BY the service executes
       Object.values(
         tickets
-          .filter((t) =>
-            [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT].includes(t.status),
-          )
+          .filter((t) => [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT].includes(t.status))
           .reduce<Record<string, { matchId: string; soldCount: number }>>((acc, t) => {
             if (!acc[t.matchId]) acc[t.matchId] = { matchId: t.matchId, soldCount: 0 };
             acc[t.matchId].soldCount += 1;
@@ -142,10 +142,7 @@ describe('MatchesController – integration', () => {
   let matchRepoMock: ReturnType<typeof makeMatchRepoMock>;
   let ticketRepoMock: ReturnType<typeof makeTicketRepoMock>;
 
-  async function buildApp(
-    matches: Match[],
-    tickets: Ticket[] = [],
-  ): Promise<void> {
+  async function buildApp(matches: Match[], tickets: Ticket[] = []): Promise<void> {
     matchRepoMock = makeMatchRepoMock(matches);
     ticketRepoMock = makeTicketRepoMock(tickets);
 
@@ -229,9 +226,7 @@ describe('MatchesController – integration', () => {
       const onSaleMatch = makeMatch({ id: UUID_1, status: MatchStatus.ON_SALE });
       await buildApp([onSaleMatch]);
 
-      const res = await request(app.getHttpServer())
-        .get('/matches?status=on_sale')
-        .expect(200);
+      const res = await request(app.getHttpServer()).get('/matches?status=on_sale').expect(200);
 
       // The mock returns the single match regardless, but we verify the QB
       // received the andWhere call with the correct parameter.
@@ -246,18 +241,14 @@ describe('MatchesController – integration', () => {
     it('should reject an invalid status value with 400', async () => {
       await buildApp([]);
 
-      await request(app.getHttpServer())
-        .get('/matches?status=invalid_status')
-        .expect(400);
+      await request(app.getHttpServer()).get('/matches?status=invalid_status').expect(400);
     });
 
     it('should apply the from date filter through to the query builder', async () => {
       await buildApp([makeMatch()]);
 
       const fromDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      await request(app.getHttpServer())
-        .get(`/matches?from=${fromDate}`)
-        .expect(200);
+      await request(app.getHttpServer()).get(`/matches?from=${fromDate}`).expect(200);
 
       const qb = matchRepoMock._qb;
       expect(qb.andWhere).toHaveBeenCalledWith(
@@ -286,9 +277,18 @@ describe('MatchesController – integration', () => {
       const item = res.body[0];
 
       const requiredFields = [
-        'id', 'homeTeam', 'awayTeam', 'competition', 'venue',
-        'kickoffAt', 'status', 'basePrice', 'capacity', 'availableSeats',
-        'isHome', 'isSeasonPassEligible',
+        'id',
+        'homeTeam',
+        'awayTeam',
+        'competition',
+        'venue',
+        'kickoffAt',
+        'status',
+        'basePrice',
+        'capacity',
+        'availableSeats',
+        'isHome',
+        'isSeasonPassEligible',
       ];
       for (const field of requiredFields) {
         expect(item).toHaveProperty(field);
@@ -451,9 +451,7 @@ describe('MatchesController – integration', () => {
       const match = makeMatch({ id: UUID_1 });
       await buildApp([match]);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${UUID_1}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${UUID_1}`).expect(200);
 
       expect(res.body.id).toBe(UUID_1);
       expect(res.body.homeTeam).toBe(match.homeTeam);
@@ -471,9 +469,7 @@ describe('MatchesController – integration', () => {
       ];
       await buildApp([match], tickets);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${UUID_1}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${UUID_1}`).expect(200);
 
       expect(res.body.availableSeats).toBe(48); // 50 - 2
     });
@@ -498,9 +494,7 @@ describe('MatchesController – integration', () => {
       const match = makeMatch({ id: UUID_1, homeTeam: HOME_TEAM });
       await buildApp([match]);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${UUID_1}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${UUID_1}`).expect(200);
 
       expect(res.body.isHome).toBe(true);
     });
@@ -509,9 +503,7 @@ describe('MatchesController – integration', () => {
       const match = makeMatch({ id: UUID_1, basePrice: '3500.99' });
       await buildApp([match]);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${UUID_1}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${UUID_1}`).expect(200);
 
       expect(Number.isInteger(res.body.basePrice)).toBe(true);
       expect(res.body.basePrice).toBe(3501);

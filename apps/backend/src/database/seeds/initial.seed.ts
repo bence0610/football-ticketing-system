@@ -172,8 +172,7 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
       // 2026-07-26 (Sunday) 17:00 local => 15:00 UTC
       kickoffAt: new Date('2026-07-26T15:00:00.000Z'),
       basePrice: '3000.00',
-      description:
-        'Felkészülési mérkőzés. KTE vs Paksi FC — utolsó főpróba a bajnoki rajt előtt.',
+      description: 'Felkészülési mérkőzés. KTE vs Paksi FC — utolsó főpróba a bajnoki rajt előtt.',
     },
   ];
 

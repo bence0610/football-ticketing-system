@@ -12,7 +12,7 @@ import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import Stripe from 'stripe';
 import { DataSource, In, Repository } from 'typeorm';
-import { LoyaltyConfig, StripeConfig } from '../../config';
+import { LoyaltyConfig, MailConfig, StripeConfig } from '../../config';
 import {
   LoyaltyTransactionSource,
   LoyaltyTransactionType,
@@ -24,8 +24,10 @@ import {
 } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { SeatLockService } from '../../redis/seat-lock.service';
+import { EmailService } from '../email/email.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { QrService } from '../qr/qr.service';
+import { TicketRendererService } from '../tickets/ticket-renderer.service';
 import {
   CreatePaymentIntentDto,
   PaymentIntentResponseDto,
@@ -46,6 +48,7 @@ export class PaymentsService {
   private readonly currency: string;
   private readonly webhookSecret: string;
   private readonly loyaltyConfig: LoyaltyConfig;
+  private readonly mailConfig: MailConfig;
 
   constructor(
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe,
@@ -57,12 +60,15 @@ export class PaymentsService {
     private readonly dataSource: DataSource,
     private readonly loyaltyService: LoyaltyService,
     private readonly qrService: QrService,
+    private readonly emailService: EmailService,
+    private readonly ticketRenderer: TicketRendererService,
     configService: ConfigService,
   ) {
     const stripeConfig = configService.getOrThrow<StripeConfig>('stripe');
     this.currency = stripeConfig.currency;
     this.webhookSecret = stripeConfig.webhookSecret;
     this.loyaltyConfig = configService.getOrThrow<LoyaltyConfig>('loyalty');
+    this.mailConfig = configService.getOrThrow<MailConfig>('mail');
   }
 
   async createPaymentIntent(
@@ -87,7 +93,9 @@ export class PaymentsService {
       .join('_')}`;
 
     const stripeAmount = this.toStripeAmount(totalAmount);
-    console.log('[Stripe] PaymentIntent amount being sent:', stripeAmount, '| currency: huf');
+    this.logger.debug(
+      `Creating PaymentIntent amount=${stripeAmount} currency=${this.currency} user=${userId} match=${dto.matchId}`,
+    );
 
     const intent = await this.stripe.paymentIntents.create(
       {
@@ -218,9 +226,7 @@ export class PaymentsService {
       this.logger.warn(
         `confirmPaymentAndCreateTicket called for ${paymentIntentId} with status=${intent.status}`,
       );
-      throw new BadRequestException(
-        `A fizetés még nem sikerült (státusz: ${intent.status}).`,
-      );
+      throw new BadRequestException(`A fizetés még nem sikerült (státusz: ${intent.status}).`);
     }
 
     const intentUserId = intent.metadata.userId;
@@ -326,16 +332,14 @@ export class PaymentsService {
         if (!ownerToken) {
           return Promise.resolve(false);
         }
-        return this.seatLockService
-          .release(matchId, seatId, ownerToken)
-          .catch((error: unknown) => {
-            this.logger.warn(
-              `Seat lock release failed match=${matchId} seat=${seatId}: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            );
-            return false;
-          });
+        return this.seatLockService.release(matchId, seatId, ownerToken).catch((error: unknown) => {
+          this.logger.warn(
+            `Seat lock release failed match=${matchId} seat=${seatId}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+          return false;
+        });
       }),
     );
 
@@ -371,10 +375,132 @@ export class PaymentsService {
       }
     }
 
+    // Dispatch the confirmation email. Multi-seat purchases by a single user
+    // must produce exactly one email, so we group by userId first. The whole
+    // block is defensively wrapped — a mail failure must never roll back or
+    // throw past payment finalization, and the webhook may fire multiple
+    // times so `confirmationEmailSentAt` acts as the idempotency guard.
+    try {
+      await this.sendConfirmationEmails(intent.id, createdTickets);
+    } catch (error) {
+      this.logger.error(
+        `Confirmation email dispatch failed for payment ${intent.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
     this.logger.log(
       `Finalized payment ${intent.id}: ${createdTickets.length} ticket(s) PAID for user ${userId}, loyalty awarded.`,
     );
     return createdTickets;
+  }
+
+  /**
+   * Sends one `ticket-confirmation` email per distinct buyer in the given
+   * ticket set, guarded by `confirmationEmailSentAt` so repeated Stripe
+   * webhook deliveries never produce duplicates.
+   *
+   * The relations (`user`, `match`, `seat`) required by the renderer and
+   * template are reloaded here because callers of `finalizePaymentIntent`
+   * work with ticket entities that may not have these populated.
+   */
+  private async sendConfirmationEmails(
+    paymentIntentId: string,
+    createdTickets: Ticket[],
+  ): Promise<void> {
+    if (createdTickets.length === 0) {
+      return;
+    }
+
+    const ticketsWithRelations = await this.ticketRepository.find({
+      where: { stripePaymentIntentId: paymentIntentId },
+      relations: ['user', 'match', 'seat'],
+    });
+    if (ticketsWithRelations.length === 0) {
+      return;
+    }
+
+    const grouped = new Map<string, Ticket[]>();
+    for (const ticket of ticketsWithRelations) {
+      const bucket = grouped.get(ticket.userId) ?? [];
+      bucket.push(ticket);
+      grouped.set(ticket.userId, bucket);
+    }
+
+    for (const [userId, userTickets] of grouped) {
+      const alreadySent = userTickets.some((t) => t.confirmationEmailSentAt != null);
+      if (alreadySent) {
+        this.logger.log(
+          `Confirmation email skipped (already sent) user=${userId} payment=${paymentIntentId}`,
+        );
+        continue;
+      }
+
+      const first = userTickets[0];
+      if (!first.user || !first.match) {
+        this.logger.warn(
+          `Confirmation email skipped (missing relations) user=${userId} payment=${paymentIntentId}`,
+        );
+        continue;
+      }
+      if (userTickets.some((t) => !t.seat)) {
+        this.logger.warn(
+          `Confirmation email skipped (missing seat relation) user=${userId} payment=${paymentIntentId}`,
+        );
+        continue;
+      }
+
+      try {
+        const matchSummary = this.ticketRenderer.matchSummary(first.match);
+        const sections = userTickets.map((t) => this.ticketRenderer.renderTicketSection(t));
+        const qrImageDataUrls = await Promise.all(
+          userTickets.map(async (t) => {
+            const result = await this.qrService.generateForTicket(t.id, t.qrJti);
+            return {
+              ticketId: t.id,
+              seatLabel: t.seat ? this.ticketRenderer.formatSeat(t.seat) : '',
+              dataUrl: result.dataUrl,
+            };
+          }),
+        );
+
+        await this.emailService.send({
+          to: first.user.email,
+          subject: `Jegy visszaigazolás - ${matchSummary.title}`,
+          template: 'ticket-confirmation',
+          context: {
+            recipientName: first.user.firstName,
+            matchTitle: matchSummary.title,
+            matchVenue: matchSummary.venue,
+            matchKickoffLabel: matchSummary.kickoffLabel,
+            tickets: sections,
+            totalLabel: this.ticketRenderer.computeTotal(userTickets),
+            ticketsUrl: `${this.mailConfig.baseUrl}/profile`,
+            qrImageDataUrls,
+          },
+          correlationId: `ticket-confirmation:${paymentIntentId}:${userId}`,
+        });
+
+        const sentAt = new Date();
+        await this.ticketRepository
+          .createQueryBuilder()
+          .update(Ticket)
+          .set({ confirmationEmailSentAt: sentAt })
+          .whereInIds(userTickets.map((t) => t.id))
+          .execute();
+
+        this.logger.log(
+          `Confirmation email sent user=${userId} payment=${paymentIntentId} tickets=${userTickets.length}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Confirmation email failed user=${userId} payment=${paymentIntentId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
   }
 
   private async handlePaymentFailed(intent: Stripe.PaymentIntent): Promise<void> {
@@ -451,7 +577,9 @@ export class PaymentsService {
 
       const modifier = Number(seat.priceModifier);
       const price = Math.round(basePrice * modifier);
-      console.log('[Checkout] base_price:', basePrice, '| price_modifier:', modifier, '| unitPrice:', price);
+      this.logger.debug(
+        `Seat ${seat.id} base=${basePrice} modifier=${modifier} unitPrice=${price}`,
+      );
       lines.push({ seat, ownerToken: item.ownerToken, price });
     }
     return lines;

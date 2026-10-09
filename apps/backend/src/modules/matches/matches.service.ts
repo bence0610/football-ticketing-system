@@ -3,22 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppConfig } from '../../config';
-import {
-  Match,
-  MatchStatus,
-  Ticket,
-  TicketStatus,
-} from '../../database/entities';
-import {
-  MatchDetailDto,
-  MatchListItemDto,
-  QueryMatchesDto,
-} from './dto';
+import { Match, MatchStatus, Ticket, TicketStatus } from '../../database/entities';
+import { MatchDetailDto, MatchListItemDto, QueryMatchesDto } from './dto';
 
-const ACTIVE_TICKET_STATUSES: TicketStatus[] = [
-  TicketStatus.PAID,
-  TicketStatus.PENDING_PAYMENT,
-];
+const ACTIVE_TICKET_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
 
 const UPCOMING_STATUSES: MatchStatus[] = [MatchStatus.ON_SALE, MatchStatus.SCHEDULED];
 
@@ -59,9 +47,7 @@ export class MatchesService {
 
     const matches = await qb.getMany();
     const soldByMatch = await this.aggregateSoldTickets(matches.map((m) => m.id));
-    return matches.map((match) =>
-      this.toListItem(match, soldByMatch.get(match.id) ?? 0),
-    );
+    return matches.map((match) => this.toListItem(match, soldByMatch.get(match.id) ?? 0));
   }
 
   /**
@@ -79,9 +65,7 @@ export class MatchesService {
       .getMany();
 
     const soldByMatch = await this.aggregateSoldTickets(matches.map((m) => m.id));
-    return matches.map((match) =>
-      this.toListItem(match, soldByMatch.get(match.id) ?? 0),
-    );
+    return matches.map((match) => this.toListItem(match, soldByMatch.get(match.id) ?? 0));
   }
 
   /**

@@ -120,7 +120,13 @@ export class SeatLockService {
   ): Promise<boolean> {
     const key = RedisKeys.seatLock(matchId, seatId);
     const ttl = ttlSeconds ?? this.defaultTtlSeconds;
-    const result = (await this.redis.eval(EXTEND_LOCK_LUA, 1, key, ownerToken, String(ttl))) as number;
+    const result = (await this.redis.eval(
+      EXTEND_LOCK_LUA,
+      1,
+      key,
+      ownerToken,
+      String(ttl),
+    )) as number;
     return result === 1;
   }
 

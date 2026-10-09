@@ -20,15 +20,9 @@ import {
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { JoinWaitlistDto, WaitlistEntryDto } from './dto';
 
-const ACTIVE_TICKET_STATUSES: TicketStatus[] = [
-  TicketStatus.PAID,
-  TicketStatus.PENDING_PAYMENT,
-];
+const ACTIVE_TICKET_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
 
-const ACTIVE_WAITLIST_STATUSES: WaitlistStatus[] = [
-  WaitlistStatus.ACTIVE,
-  WaitlistStatus.NOTIFIED,
-];
+const ACTIVE_WAITLIST_STATUSES: WaitlistStatus[] = [WaitlistStatus.ACTIVE, WaitlistStatus.NOTIFIED];
 
 @Injectable()
 export class WaitlistService {
@@ -65,9 +59,7 @@ export class WaitlistService {
 
     const totalActive = await this.getActiveTicketCount(dto.matchId);
     if (match.capacity > 0 && totalActive < match.capacity) {
-      throw new BadRequestException(
-        'A meccsen még van szabad hely, nincs szükség várólistára.',
-      );
+      throw new BadRequestException('A meccsen még van szabad hely, nincs szükség várólistára.');
     }
 
     const existing = await this.waitlistRepository.findOne({

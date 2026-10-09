@@ -42,7 +42,9 @@ export class ChatbotHistoryService {
         .filter((m): m is ChatbotMessage => m !== null)
         .reverse();
     } catch (error) {
-      this.logger.warn(`Chatbot history load failed for ${conversationId}: ${(error as Error).message}`);
+      this.logger.warn(
+        `Chatbot history load failed for ${conversationId}: ${(error as Error).message}`,
+      );
       return [];
     }
   }
@@ -66,7 +68,9 @@ export class ChatbotHistoryService {
     try {
       await this.redis.del(RedisKeys.chatbotConversation(conversationId));
     } catch (error) {
-      this.logger.warn(`Chatbot history clear failed for ${conversationId}: ${(error as Error).message}`);
+      this.logger.warn(
+        `Chatbot history clear failed for ${conversationId}: ${(error as Error).message}`,
+      );
     }
   }
 

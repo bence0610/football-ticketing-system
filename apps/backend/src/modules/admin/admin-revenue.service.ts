@@ -13,9 +13,7 @@ const REVENUE_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.USED];
 
 @Injectable()
 export class AdminRevenueService {
-  constructor(
-    @InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>,
-  ) {}
+  constructor(@InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>) {}
 
   /**
    * Aggregates revenue stats for the admin dashboard. The dataset is bound

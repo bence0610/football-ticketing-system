@@ -9,11 +9,7 @@ import { AdminRevenueService } from './admin-revenue.service';
 import { AdminService } from './admin.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Match, Seat, Ticket]),
-    AuthModule,
-    MatchesModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Match, Seat, Ticket]), AuthModule, MatchesModule],
   controllers: [AdminController],
   providers: [AdminService, AdminRevenueService, AdminOccupancyService],
   exports: [AdminService, AdminRevenueService, AdminOccupancyService],

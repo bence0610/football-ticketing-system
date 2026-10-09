@@ -40,7 +40,13 @@ export class WaitlistNotificationService {
    */
   async notifyNextInLine(matchId: string): Promise<ClaimSlotInfo | null> {
     const lockKey = RedisKeys.waitlistNotificationLock(matchId);
-    const lockAcquired = await this.redis.set(lockKey, '1', 'EX', NOTIFICATION_LOCK_TTL_SECONDS, 'NX');
+    const lockAcquired = await this.redis.set(
+      lockKey,
+      '1',
+      'EX',
+      NOTIFICATION_LOCK_TTL_SECONDS,
+      'NX',
+    );
     if (lockAcquired !== 'OK') {
       this.logger.debug(`Notification lock busy for match ${matchId}; skipping.`);
       return null;
@@ -103,9 +109,7 @@ export class WaitlistNotificationService {
     const claimKey = RedisKeys.waitlistClaim(matchId, userId);
     const exists = await this.redis.get(claimKey);
     if (!exists) {
-      throw new ConflictException(
-        'A foglalási lehetőség lejárt vagy már nem elérhető.',
-      );
+      throw new ConflictException('A foglalási lehetőség lejárt vagy már nem elérhető.');
     }
     const entry = await this.waitlistService.findUserEntry(userId, matchId);
     if (!entry) {

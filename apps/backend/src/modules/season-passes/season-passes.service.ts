@@ -124,10 +124,11 @@ export class SeasonPassesService {
 
     // Idempotency: same user buying the same section for the same season
     // within Stripe's idempotency window must collapse to a single intent.
-    const idempotencyKey = `seasonpass_${userId}_${priceRow.section}_${priceRow.seasonLabel}`.replace(
-      /[^a-zA-Z0-9_-]/g,
-      '_',
-    );
+    const idempotencyKey =
+      `seasonpass_${userId}_${priceRow.section}_${priceRow.seasonLabel}`.replace(
+        /[^a-zA-Z0-9_-]/g,
+        '_',
+      );
 
     const stripeAmount = this.toStripeAmount(priceRow.price);
 
@@ -173,9 +174,7 @@ export class SeasonPassesService {
       this.logger.error(
         `Season pass PaymentIntent create failed user=${userId} section=${priceRow.section}: ${stripeError?.message ?? String(error)}`,
       );
-      throw new BadRequestException(
-        stripeError?.message ?? 'A fizetés feldolgozása sikertelen.',
-      );
+      throw new BadRequestException(stripeError?.message ?? 'A fizetés feldolgozása sikertelen.');
     }
 
     if (intent.status === 'succeeded') {
@@ -283,7 +282,9 @@ export class SeasonPassesService {
       .filter((id): id is string => typeof id === 'string' && id.length > 0);
   }
 
-  async listForUser(userId: string): Promise<Array<{ pass: SeasonPass; loans: PassLoan[]; seat: string | undefined }>> {
+  async listForUser(
+    userId: string,
+  ): Promise<Array<{ pass: SeasonPass; loans: PassLoan[]; seat: string | undefined }>> {
     const passes = await this.seasonPassRepository.find({
       where: { userId },
       relations: ['seat'],
@@ -419,7 +420,12 @@ export class SeasonPassesService {
     });
   }
 
-  async cancelLoan(passId: string, loanId: string, userId: string, dto: CancelLoanDto): Promise<PassLoan> {
+  async cancelLoan(
+    passId: string,
+    loanId: string,
+    userId: string,
+    dto: CancelLoanDto,
+  ): Promise<PassLoan> {
     return this.dataSource.transaction(async (manager) => {
       const loanRepo = manager.getRepository(PassLoan);
       const loan = await loanRepo.findOne({
@@ -432,10 +438,7 @@ export class SeasonPassesService {
       if (loan.lenderUserId !== userId) {
         throw new ForbiddenException('Only the lender can cancel a loan');
       }
-      if (
-        loan.status !== PassLoanStatus.PENDING &&
-        loan.status !== PassLoanStatus.ACCEPTED
-      ) {
+      if (loan.status !== PassLoanStatus.PENDING && loan.status !== PassLoanStatus.ACCEPTED) {
         throw new BadRequestException(`Loan in state ${loan.status} cannot be cancelled`);
       }
       const now = new Date();
@@ -488,7 +491,9 @@ export class SeasonPassesService {
         description: 'Bérlet kölcsönzés jutalom',
       });
     } catch (error) {
-      this.logger.error(`Loan completion loyalty award failed loan=${loan.id}: ${(error as Error).message}`);
+      this.logger.error(
+        `Loan completion loyalty award failed loan=${loan.id}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -581,7 +586,8 @@ export class SeasonPassesService {
     const lender =
       loan.lender ?? (await this.userRepository.findOne({ where: { id: loan.lenderUserId } }));
     const borrower =
-      loan.borrower ?? (loan.borrowerUserId
+      loan.borrower ??
+      (loan.borrowerUserId
         ? await this.userRepository.findOne({ where: { id: loan.borrowerUserId } })
         : null);
 
@@ -590,7 +596,11 @@ export class SeasonPassesService {
     if (borrower) {
       recipients.push({ email: borrower.email, name: borrower.firstName, isLender: false });
     } else {
-      recipients.push({ email: loan.borrowerEmail, name: loan.borrowerEmail.split('@')[0], isLender: false });
+      recipients.push({
+        email: loan.borrowerEmail,
+        name: loan.borrowerEmail.split('@')[0],
+        isLender: false,
+      });
     }
     if (wasAccepted && lender) {
       recipients.push({ email: lender.email, name: lender.firstName, isLender: true });

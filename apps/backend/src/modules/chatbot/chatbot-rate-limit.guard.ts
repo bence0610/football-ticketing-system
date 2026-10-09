@@ -40,9 +40,7 @@ export class ChatbotRateLimitGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context
-      .switchToHttp()
-      .getRequest<Request & { user?: AuthenticatedUser }>();
+    const request = context.switchToHttp().getRequest<Request & { user?: AuthenticatedUser }>();
 
     const isAuthenticated = !!request.user?.id;
     const identifier = request.user?.id ?? this.extractClientIp(request);

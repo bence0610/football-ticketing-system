@@ -5,12 +5,7 @@ import { CronJob } from 'cron';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, LessThan, Not, Repository } from 'typeorm';
 import { CronConfig } from '../../../config';
-import {
-  Match,
-  MatchStatus,
-  Ticket,
-  TicketStatus,
-} from '../../../database/entities';
+import { Match, MatchStatus, Ticket, TicketStatus } from '../../../database/entities';
 import { QrService } from '../../qr/qr.service';
 
 /**
@@ -41,7 +36,10 @@ export class ExpireTicketsJob {
 
     const matches = await this.dataSource.getRepository(Match).find({
       where: [
-        { kickoffAt: LessThan(dayAgo), status: Not(In([MatchStatus.SCHEDULED, MatchStatus.ON_SALE])) },
+        {
+          kickoffAt: LessThan(dayAgo),
+          status: Not(In([MatchStatus.SCHEDULED, MatchStatus.ON_SALE])),
+        },
       ],
     });
     if (matches.length === 0) {
@@ -82,13 +80,18 @@ export class ExpireTicketsJob {
     try {
       // Cast: @nestjs/schedule pins its own cron version which differs from the
       // workspace's cron — runtime-compatible, but TS types diverge.
-      this.schedulerRegistry.addCronJob('ticketExpireSweep', job as unknown as Parameters<SchedulerRegistry['addCronJob']>[1]);
+      this.schedulerRegistry.addCronJob(
+        'ticketExpireSweep',
+        job as unknown as Parameters<SchedulerRegistry['addCronJob']>[1],
+      );
       job.start();
       this.logger.log(
         `ExpireTicketsJob registered cron="${this.cronConfig.ticketExpireExpression}" tz="${this.cronConfig.timezone}"`,
       );
     } catch (error) {
-      this.logger.warn(`Could not register dynamic ticket-expire cron: ${(error as Error).message}`);
+      this.logger.warn(
+        `Could not register dynamic ticket-expire cron: ${(error as Error).message}`,
+      );
     }
   }
 }

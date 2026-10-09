@@ -54,7 +54,11 @@
       "Bash(npx --no-install tsc -p apps/backend/tsconfig.app.json --noEmit)",
       "Bash(npx --no-install tsc -p tsconfig.json --noEmit)",
       "Bash(npx --no-install tsc -p tsconfig.app.json --noEmit)",
-      "Bash(Test-Path *)"
+      "Bash(Test-Path *)",
+      "Bash(rm C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/checkout.controller.ts C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/checkout.service.ts C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/checkout.module.ts C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/stripe-webhook.controller.ts C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/dto/create-payment-intent.dto.ts)",
+      "Bash(rmdir C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout/dto)",
+      "Bash(rmdir C:/Users/User/szakdolgozat/apps/backend/src/modules/checkout)",
+      "Bash(npm test *)"
     ]
   }
 }

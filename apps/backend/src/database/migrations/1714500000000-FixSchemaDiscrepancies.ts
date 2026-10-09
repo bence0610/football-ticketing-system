@@ -27,6 +27,8 @@ export class FixSchemaDiscrepancies1714500000000 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE \`tickets\` DROP FOREIGN KEY \`fk_tickets_scanned_by\``);
 
     // Reverse W1: re-create the orphaned unique index
-    await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_users_email_unique\` ON \`users\` (\`email\`)`);
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX \`IDX_users_email_unique\` ON \`users\` (\`email\`)`,
+    );
   }
 }

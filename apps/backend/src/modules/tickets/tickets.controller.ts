@@ -4,10 +4,7 @@ import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { TicketsService } from './tickets.service';
 import { ScanTicketDto, TicketScanResponseDto } from './dto/scan-ticket.dto';
-import {
-  TicketResponseDto,
-  TicketQrResponseDto,
-} from './dto/ticket-response.dto';
+import { TicketResponseDto, TicketQrResponseDto } from './dto/ticket-response.dto';
 import { Ticket } from '../../database/entities';
 
 interface AuthenticatedRequest extends Request {

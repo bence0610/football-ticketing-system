@@ -14,8 +14,7 @@ export class PurchaseSeasonPassDto {
 
   @ApiProperty({
     example: 'pm_card_visa',
-    description:
-      'Stripe PaymentMethod azonosító (kliens oldalon a Payment Element állítja elő).',
+    description: 'Stripe PaymentMethod azonosító (kliens oldalon a Payment Element állítja elő).',
     required: false,
   })
   @IsOptional()

@@ -9,12 +9,7 @@ import {
   User,
 } from '../../database/entities';
 import { LoyaltyService } from '../loyalty/loyalty.service';
-import {
-  ProfileDto,
-  ProfileTicketDto,
-  ProfileTicketsDto,
-  UpdateProfileDto,
-} from './dto';
+import { ProfileDto, ProfileTicketDto, ProfileTicketsDto, UpdateProfileDto } from './dto';
 
 const ACTIVE_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
 
@@ -57,11 +52,7 @@ export class UsersService {
     };
   }
 
-  async getTickets(
-    userId: string,
-    limit = 20,
-    offset = 0,
-  ): Promise<ProfileTicketsDto> {
+  async getTickets(userId: string, limit = 20, offset = 0): Promise<ProfileTicketsDto> {
     const [rows, total] = await this.ticketRepository.findAndCount({
       where: { userId },
       relations: { match: true, seat: true },
@@ -73,8 +64,7 @@ export class UsersService {
     const now = Date.now();
     const items: ProfileTicketDto[] = rows.map((ticket) => {
       const kickoff = ticket.match?.kickoffAt?.getTime() ?? 0;
-      const isActive =
-        ACTIVE_STATUSES.includes(ticket.status) && kickoff >= now;
+      const isActive = ACTIVE_STATUSES.includes(ticket.status) && kickoff >= now;
       return {
         id: ticket.id,
         matchId: ticket.matchId,
@@ -167,9 +157,7 @@ export class UsersService {
         description: 'Regisztráció bónusz',
       });
     } catch (error) {
-      this.logger.error(
-        `Registration bonus failed user=${userId}: ${(error as Error).message}`,
-      );
+      this.logger.error(`Registration bonus failed user=${userId}: ${(error as Error).message}`);
     }
   }
 

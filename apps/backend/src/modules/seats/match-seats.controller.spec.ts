@@ -243,17 +243,12 @@ describe('MatchSeatsController – integration', () => {
   describe('GET /matches/:matchId/seats', () => {
     it('should return 200 with seats and sector summary', async () => {
       const match = makeMatch();
-      const seats = [
-        makeSeat(SEAT_ID_FREE, 'A', '1', 1),
-        makeSeat(SEAT_ID_SOLD, 'A', '1', 2),
-      ];
+      const seats = [makeSeat(SEAT_ID_FREE, 'A', '1', 1), makeSeat(SEAT_ID_SOLD, 'A', '1', 2)];
       const tickets = [makeTicket(MATCH_ID, SEAT_ID_SOLD, TicketStatus.PAID)];
 
       await buildApp(match, seats, tickets);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${MATCH_ID}/seats`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       expect(res.body.matchId).toBe(MATCH_ID);
       expect(Array.isArray(res.body.seats)).toBe(true);
@@ -268,9 +263,7 @@ describe('MatchSeatsController – integration', () => {
 
       await buildApp(match, seats, tickets);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${MATCH_ID}/seats`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       const soldSeat = res.body.seats.find((s: { id: string }) => s.id === SEAT_ID_SOLD);
       expect(soldSeat).toBeDefined();
@@ -284,9 +277,7 @@ describe('MatchSeatsController – integration', () => {
 
       await buildApp(match, seats, tickets);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${MATCH_ID}/seats`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       const seat = res.body.seats[0];
       expect(seat.status).toBe('sold');
@@ -299,26 +290,19 @@ describe('MatchSeatsController – integration', () => {
 
       await buildApp(match, seats, tickets);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${MATCH_ID}/seats`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       expect(res.body.seats[0].status).toBe('available');
     });
 
     it('should mark a seat as "locked" when its key exists in Redis', async () => {
       const match = makeMatch();
-      const seats = [
-        makeSeat(SEAT_ID_FREE, 'A', '1', 1),
-        makeSeat(SEAT_ID_LOCKED, 'A', '1', 2),
-      ];
+      const seats = [makeSeat(SEAT_ID_FREE, 'A', '1', 1), makeSeat(SEAT_ID_LOCKED, 'A', '1', 2)];
 
       // Feed only SEAT_ID_LOCKED as locked in Redis
       await buildApp(match, seats, [], [SEAT_ID_LOCKED]);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${MATCH_ID}/seats`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       const freeSeat = res.body.seats.find((s: { id: string }) => s.id === SEAT_ID_FREE);
       const lockedSeat = res.body.seats.find((s: { id: string }) => s.id === SEAT_ID_LOCKED);
@@ -333,9 +317,7 @@ describe('MatchSeatsController – integration', () => {
 
       await buildApp(match, seats, []);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${MATCH_ID}/seats`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       expect(res.body.seats[0].status).toBe('disabled');
     });
@@ -347,9 +329,7 @@ describe('MatchSeatsController – integration', () => {
 
       await buildApp(match, [seat], []);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${MATCH_ID}/seats`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       // 4000 * 1.50 = 6000
       expect(res.body.seats[0].price).toBe(6000);
@@ -358,17 +338,15 @@ describe('MatchSeatsController – integration', () => {
     it('should compute a correct sector summary occupancyRatio', async () => {
       const match = makeMatch();
       const seats = [
-        makeSeat(SEAT_ID_FREE, 'A', '1', 1),     // available
-        makeSeat(SEAT_ID_SOLD, 'A', '1', 2),     // sold
-        makeSeat(SEAT_ID_LOCKED, 'A', '1', 3),   // locked via Redis
+        makeSeat(SEAT_ID_FREE, 'A', '1', 1), // available
+        makeSeat(SEAT_ID_SOLD, 'A', '1', 2), // sold
+        makeSeat(SEAT_ID_LOCKED, 'A', '1', 3), // locked via Redis
       ];
       const tickets = [makeTicket(MATCH_ID, SEAT_ID_SOLD, TicketStatus.PAID)];
 
       await buildApp(match, seats, tickets, [SEAT_ID_LOCKED]);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${MATCH_ID}/seats`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       const summary = res.body.sectorSummary.find((s: { section: string }) => s.section === 'A');
       expect(summary).toBeDefined();
@@ -390,9 +368,7 @@ describe('MatchSeatsController – integration', () => {
 
       await buildApp(match, seats, []);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${MATCH_ID}/seats`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       const sections = res.body.sectorSummary.map((s: { section: string }) => s.section);
       expect(sections).toEqual([...sections].sort());
@@ -411,9 +387,7 @@ describe('MatchSeatsController – integration', () => {
     it('should return 400 for a non-UUID matchId', async () => {
       await buildApp(makeMatch(), []);
 
-      await request(app.getHttpServer())
-        .get('/matches/not-a-uuid/seats')
-        .expect(400);
+      await request(app.getHttpServer()).get('/matches/not-a-uuid/seats').expect(400);
     });
 
     it('should include isAccessible field on each seat', async () => {
@@ -422,9 +396,7 @@ describe('MatchSeatsController – integration', () => {
 
       await buildApp(match, [seat], []);
 
-      const res = await request(app.getHttpServer())
-        .get(`/matches/${MATCH_ID}/seats`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       expect(res.body.seats[0].isAccessible).toBe(true);
     });
@@ -466,13 +438,9 @@ describe('MatchSeatsController – integration', () => {
 
     it('should return 409 Conflict when the seat is already locked', async () => {
       // SeatLockService.acquire returns null → already locked
-      await buildApp(
-        makeMatch(),
-        [makeSeat(SEAT_ID_LOCKED, 'A', '1', 1)],
-        [],
-        [],
-        { acquire: jest.fn().mockResolvedValue(null) },
-      );
+      await buildApp(makeMatch(), [makeSeat(SEAT_ID_LOCKED, 'A', '1', 1)], [], [], {
+        acquire: jest.fn().mockResolvedValue(null),
+      });
 
       const res = await request(app.getHttpServer())
         .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_LOCKED}/lock`)
@@ -488,13 +456,9 @@ describe('MatchSeatsController – integration', () => {
         ownerToken: OWNER_TOKEN,
         ttlSeconds: 300,
       });
-      await buildApp(
-        makeMatch(),
-        [makeSeat(SEAT_ID_FREE, 'A', '1', 1)],
-        [],
-        [],
-        { acquire: acquireSpy },
-      );
+      await buildApp(makeMatch(), [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], [], [], {
+        acquire: acquireSpy,
+      });
 
       await request(app.getHttpServer())
         .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
@@ -553,9 +517,7 @@ describe('MatchSeatsController – integration', () => {
       await buildApp(makeMatch(), [], [], [], { release: releaseSpy });
 
       await request(app.getHttpServer())
-        .delete(
-          `/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock?ownerToken=wrong-token`,
-        )
+        .delete(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock?ownerToken=wrong-token`)
         .expect(204);
     });
 

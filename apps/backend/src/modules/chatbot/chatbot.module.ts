@@ -11,12 +11,7 @@ import { ChatbotService } from './chatbot.service';
 @Module({
   imports: [TypeOrmModule.forFeature([Match, Ticket]), AuthModule],
   controllers: [ChatbotController],
-  providers: [
-    ChatbotService,
-    ChatbotContextService,
-    ChatbotHistoryService,
-    ChatbotRateLimitGuard,
-  ],
+  providers: [ChatbotService, ChatbotContextService, ChatbotHistoryService, ChatbotRateLimitGuard],
   exports: [ChatbotService],
 })
 export class ChatbotModule {}

@@ -129,9 +129,7 @@ export class ChatbotService {
     };
   }
 
-  private extractText(
-    response: Anthropic.Beta.PromptCaching.PromptCachingBetaMessage,
-  ): string {
+  private extractText(response: Anthropic.Beta.PromptCaching.PromptCachingBetaMessage): string {
     const parts: string[] = [];
     for (const block of response.content) {
       if (block.type === 'text') {
