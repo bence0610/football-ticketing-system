@@ -42,6 +42,36 @@ Full-stack ticketing, season pass and loyalty platform for football clubs.
 4. Futtasd: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
 5. A kapott `whsec_...` kulcsot másold be az `apps/backend/.env` fájlba `STRIPE_WEBHOOK_SECRET` értékeként
 
+## Seed fiókok
+
+A `npm run seed` parancs az alábbi felhasználókat hozza létre (idempotens):
+
+| E-mail             | Jelszó      | Szerepkör    | Leírás                              |
+| ------------------ | ----------- | ------------ | ----------------------------------- |
+| `admin@kte.hu`     | `Admin123!` | `super_admin`| Teljes admin hozzáférés             |
+| `fan@kte.hu`       | `Fan12345!` | `fan`        | Demo szurkoló fiók                  |
+| `kapu@kte.hu`      | `Kapu123!`  | `gate`       | Beléptető operátor (kapus) fiók     |
+
+### Szerepkörök
+
+| Szerepkör     | Elérhető oldalak                          |
+| ------------- | ----------------------------------------- |
+| `fan`         | Főoldal, vásárlás, profil, hűségprogram   |
+| `gate`        | `/gate` — beléptető oldal                 |
+| `admin`       | Minden fentebb + `/admin` dashboard       |
+| `super_admin` | Minden + magasabb szintű admin műveletek  |
+
+## Beléptető oldal (`/gate`)
+
+A `/gate` útvonal kapu-operátoroknak szól (szerepkör: `gate`, `admin` vagy `super_admin`).
+
+1. A szurkoló megmutatja a profil oldalán megjelenő QR kódot.
+2. Az operátor beilleszti a QR token szövegét a szövegmezőbe.
+3. A rendszer ellenőrzi a tokent és megjeleníti az eredményt magyarúl:
+   - **Belépés engedélyezve** — mérkőzés, szektoron/sor/szék adatokkal
+   - **A jegy már be lett mutatva** — dupla belépési kísérlet blokkolva
+   - **Érvénytelen jegy** / **A jegy lejárt** / **A jegy más mérkőzésre szól**
+
 ## Teszt fizetés
 
 | Mező   | Érték               |

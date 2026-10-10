@@ -73,4 +73,7 @@ export class TicketQrResponseDto {
 
   @ApiProperty()
   dataUrl!: string;
+
+  @ApiProperty({ description: 'The signed JWT token encoded inside the QR image' })
+  token!: string;
 }

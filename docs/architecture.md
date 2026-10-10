@@ -49,17 +49,28 @@ docs/      Tervezési és architektúra dokumentumok
 A kulcs prefix `kte:` (env-ből konfigurálható), tehát a teljes kulcs pl.
 `kte:seat-lock:m1:s1`.
 
+## Szerepkörök (UserRole)
+
+| Érték         | Leírás                                                             |
+| ------------- | ------------------------------------------------------------------ |
+| `fan`         | Alapértelmezett. Jegyvásárlás, profil, hűségprogram.              |
+| `gate`        | Beléptető operátor. Csak a `/gate` oldalt érheti el.              |
+| `admin`       | Admin panel (`/admin`) + gate oldal.                              |
+| `super_admin` | Teljes hozzáférés.                                                 |
+
+A beléptetés folyamata: szurkoló QR token → `/gate` oldal → `PATCH /api/tickets/:id/scan` (szerepkör: gate/admin/super_admin) → token JWT-ellenőrzés (QrService) → jegy USED státuszra.
+
 ## Frontend útvonalak
 
-| Útvonal       | Komponens         | Megjegyzés         |
+| Útvonal       | Komponens         | Guard              |
 | ------------- | ----------------- | ------------------ |
-| `/`           | `HomePage`        | Lazy, eager UI     |
-| `/stadium`    | `StadiumPage`     | Lazy               |
-| `/cart`       | `CartPage`        | Lazy               |
-| `/checkout`   | `CheckoutPage`    | Lazy               |
-| `/profile`    | `ProfilePage`     | Lazy               |
-| `/admin`      | `AdminPage`       | Lazy, később guard |
+| `/`           | `HomePage`        | —                  |
+| `/stadium`    | `StadiumPage`     | —                  |
+| `/cart`       | `CartPage`        | —                  |
+| `/checkout`   | `CheckoutPage`    | `authGuard`        |
+| `/profile`    | `ProfilePage`     | `authGuard`        |
+| `/gate`       | `GatePage`        | `gateGuard` (gate/admin/super_admin) |
+| `/admin`      | `AdminPage`       | `adminGuard` (admin/super_admin) |
 | `**`          | `NotFoundPage`    | 404                |
 
-Minden komponens **standalone**, **OnPush** changeDetection, NgRx Store
-globálisan provide-olva (üres reducer map jelenleg).
+Minden komponens **standalone**, **OnPush** changeDetection.

@@ -19,18 +19,16 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { Router } from '@angular/router';
 import { Subscription, firstValueFrom, interval } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { TicketResponse } from '../../core/models/ticket.models';
 import { SeasonPassResponse } from '../../core/models/season-pass.models';
 import { SeasonPassesService } from '../../core/services/season-passes.service';
-import {
-  LoyaltyTier,
-  UserProfile,
-  UserTicket,
-} from '../../shared/models/auth.model';
+import { TicketsService } from '../../core/services/tickets.service';
+import { LoyaltyTier, UserProfile } from '../../shared/models/auth.model';
 import { WaitlistEntry } from '../../shared/models/waitlist.model';
-import { HufCurrencyPipe } from '../../shared/pipes/huf-currency.pipe';
 import { AuthApiService } from '../../shared/services/auth.api.service';
 import { WaitlistApiService } from '../../shared/services/waitlist.api.service';
 import { SeasonPassCardComponent } from './components/season-pass-card.component';
+import { TicketCardComponent } from './components/ticket-card.component';
 import { WaitlistCardComponent } from './components/waitlist-card/waitlist-card.component';
 
 const TIER_LABEL: Readonly<Record<LoyaltyTier, string>> = {
@@ -62,8 +60,8 @@ const WAITLIST_POLL_MS = 5_000;
     MatButtonModule,
     MatDividerModule,
     MatProgressSpinnerModule,
-    HufCurrencyPipe,
     SeasonPassCardComponent,
+    TicketCardComponent,
     WaitlistCardComponent,
   ],
   template: `
@@ -113,29 +111,7 @@ const WAITLIST_POLL_MS = 5_000;
             } @else {
               <div class="kte-profile__tickets">
                 @for (ticket of activeTickets(); track ticket.id) {
-                  <mat-card appearance="outlined" class="kte-profile__ticket">
-                    <mat-card-header>
-                      <mat-card-title>
-                        {{ ticket.homeTeam }} – {{ ticket.awayTeam }}
-                      </mat-card-title>
-                      <mat-card-subtitle>
-                        {{ ticket.kickoffAt | date: "yyyy. MMM d. HH:mm" : '' : 'hu-HU' }}
-                        · {{ ticket.venue }}
-                      </mat-card-subtitle>
-                    </mat-card-header>
-                    <mat-card-content>
-                      <dl class="kte-profile__ticket-grid">
-                        <dt>Szektor</dt>
-                        <dd>{{ ticket.section }}</dd>
-                        <dt>Sor / Szék</dt>
-                        <dd>{{ ticket.row }} / {{ ticket.seatNumber }}</dd>
-                        <dt>Ár</dt>
-                        <dd>{{ ticket.pricePaid | hufCurrency }}</dd>
-                        <dt>QR azonosító</dt>
-                        <dd class="kte-profile__qr">{{ ticket.qrCode }}</dd>
-                      </dl>
-                    </mat-card-content>
-                  </mat-card>
+                  <kte-ticket-card [ticket]="ticket" />
                 }
               </div>
             }
@@ -147,18 +123,7 @@ const WAITLIST_POLL_MS = 5_000;
             } @else {
               <div class="kte-profile__history">
                 @for (ticket of pastTickets(); track ticket.id) {
-                  <mat-card appearance="outlined" class="kte-profile__history-row">
-                    <mat-card-content>
-                      <div class="kte-profile__history-meta">
-                        <strong>{{ ticket.homeTeam }} – {{ ticket.awayTeam }}</strong>
-                        <span>{{ ticket.kickoffAt | date: "yyyy. MMM d." : '' : 'hu-HU' }}</span>
-                      </div>
-                      <div class="kte-profile__history-details">
-                        <span>{{ ticket.section }} · sor {{ ticket.row }} · szék {{ ticket.seatNumber }}</span>
-                        <span>{{ ticket.pricePaid | hufCurrency }}</span>
-                      </div>
-                    </mat-card-content>
-                  </mat-card>
+                  <kte-ticket-card [ticket]="ticket" />
                 }
               </div>
             }
@@ -281,35 +246,6 @@ const WAITLIST_POLL_MS = 5_000;
         gap: var(--kte-spacing-3);
         padding: var(--kte-spacing-4) 0;
       }
-      .kte-profile__ticket-grid {
-        display: grid;
-        grid-template-columns: max-content 1fr;
-        gap: 6px var(--kte-spacing-3);
-        margin: 0;
-      }
-      .kte-profile__ticket-grid dt {
-        font-weight: 600;
-        color: rgba(0, 0, 0, 0.6);
-      }
-      .kte-profile__ticket-grid dd {
-        margin: 0;
-      }
-      .kte-profile__qr {
-        font-family: 'Roboto Mono', monospace;
-        font-size: 12px;
-      }
-      .kte-profile__history-meta {
-        display: flex;
-        justify-content: space-between;
-        font-size: 14px;
-      }
-      .kte-profile__history-details {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 4px;
-        color: rgba(0, 0, 0, 0.6);
-        font-size: 13px;
-      }
       .kte-profile__empty {
         padding: var(--kte-spacing-6);
         text-align: center;
@@ -335,6 +271,7 @@ export class ProfilePageComponent implements OnInit {
   private readonly api = inject(AuthApiService);
   private readonly auth = inject(AuthService);
   private readonly passesApi = inject(SeasonPassesService);
+  private readonly ticketsService = inject(TicketsService);
   private readonly waitlistApi = inject(WaitlistApiService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -343,15 +280,15 @@ export class ProfilePageComponent implements OnInit {
   protected readonly loadingPasses = signal(true);
   protected readonly loadingWaitlist = signal(true);
   protected readonly profile = signal<UserProfile | null>(null);
-  protected readonly tickets = signal<readonly UserTicket[]>([]);
+  protected readonly tickets = signal<readonly TicketResponse[]>([]);
   protected readonly passes = signal<readonly SeasonPassResponse[]>([]);
   protected readonly waitlistEntries = signal<readonly WaitlistEntry[]>([]);
 
   protected readonly activeTickets = computed(() =>
-    this.tickets().filter((t) => t.isActive),
+    this.tickets().filter((t) => t.status === 'paid' || t.status === 'pending_payment'),
   );
   protected readonly pastTickets = computed(() =>
-    this.tickets().filter((t) => !t.isActive),
+    this.tickets().filter((t) => t.status !== 'paid' && t.status !== 'pending_payment'),
   );
 
   protected readonly initials = computed(() => {
@@ -382,12 +319,12 @@ export class ProfilePageComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      const [profile, ticketsPage] = await Promise.all([
+      const [profile, tickets] = await Promise.all([
         firstValueFrom(this.api.me()),
-        firstValueFrom(this.api.myTickets(50, 0)),
+        firstValueFrom(this.ticketsService.listMine()),
       ]);
       this.profile.set(profile);
-      this.tickets.set(ticketsPage.items);
+      this.tickets.set(tickets);
     } finally {
       this.loading.set(false);
     }

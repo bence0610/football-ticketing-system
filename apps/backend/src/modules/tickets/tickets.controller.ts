@@ -1,18 +1,22 @@
 import { Body, Controller, Get, Param, Patch, Req, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { UserRole } from '../../database/entities';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { TicketsService } from './tickets.service';
 import { ScanTicketDto, TicketScanResponseDto } from './dto/scan-ticket.dto';
 import { TicketResponseDto, TicketQrResponseDto } from './dto/ticket-response.dto';
 import { Ticket } from '../../database/entities';
+import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 
 interface AuthenticatedRequest extends Request {
-  user?: { sub: string; userId?: string; id?: string; role?: string };
+  user?: AuthenticatedUser;
 }
 
 function extractUserId(req: AuthenticatedRequest): string {
-  const userId = req.user?.sub ?? req.user?.userId ?? req.user?.id;
+  const userId = req.user?.id;
   if (!userId) {
     throw new Error('Authenticated user id missing from request');
   }
@@ -62,7 +66,7 @@ export class TicketsController {
   }
 
   @Get('me')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOkResponse({ type: [TicketResponseDto] })
   async listMine(@Req() req: AuthenticatedRequest): Promise<TicketResponseDto[]> {
@@ -72,7 +76,7 @@ export class TicketsController {
   }
 
   @Get(':id/qr')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOkResponse({ type: TicketQrResponseDto })
   async getQr(
@@ -80,12 +84,13 @@ export class TicketsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<TicketQrResponseDto> {
     const userId = extractUserId(req);
-    const dataUrl = await this.ticketsService.getQrForOwner(id, userId);
-    return { ticketId: id, dataUrl };
+    const { dataUrl, token } = await this.ticketsService.getQrForOwner(id, userId);
+    return { ticketId: id, dataUrl, token };
   }
 
   @Patch(':id/scan')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.GATE, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOkResponse({ type: TicketScanResponseDto })
   async scan(
@@ -93,7 +98,7 @@ export class TicketsController {
     @Body() body: ScanTicketDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<TicketScanResponseDto> {
-    const scannedByUserId = req.user?.sub ?? req.user?.userId ?? req.user?.id;
+    const scannedByUserId = req.user?.id;
     return this.ticketsService.scanTicket(id, {
       token: body.token,
       scannedByUserId,

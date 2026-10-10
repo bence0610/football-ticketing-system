@@ -60,13 +60,16 @@ export class TicketsService {
    * The token includes the persisted `qr_jti` so a leaked old token can be
    * rotated (admin can simply update qr_jti on the row to invalidate it).
    */
-  async getQrForOwner(ticketId: string, userId: string): Promise<string> {
+  async getQrForOwner(
+    ticketId: string,
+    userId: string,
+  ): Promise<{ dataUrl: string; token: string }> {
     const ticket = await this.findById(ticketId, userId);
     if (ticket.status !== TicketStatus.PAID && ticket.status !== TicketStatus.USED) {
       throw new BadRequestException(`Ticket ${ticketId} is not in a presentable state`);
     }
     const result = await this.qrService.generateForTicket(ticket.id, ticket.qrJti);
-    return result.dataUrl;
+    return { dataUrl: result.dataUrl, token: result.token };
   }
 
   /**
@@ -95,7 +98,7 @@ export class TicketsService {
       const ticketRepo = manager.getRepository(Ticket);
       const ticket = await ticketRepo.findOne({
         where: { id: ticketId },
-        relations: ['match'],
+        relations: ['match', 'seat'],
       });
       if (!ticket) {
         return { success: false, result: 'invalid', message: 'ticket_not_found' };
@@ -133,6 +136,24 @@ export class TicketsService {
         result: 'ok',
         ticketId: ticket.id,
         scannedAt: now.toISOString(),
+        match: ticket.match
+          ? {
+              id: ticket.match.id,
+              homeTeam: ticket.match.homeTeam,
+              awayTeam: ticket.match.awayTeam,
+              venue: ticket.match.venue,
+              kickoffAt: ticket.match.kickoffAt.toISOString(),
+            }
+          : undefined,
+        seat: ticket.seat
+          ? {
+              id: ticket.seat.id,
+              section: ticket.seat.section,
+              row: ticket.seat.row,
+              number: ticket.seat.number,
+              category: ticket.seat.category,
+            }
+          : undefined,
       };
     });
   }

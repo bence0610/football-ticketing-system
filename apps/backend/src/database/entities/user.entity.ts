@@ -7,6 +7,7 @@ import { Waitlist } from './waitlist.entity';
 
 export enum UserRole {
   FAN = 'fan',
+  GATE = 'gate',
   ADMIN = 'admin',
   SUPER_ADMIN = 'super_admin',
 }

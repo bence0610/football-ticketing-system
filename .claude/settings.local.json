@@ -67,7 +67,9 @@
       "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/health\" -Method Get | ConvertTo-Json)",
       "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/health\" -Method Get | ConvertTo-Json -Depth 5)",
       "Bash(npx eslint *)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\User\\\\szakdolgozat\" -Directory)",
+      "Bash(Select-Object -ExpandProperty Name)"
     ]
   }
 }

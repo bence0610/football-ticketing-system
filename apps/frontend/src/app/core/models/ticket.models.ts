@@ -33,6 +33,35 @@ export interface TicketResponse {
 export interface TicketQrResponse {
   ticketId: string;
   dataUrl: string;
+  token: string;
+}
+
+export type ScanResult = 'ok' | 'already_used' | 'invalid' | 'expired' | 'wrong_match';
+
+export interface ScanMatchInfo {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
+  venue: string;
+  kickoffAt: string;
+}
+
+export interface ScanSeatInfo {
+  id: string;
+  section: string;
+  row: string;
+  number: number;
+  category: string;
+}
+
+export interface TicketScanResponse {
+  success: boolean;
+  result: ScanResult;
+  ticketId?: string;
+  scannedAt?: string;
+  message?: string;
+  match?: ScanMatchInfo;
+  seat?: ScanSeatInfo;
 }
 
 export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {

@@ -95,7 +95,27 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
     logger.log('Created fan@kte.hu (password: Fan12345!)');
   }
 
-  // 3. Seats (idempotent)
+  // 3. Gate operator user
+  const existingGate = await userRepo.findOne({ where: { email: 'kapu@kte.hu' } });
+  if (!existingGate) {
+    const passwordHash = await bcrypt.hash('Kapu123!', 12);
+    const gate = userRepo.create({
+      id: randomUUID(),
+      email: 'kapu@kte.hu',
+      passwordHash,
+      firstName: 'Kapu',
+      lastName: 'Operator',
+      role: UserRole.GATE,
+      emailVerified: true,
+      isActive: true,
+    });
+    await userRepo.save(gate);
+    logger.log('Created kapu@kte.hu (password: Kapu123!)');
+  } else {
+    logger.log('Gate user already exists, skipping.');
+  }
+
+  // 5. Seats (idempotent)
   const seatCount = await seatRepo.count();
   if (seatCount === 0) {
     const seatsToInsert: Seat[] = [];
@@ -123,7 +143,7 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
     logger.log(`Seats already present (${seatCount}), skipping seat seed.`);
   }
 
-  // 4. Mark past-season matches as FINISHED (idempotent housekeeping).
+  // 6. Mark past-season matches as FINISHED (idempotent housekeeping).
   // The previous season's NB1 fixtures (e.g. KTE vs Ferencvárosi TC on 2026-07-05)
   // are kept for historical reference but moved to FINISHED so they no longer
   // appear in the on-sale listings.
@@ -138,7 +158,7 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
     }
   }
 
-  // 5. Upcoming friendly matches (pre-season July 2026)
+  // 7. Upcoming friendly matches (pre-season July 2026)
   const totalCapacity = await seatRepo.count({ where: { isActive: true } });
 
   interface FriendlyBlueprint {
@@ -210,7 +230,7 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
     );
   }
 
-  // 6. Season pass prices for 2026/2027 (idempotent per (section, seasonLabel))
+  // 8. Season pass prices for 2026/2027 (idempotent per (section, seasonLabel))
   interface SeasonPassPriceBlueprint {
     section: string;
     sectionLabel: string;

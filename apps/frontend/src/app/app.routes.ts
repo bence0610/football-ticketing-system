@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { adminGuard } from './core/auth/admin.guard';
 import { authGuard, guestGuard } from './core/auth/auth.guard';
+import { gateGuard } from './core/auth/gate.guard';
 import { AppShellComponent } from './core/layout/app-shell/app-shell.component';
 
 export const APP_ROUTES: Routes = [
@@ -83,6 +84,13 @@ export const APP_ROUTES: Routes = [
             (m) => m.SeasonPassConfirmationPageComponent,
           ),
         title: 'Sikeres bérletvásárlás',
+      },
+      {
+        path: 'gate',
+        canActivate: [gateGuard],
+        loadComponent: () =>
+          import('./features/gate/gate.page').then((m) => m.GatePageComponent),
+        title: 'Beléptető',
       },
       {
         path: 'admin',

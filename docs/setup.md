@@ -24,8 +24,8 @@ mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS kte_jegyportal CHARACTER SET 
 # 4. Migrációk + seed
 npm run migration:run
 npm run seed
-# Létrejön: 1 mérkőzés (KTE vs FTC), ~370 szék 4 szektorban,
-# admin@kte.hu (Admin123!), fan@kte.hu (Fan12345!).
+# Létrejön: 2 mérkőzés, ~370 szék 4 szektorban,
+# admin@kte.hu (Admin123!), fan@kte.hu (Fan12345!), kapu@kte.hu (Kapu123!).
 
 # 5. Indítás
 npm run start:all
@@ -40,3 +40,23 @@ npm run start:all
 curl http://localhost:3000/health
 # { "status": "ok", "checks": { "database": "up", "redis": "up" }, ... }
 ```
+
+## Teljes vásárlás → belépés folyamat (kézi teszt)
+
+1. Nyisd meg a frontenden: `http://localhost:4200`
+2. Jelentkezz be **fan@kte.hu / Fan12345!** fiókkal.
+3. Válassz egy mérkőzést → kattints egy szabad székre → Add kosárba → Fizetés.
+4. Teszt kártyaadatok: `4242 4242 4242 4242`, lejárat `12/29`, CVC `123`.
+5. Fizetés után menj a **Profil** oldalra → nyisd meg a jegy QR-párbeszédét (QR ikon).
+6. A párbeszédben a QR kép alatt megjelenik a **token szövege** és egy **Másolás** gomb. Kattints rá.
+7. Jelentkezz ki, majd jelentkezz be **kapu@kte.hu / Kapu123!** fiókkal.
+8. Nyisd meg: `http://localhost:4200/gate`
+9. Illeszd be a tokent a szövegmezőbe → **Ellenőrzés**.
+   - Első beolvasás: zöld **„Belépés engedélyezve"** + mérkőzés és szék adatai.
+10. Kattints **„Következő jegy"**, majd illeszd be ugyanazt a tokent újra → **„A jegy már be lett mutatva"**.
+
+> **Megjegyzés:** a Stripe webhook-ot a Stripe CLI-vel kell továbbítani a helyi backendnek:
+> ```bash
+> stripe listen --forward-to localhost:3000/api/webhooks/stripe
+> ```
+> A kapott `whsec_...` értéket másold be az `apps/backend/.env` fájl `STRIPE_WEBHOOK_SECRET` mezőjébe.

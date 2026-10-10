@@ -1,17 +1,45 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsString, MinLength } from 'class-validator';
 
 export class ScanTicketDto {
-  /**
-   * The JWT-encoded QR token presented by the visitor at the gate.
-   * Optional because some scan flows pass only the path-id (already verified
-   * by other means, e.g. trusted operator app).
-   */
-  @ApiProperty({ required: false, example: 'eyJhbGciOi...' })
-  @IsOptional()
+  @ApiProperty({ example: 'eyJhbGciOi...' })
   @IsString()
   @MinLength(20)
-  token?: string;
+  token!: string;
+}
+
+export class ScanMatchInfoDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  homeTeam!: string;
+
+  @ApiProperty()
+  awayTeam!: string;
+
+  @ApiProperty()
+  venue!: string;
+
+  @ApiProperty()
+  kickoffAt!: string;
+}
+
+export class ScanSeatInfoDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  section!: string;
+
+  @ApiProperty()
+  row!: string;
+
+  @ApiProperty()
+  number!: number;
+
+  @ApiProperty()
+  category!: string;
 }
 
 export class TicketScanResponseDto {
@@ -29,4 +57,10 @@ export class TicketScanResponseDto {
 
   @ApiProperty({ required: false })
   message?: string;
+
+  @ApiProperty({ required: false, type: ScanMatchInfoDto })
+  match?: ScanMatchInfoDto;
+
+  @ApiProperty({ required: false, type: ScanSeatInfoDto })
+  seat?: ScanSeatInfoDto;
 }

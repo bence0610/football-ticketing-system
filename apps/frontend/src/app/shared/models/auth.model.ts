@@ -1,4 +1,4 @@
-export type UserRole = 'fan' | 'admin' | 'super_admin';
+export type UserRole = 'fan' | 'gate' | 'admin' | 'super_admin';
 export type LoyaltyTier = 'bronze' | 'silver' | 'gold' | 'platinum';
 
 export interface AuthUser {
