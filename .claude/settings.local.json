@@ -65,7 +65,9 @@
       "Bash(fuser -k 3000/tcp)",
       "Bash(curl *)",
       "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/health\" -Method Get | ConvertTo-Json)",
-      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/health\" -Method Get | ConvertTo-Json -Depth 5)"
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/health\" -Method Get | ConvertTo-Json -Depth 5)",
+      "Bash(npx eslint *)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

@@ -88,6 +88,42 @@ export class SeatsService {
   }
 
   /**
+   * Resolves the current availability of the given seats for a specific match.
+   * Queries DB and Redis at call time — safe to use at payment time to guard
+   * against races that occurred after the initial seat lock.
+   */
+  async resolveAvailabilityForSeats(
+    matchId: string,
+    seatIds: string[],
+  ): Promise<Map<string, SeatAvailability>> {
+    if (seatIds.length === 0) {
+      return new Map();
+    }
+
+    const seats = await this.seatRepository.find({
+      where: { id: In(seatIds) },
+    });
+
+    const tickets = await this.ticketRepository.find({
+      where: { matchId, seatId: In(seatIds), status: In(ACTIVE_TICKET_STATUSES) },
+      select: ['seatId'],
+    });
+    const soldSeatIds = new Set<string>(tickets.map((t) => t.seatId));
+
+    const lockedSeatIds = await this.fetchLockedSeatIds(matchId, seatIds);
+    const seasonPassSeatIds = await this.fetchSeasonPassSeatIds();
+
+    const result = new Map<string, SeatAvailability>();
+    for (const seat of seats) {
+      result.set(
+        seat.id,
+        this.computeSeatAvailability(seat, soldSeatIds, lockedSeatIds, seasonPassSeatIds),
+      );
+    }
+    return result;
+  }
+
+  /**
    * Loads the Redis seat-lock keys for the given seat ids in a single
    * pipeline. Falls back gracefully (treats every seat as unlocked)
    * if Redis is unavailable.
@@ -174,19 +210,12 @@ export class SeatsService {
     lockedSeatIds: Set<string>,
     seasonPassSeatIds: Set<string>,
   ): SeatStatusDto {
-    let status: SeatAvailability;
-    if (!seat.isActive) {
-      status = SeatAvailability.DISABLED;
-    } else if (soldSeatIds.has(seat.id)) {
-      status = SeatAvailability.SOLD;
-    } else if (seasonPassSeatIds.has(seat.id)) {
-      status = SeatAvailability.SEASON_PASS;
-    } else if (lockedSeatIds.has(seat.id)) {
-      status = SeatAvailability.LOCKED;
-    } else {
-      status = SeatAvailability.AVAILABLE;
-    }
-
+    const status = this.computeSeatAvailability(
+      seat,
+      soldSeatIds,
+      lockedSeatIds,
+      seasonPassSeatIds,
+    );
     const price = Math.round(basePrice * Number(seat.priceModifier));
 
     return {
@@ -199,6 +228,27 @@ export class SeatsService {
       status,
       isAccessible: seat.isAccessible,
     };
+  }
+
+  private computeSeatAvailability(
+    seat: Seat,
+    soldSeatIds: Set<string>,
+    lockedSeatIds: Set<string>,
+    seasonPassSeatIds: Set<string>,
+  ): SeatAvailability {
+    if (!seat.isActive) {
+      return SeatAvailability.DISABLED;
+    }
+    if (soldSeatIds.has(seat.id)) {
+      return SeatAvailability.SOLD;
+    }
+    if (seasonPassSeatIds.has(seat.id)) {
+      return SeatAvailability.SEASON_PASS;
+    }
+    if (lockedSeatIds.has(seat.id)) {
+      return SeatAvailability.LOCKED;
+    }
+    return SeatAvailability.AVAILABLE;
   }
 
   private buildSectorSummary(seats: SeatStatusDto[]): SectorSummaryDto[] {

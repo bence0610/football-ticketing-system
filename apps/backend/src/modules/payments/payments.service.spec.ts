@@ -12,6 +12,8 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { QrService } from '../qr/qr.service';
 import { TicketRendererService } from '../tickets/ticket-renderer.service';
 import { Match, Seat, Ticket } from '../../database/entities';
+import { SeatAvailability } from '../seats/dto';
+import { SeatsService } from '../seats/seats.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -22,7 +24,12 @@ describe('PaymentsService', () => {
   };
   const mockMatchRepo = { findOne: jest.fn() };
   const mockSeatRepo = { find: jest.fn() };
-  const mockRedis = { del: jest.fn(), set: jest.fn() };
+  const mockRedis = { del: jest.fn(), set: jest.fn(), get: jest.fn() };
+  const mockSeatsService = { resolveAvailabilityForSeats: jest.fn() };
+  const mockStripe = {
+    paymentIntents: { create: jest.fn(), retrieve: jest.fn() },
+    webhooks: { constructEvent: jest.fn() },
+  };
   const mockSeatLockService = { release: jest.fn() };
   const mockDataSource = { transaction: jest.fn() };
   const mockLoyaltyService = { award: jest.fn() };
@@ -50,18 +57,13 @@ describe('PaymentsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
-        {
-          provide: STRIPE_CLIENT,
-          useValue: {
-            paymentIntents: { create: jest.fn() },
-            webhooks: { constructEvent: jest.fn() },
-          },
-        },
+        { provide: STRIPE_CLIENT, useValue: mockStripe },
         { provide: getRepositoryToken(Match), useValue: mockMatchRepo },
         { provide: getRepositoryToken(Seat), useValue: mockSeatRepo },
         { provide: getRepositoryToken(Ticket), useValue: mockTicketRepo },
         { provide: REDIS_CLIENT, useValue: mockRedis },
         { provide: SeatLockService, useValue: mockSeatLockService },
+        { provide: SeatsService, useValue: mockSeatsService },
         { provide: DataSource, useValue: mockDataSource },
         { provide: LoyaltyService, useValue: mockLoyaltyService },
         { provide: QrService, useValue: mockQrService },
@@ -127,6 +129,70 @@ describe('PaymentsService', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+  });
+
+  describe('createPaymentIntent', () => {
+    const matchId = 'aaaaaaaa-0000-4000-8000-000000000001';
+    const seatId = 'bbbbbbbb-0000-4000-8000-000000000001';
+    const userId = 'cccccccc-0000-4000-8000-000000000001';
+    const ownerToken = 'dddddddd-0000-4000-8000-000000000001';
+
+    beforeEach(() => {
+      mockMatchRepo.findOne.mockResolvedValue({
+        id: matchId,
+        homeTeam: 'KTE',
+        awayTeam: 'DVTK',
+        basePrice: '3000',
+      });
+      mockSeatRepo.find.mockResolvedValue([
+        { id: seatId, priceModifier: '1.0', section: 'A', row: '1', number: 1 },
+      ]);
+    });
+
+    it('should throw ConflictException when a seat is held by a season pass', async () => {
+      mockSeatsService.resolveAvailabilityForSeats.mockResolvedValue(
+        new Map([[seatId, SeatAvailability.SEASON_PASS]]),
+      );
+
+      await expect(
+        service.createPaymentIntent(userId, {
+          matchId,
+          seats: [{ seatId, ownerToken }],
+        }),
+      ).rejects.toThrow('Ez a hely bérletes hely.');
+    });
+
+    it('should throw ConflictException when a seat is inactive', async () => {
+      mockSeatsService.resolveAvailabilityForSeats.mockResolvedValue(
+        new Map([[seatId, SeatAvailability.DISABLED]]),
+      );
+
+      await expect(
+        service.createPaymentIntent(userId, {
+          matchId,
+          seats: [{ seatId, ownerToken }],
+        }),
+      ).rejects.toThrow('Ez a hely nem foglalható');
+    });
+
+    it('should create a payment intent for an available locked seat', async () => {
+      mockSeatsService.resolveAvailabilityForSeats.mockResolvedValue(
+        new Map([[seatId, SeatAvailability.LOCKED]]),
+      );
+      mockRedis.get.mockResolvedValue(ownerToken);
+      mockStripe.paymentIntents.create.mockResolvedValue({
+        id: 'pi_test_123',
+        client_secret: 'secret_test_456',
+      });
+
+      const result = await service.createPaymentIntent(userId, {
+        matchId,
+        seats: [{ seatId, ownerToken }],
+      });
+
+      expect(result.paymentIntentId).toBe('pi_test_123');
+      expect(result.clientSecret).toBe('secret_test_456');
     });
   });
 });

@@ -26,7 +26,7 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import { SeatsService } from './seats.service';
-import { LockSeatResponseDto, MatchSeatsResponseDto } from './dto';
+import { LockSeatResponseDto, MatchSeatsResponseDto, SeatAvailability } from './dto';
 
 @ApiTags('Seats')
 @Controller('matches/:matchId/seats')
@@ -66,6 +66,22 @@ export class MatchSeatsController {
     @Param('seatId', new ParseUUIDPipe()) seatId: string,
     @CurrentUser() user: AuthenticatedUser | undefined,
   ): Promise<LockSeatResponseDto> {
+    const availability = await this.seatsService.resolveAvailabilityForSeats(matchId, [seatId]);
+    const status = availability.get(seatId);
+
+    if (status === undefined) {
+      throw new NotFoundException(`A szék (${seatId}) nem található.`);
+    }
+    if (status === SeatAvailability.DISABLED) {
+      throw new ConflictException('Ez a hely nem foglalható.');
+    }
+    if (status === SeatAvailability.SOLD) {
+      throw new ConflictException('Ez a hely már elkelt.');
+    }
+    if (status === SeatAvailability.SEASON_PASS) {
+      throw new ConflictException('Ez a hely bérletes hely.');
+    }
+
     const lock = await this.seatLockService.acquire({
       matchId,
       seatId,

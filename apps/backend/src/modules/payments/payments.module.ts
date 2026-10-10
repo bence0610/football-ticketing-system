@@ -4,6 +4,7 @@ import { Match, Seat, Ticket } from '../../database/entities';
 import { AuthModule } from '../auth/auth.module';
 import { EmailModule } from '../email/email.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
+import { SeatsModule } from '../seats/seats.module';
 import { TicketsModule } from '../tickets/tickets.module';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
@@ -16,6 +17,7 @@ import { stripeProvider } from './stripe.provider';
     AuthModule,
     LoyaltyModule,
     EmailModule,
+    SeatsModule,
     TicketsModule,
   ],
   controllers: [PaymentsController, StripeWebhookController],

@@ -60,6 +60,7 @@ const SEAT_ID_SOLD = 'bbbbbbbb-0000-4000-8000-000000000002';
 const SEAT_ID_LOCKED = 'bbbbbbbb-0000-4000-8000-000000000003';
 const SEAT_ID_DISABLED = 'bbbbbbbb-0000-4000-8000-000000000004';
 const SEAT_ID_ACCESSIBLE = 'bbbbbbbb-0000-4000-8000-000000000005';
+const SEAT_ID_SEASON_PASS = 'bbbbbbbb-0000-4000-8000-000000000006';
 const OWNER_TOKEN = 'dddddddd-0000-4000-8000-000000000001';
 const NON_EXISTENT_MATCH_ID = 'ffffffff-ffff-4fff-bfff-ffffffffffff';
 
@@ -170,6 +171,7 @@ describe('MatchSeatsController – integration', () => {
     tickets: Ticket[] = [],
     lockedSeatIds: string[] = [],
     lockServiceOverrides: Partial<SeatLockService> = {},
+    seasonPassSeatIds: string[] = [],
   ): Promise<void> {
     const matchRepoMock = {
       findOne: jest.fn().mockResolvedValue(match),
@@ -184,7 +186,7 @@ describe('MatchSeatsController – integration', () => {
     };
 
     const seasonPassRepoMock = {
-      find: jest.fn().mockResolvedValue([]),
+      find: jest.fn().mockResolvedValue(seasonPassSeatIds.map((id) => ({ seatId: id }))),
     };
 
     const redisMock = makeRedisMock(lockedSeatIds);
@@ -467,6 +469,43 @@ describe('MatchSeatsController – integration', () => {
       expect(acquireSpy).toHaveBeenCalledWith(
         expect.objectContaining({ matchId: MATCH_ID, seatId: SEAT_ID_FREE }),
       );
+    });
+
+    it('should return 409 when trying to lock a sold seat', async () => {
+      const tickets = [makeTicket(MATCH_ID, SEAT_ID_SOLD, TicketStatus.PAID)];
+      await buildApp(makeMatch(), [makeSeat(SEAT_ID_SOLD, 'A', '1', 2)], tickets);
+
+      const res = await request(app.getHttpServer())
+        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_SOLD}/lock`)
+        .expect(409);
+
+      expect(res.body.message).toBe('Ez a hely már elkelt.');
+    });
+
+    it('should return 409 when trying to lock a season-pass seat', async () => {
+      await buildApp(makeMatch(), [makeSeat(SEAT_ID_SEASON_PASS, 'A', '1', 6)], [], [], {}, [
+        SEAT_ID_SEASON_PASS,
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_SEASON_PASS}/lock`)
+        .expect(409);
+
+      expect(res.body.message).toBe('Ez a hely bérletes hely.');
+    });
+
+    it('should return 409 when trying to lock an inactive seat', async () => {
+      await buildApp(
+        makeMatch(),
+        [makeSeat(SEAT_ID_DISABLED, 'A', '1', 4, { isActive: false })],
+        [],
+      );
+
+      const res = await request(app.getHttpServer())
+        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_DISABLED}/lock`)
+        .expect(409);
+
+      expect(res.body.message).toContain('Ez a hely nem foglalható');
     });
 
     it('should return 400 for a non-UUID seatId', async () => {

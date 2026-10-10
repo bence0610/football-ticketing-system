@@ -26,6 +26,8 @@ import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import { EmailService } from '../email/email.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { SeatAvailability } from '../seats/dto';
+import { SeatsService } from '../seats/seats.service';
 import { QrService } from '../qr/qr.service';
 import { TicketRendererService } from '../tickets/ticket-renderer.service';
 import {
@@ -57,6 +59,7 @@ export class PaymentsService {
     @InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly seatLockService: SeatLockService,
+    private readonly seatsService: SeatsService,
     private readonly dataSource: DataSource,
     private readonly loyaltyService: LoyaltyService,
     private readonly qrService: QrService,
@@ -552,30 +555,40 @@ export class PaymentsService {
 
   /**
    * Validates that every seat in the request is still locked by the caller,
-   * not yet sold, and resolves their server-authoritative price.
+   * not yet sold, not season-pass-held, not inactive, and resolves their
+   * server-authoritative price.
+   *
+   * Calls SeatsService.resolveAvailabilityForSeats so the rule lives in one
+   * place. The DB + Redis queries run at payment time, guarding against races
+   * that occurred after the initial seat lock.
    */
   private async assertSeatsAvailable(
     matchId: string,
     requested: PaymentIntentSeatDto[],
     match: Match,
   ): Promise<SeatLine[]> {
+    const seatIds = requested.map((r) => r.seatId);
     const seats = await this.seatRepository.find({
-      where: { id: In(requested.map((r) => r.seatId)) },
+      where: { id: In(seatIds) },
     });
     if (seats.length !== requested.length) {
       throw new BadRequestException('Egy vagy több szék nem található.');
     }
 
-    const soldTickets = await this.ticketRepository.find({
-      where: {
-        matchId,
-        seatId: In(requested.map((r) => r.seatId)),
-        status: In([TicketStatus.PAID, TicketStatus.PENDING_PAYMENT]),
-      },
-      select: ['seatId'],
-    });
-    if (soldTickets.length > 0) {
-      throw new ConflictException('Egy vagy több szék már elkelt.');
+    const availability = await this.seatsService.resolveAvailabilityForSeats(matchId, seatIds);
+    for (const seat of seats) {
+      const seatStatus = availability.get(seat.id);
+      if (seatStatus === SeatAvailability.DISABLED) {
+        throw new ConflictException(
+          `Ez a hely nem foglalható (${seat.section}-${seat.row}-${seat.number}).`,
+        );
+      }
+      if (seatStatus === SeatAvailability.SOLD) {
+        throw new ConflictException('Ez a hely már elkelt.');
+      }
+      if (seatStatus === SeatAvailability.SEASON_PASS) {
+        throw new ConflictException('Ez a hely bérletes hely.');
+      }
     }
 
     const lines: SeatLine[] = [];
