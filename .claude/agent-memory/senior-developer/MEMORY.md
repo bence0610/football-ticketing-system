@@ -5,3 +5,4 @@
 - [Iteration 4 scope](project_iteration_4_tickets_loyalty_loans.md) — Tickets/Loyalty/Pass-Loan (KTE-038..054 except KTE-051)
 - [Payment flow](project_payment_flow.md) — single Stripe path in PaymentsModule; /api/payments/create-intent + /api/webhooks/stripe; CheckoutModule removed 2026-10-09
 - [Season pass purchase flow](project_season_pass_purchase_flow.md) — separate Stripe path in SeasonPassesModule, SeasonPassPrice catalogue, seat-map 'season_pass' status
+- [E2E test suite](project_e2e_test_suite.md) — apps/backend/test/, real MySQL+Redis, Stripe stub keeps real signature verifier

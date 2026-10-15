@@ -69,7 +69,30 @@
       "Bash(npx eslint *)",
       "Bash(echo \"EXIT:$?\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\User\\\\szakdolgozat\" -Directory)",
-      "Bash(Select-Object -ExpandProperty Name)"
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(mysql --version)",
+      "Bash(redis-cli --version)",
+      "Bash(nc -z 127.0.0.1 3306)",
+      "Bash(echo \"mysql: $?\")",
+      "Bash(nc -z 127.0.0.1 6379)",
+      "Bash(echo \"redis: $?\")",
+      "PowerShell(Test-NetConnection *)",
+      "Bash(DB_USERNAME=kte_user DB_PASSWORD=changeme npm run test:e2e)",
+      "PowerShell(npm run *)",
+      "PowerShell(Get-Service *)",
+      "PowerShell(& \"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -u kte_user -pchangeme -e \"SHOW GRANTS FOR CURRENT_USER\" 2>&1)",
+      "PowerShell(& \"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -u root -e \"SELECT 1\" 2>&1 | Select-Object -Last 5)",
+      "Bash(Select-Object -First 20)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(docker system *)",
+      "Bash(docker pull *)",
+      "Bash(docker context *)",
+      "Bash(docker info *)",
+      "Bash(echo \"TypeScript exit: $?\")",
+      "Bash(docker rmi *)",
+      "Bash(docker run *)",
+      "Bash(docker image *)"
     ]
   }
 }
