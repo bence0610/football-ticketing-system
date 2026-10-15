@@ -2,7 +2,7 @@
 
 ## Előfeltételek
 
-- Node.js 20.10+
+- Node.js 24
 - npm 10+
 - MySQL 8 fut
 - Redis 7 fut

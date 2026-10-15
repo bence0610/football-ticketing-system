@@ -92,7 +92,8 @@
       "Bash(echo \"TypeScript exit: $?\")",
       "Bash(docker rmi *)",
       "Bash(docker run *)",
-      "Bash(docker image *)"
+      "Bash(docker image *)",
+      "Bash(npm --version)"
     ]
   }
 }
