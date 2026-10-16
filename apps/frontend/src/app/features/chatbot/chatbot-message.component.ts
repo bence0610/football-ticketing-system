@@ -23,8 +23,8 @@ import { ChatbotMessage } from '../../shared/models/chatbot.model';
       .kte-chatbot-msg__bubble {
         max-width: 80%;
         padding: 10px 14px;
-        background: #2E2E2E;
-        color: #F5F5F5;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--kte-surface);
         border-radius: 14px 14px 14px 4px;
         font-size: 14px;
         line-height: 1.45;
@@ -35,8 +35,8 @@ import { ChatbotMessage } from '../../shared/models/chatbot.model';
         justify-content: flex-end;
       }
       .kte-chatbot-msg--user .kte-chatbot-msg__bubble {
-        background: #C94B1E;
-        color: #FFFFFF;
+        background: var(--kte-brand-mid);
+        color: var(--kte-surface);
         border-radius: 14px 14px 4px 14px;
       }
     `,

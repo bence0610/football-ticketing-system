@@ -126,64 +126,72 @@ import {
   `,
   styles: [
     `
+      /* Loyalty dashboard: light surface base per design-token refactor.
+         Gold accents reserved for the tier badge/card only, per token policy. */
       .loyalty-page { display: block; padding: 24px; max-width: 1080px; margin: 0 auto; }
       .loader { display: flex; justify-content: center; padding: 64px; }
 
       .hero {
-        background: #1a1a1a;
-        border: 2px solid #2e2e2e;
-        border-radius: 16px;
+        background: var(--kte-surface);
+        border: 2px solid var(--kte-border);
+        border-radius: var(--kte-radius-lg);
         padding: 32px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 16px;
       }
-      .hero h1 { margin: 0 0 12px; font-size: 28px; color: #f5f5f5; }
+      .hero h1 { margin: 0 0 12px; font-size: 28px; color: var(--kte-ink); font-family: var(--kte-font-display); }
       .tier-badge {
         display: inline-block;
         padding: 8px 18px;
-        border-radius: 999px;
-        color: #0f0f0f;
+        border-radius: var(--kte-radius-pill);
+        color: var(--kte-surface);
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.6px;
         font-size: 13px;
       }
-      .points-value { font-size: 56px; font-weight: 700; color: #c94b1e; line-height: 1; }
-      .points-label { color: #aaaaaa; font-size: 13px; text-align: right; }
+      .points-value {
+        font-size: 56px;
+        font-weight: 700;
+        color: var(--kte-gold);
+        line-height: 1;
+        font-family: var(--kte-font-display);
+      }
+      .points-label { color: var(--kte-muted); font-size: 13px; text-align: right; }
 
-      .progress-card { background: #1a1a1a; padding: 20px; margin-bottom: 16px; color: #f5f5f5; }
+      .progress-card { background: var(--kte-surface); border: 1px solid var(--kte-border); padding: 20px; margin-bottom: 16px; color: var(--kte-ink); }
       .progress-header { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; }
-      .points-needed { color: #aaaaaa; }
-      .progress-info { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: #777777; }
+      .points-needed { color: var(--kte-muted); }
+      .progress-info { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--kte-faint); }
 
       .kte-progress {
-        --mdc-linear-progress-track-color: #2e2e2e;
-        --mdc-linear-progress-active-indicator-color: #c94b1e;
+        --mdc-linear-progress-track-color: var(--kte-line);
+        --mdc-linear-progress-active-indicator-color: var(--kte-brand-mid);
         height: 10px; border-radius: 6px;
       }
-      .max-tier { color: #ffd700; font-weight: 600; display: flex; gap: 8px; align-items: center; }
+      .max-tier { color: var(--kte-gold-ink); background: var(--kte-gold-bg); padding: 12px 16px; border-radius: var(--kte-radius); font-weight: 600; display: flex; gap: 8px; align-items: center; }
 
-      .tiers-card { background: #1a1a1a; padding: 20px; margin-bottom: 16px; color: #f5f5f5; }
-      .tiers-card h3 { margin: 0 0 16px; font-size: 16px; color: #aaaaaa; text-transform: uppercase; letter-spacing: 0.6px; }
+      .tiers-card { background: var(--kte-surface); border: 1px solid var(--kte-border); padding: 20px; margin-bottom: 16px; color: var(--kte-ink); }
+      .tiers-card h3 { margin: 0 0 16px; font-size: 16px; color: var(--kte-muted); text-transform: uppercase; letter-spacing: 0.6px; }
       .tier-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-      .tier-cell { background: #0f0f0f; border: 1px solid #2e2e2e; border-radius: 12px; padding: 16px; transition: border-color .15s; }
-      .tier-cell.active { border-color: #c94b1e; }
-      .tier-color { width: 32px; height: 32px; border-radius: 8px; margin-bottom: 8px; }
-      .tier-name { font-weight: 700; font-size: 16px; }
-      .tier-min { font-size: 13px; color: #aaaaaa; }
-      .tier-discount { font-size: 13px; color: #4caf50; margin-top: 4px; }
+      .tier-cell { background: var(--kte-page); border: 1px solid var(--kte-border); border-radius: var(--kte-radius); padding: 16px; transition: border-color .15s; }
+      .tier-cell.active { border-color: var(--kte-brand-mid); }
+      .tier-color { width: 32px; height: 32px; border-radius: var(--kte-radius-sm); margin-bottom: 8px; }
+      .tier-name { font-weight: 700; font-size: 16px; color: var(--kte-ink); }
+      .tier-min { font-size: 13px; color: var(--kte-muted); }
+      .tier-discount { font-size: 13px; color: var(--kte-success); margin-top: 4px; }
 
-      .transactions-card { background: #1a1a1a; padding: 20px; color: #f5f5f5; }
-      .transactions-card h3 { margin: 0 0 16px; font-size: 16px; color: #aaaaaa; text-transform: uppercase; letter-spacing: 0.6px; }
+      .transactions-card { background: var(--kte-surface); border: 1px solid var(--kte-border); padding: 20px; color: var(--kte-ink); }
+      .transactions-card h3 { margin: 0 0 16px; font-size: 16px; color: var(--kte-muted); text-transform: uppercase; letter-spacing: 0.6px; }
       .kte-tx-table { width: 100%; background: transparent; }
-      .kte-tx-table th { color: #aaaaaa; background: #0f0f0f; }
+      .kte-tx-table th { color: var(--kte-muted); background: var(--kte-page); }
       .kte-tx-table tr.mat-mdc-row { height: 46px; }
-      .kte-tx-table tr.mat-mdc-row td { border-bottom: 1px solid #2e2e2e; color: #f5f5f5; }
-      .positive { color: #4caf50; font-weight: 600; }
-      .negative { color: #ff6f6f; font-weight: 600; }
-      .empty { color: #777777; padding: 16px; text-align: center; }
+      .kte-tx-table tr.mat-mdc-row td { border-bottom: 1px solid var(--kte-line); color: var(--kte-ink); }
+      .positive { color: var(--kte-success); font-weight: 600; }
+      .negative { color: var(--kte-danger); font-weight: 600; }
+      .empty { color: var(--kte-muted); padding: 16px; text-align: center; }
     `,
   ],
 })
@@ -238,7 +246,8 @@ export class LoyaltyDashboardPageComponent implements OnInit {
   }
 
   protected tierColor(tier: string): string {
-    return TIER_COLORS[tier as keyof typeof TIER_COLORS] ?? '#777777';
+    // Fallback mirrors --kte-faint from styles.scss (inline style, no CSS vars).
+    return TIER_COLORS[tier as keyof typeof TIER_COLORS] ?? '#9D96A8';
   }
 
   protected sourceLabel(tx: LoyaltyTransactionResponse): string {

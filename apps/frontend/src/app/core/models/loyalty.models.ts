@@ -50,11 +50,18 @@ export const TIER_LABELS: Record<LoyaltyTier, string> = {
   platinum: 'KTE Legenda',
 };
 
+/**
+ * Loyalty tier swatch colors. Values mirror design tokens from styles.scss
+ * (--kte-seat-pass, --kte-faint, --kte-gold, --kte-brand-mid). Kept as raw
+ * hex because tier colors are bound via `[style.background]` inline, which
+ * does not resolve CSS custom properties cross-browser. The gold value is
+ * reserved exclusively for the loyalty tier badge/card (--kte-gold).
+ */
 export const TIER_COLORS: Record<LoyaltyTier, string> = {
-  bronze: '#4B8EC9',
-  silver: '#AAAAAA',
-  gold: '#FFD700',
-  platinum: '#C94B1E',
+  bronze: '#1F5C8B',   // --kte-seat-pass
+  silver: '#9D96A8',   // --kte-faint
+  gold: '#C9A227',     // --kte-gold (reserved for loyalty tier)
+  platinum: '#6B2D96', // --kte-brand-mid
 };
 
 export const TRANSACTION_SOURCE_LABELS: Record<LoyaltyTransactionSource, string> = {

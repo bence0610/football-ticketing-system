@@ -229,7 +229,7 @@ const MAX_RETRY_ATTEMPTS = 3;
       }
       .kte-checkout__user-grid dt {
         font-weight: 600;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
       }
       .kte-checkout__user-grid dd {
         margin: 0;
@@ -242,14 +242,14 @@ const MAX_RETRY_ATTEMPTS = 3;
         display: flex;
         align-items: center;
         gap: var(--kte-spacing-2);
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
         margin: var(--kte-spacing-3) 0;
       }
       .kte-checkout__error {
-        background: rgba(244, 67, 54, 0.08);
-        color: #b71c1c;
+        background: var(--kte-danger-bg);
+        color: var(--kte-danger);
         padding: var(--kte-spacing-3);
-        border-radius: var(--kte-radius-md);
+        border-radius: var(--kte-radius);
         margin: var(--kte-spacing-2) 0;
       }
       .kte-checkout__support {
@@ -257,9 +257,9 @@ const MAX_RETRY_ATTEMPTS = 3;
         gap: var(--kte-spacing-2);
         align-items: flex-start;
         padding: var(--kte-spacing-3);
-        background: rgba(255, 152, 0, 0.1);
-        color: #b26500;
-        border-radius: var(--kte-radius-md);
+        background: var(--kte-warn-bg);
+        color: var(--kte-warn);
+        border-radius: var(--kte-radius);
         margin: var(--kte-spacing-2) 0;
       }
       .kte-checkout__support p {
@@ -282,7 +282,7 @@ const MAX_RETRY_ATTEMPTS = 3;
         flex-direction: column;
       }
       .kte-checkout__line div span {
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
         font-size: 12px;
       }
       .kte-checkout__line--total {
@@ -290,7 +290,7 @@ const MAX_RETRY_ATTEMPTS = 3;
       }
       .kte-checkout__lock-status {
         margin-top: var(--kte-spacing-3);
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
         font-size: 13px;
         display: inline-flex;
         gap: 6px;

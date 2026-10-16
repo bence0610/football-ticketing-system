@@ -126,8 +126,8 @@ const STATUS_LABEL: Readonly<Record<WaitlistEntry['status'], string>> = {
         gap: var(--kte-spacing-2);
       }
       .kte-waitlist-card--notified {
-        border: 2px solid #C94B1E;
-        box-shadow: 0 4px 18px rgba(201, 75, 30, 0.18);
+        border: 2px solid var(--kte-danger);
+        box-shadow: 0 4px 18px rgba(138, 28, 28, 0.18);
       }
       .kte-waitlist-card__status {
         display: flex;
@@ -137,7 +137,7 @@ const STATUS_LABEL: Readonly<Record<WaitlistEntry['status'], string>> = {
         margin-bottom: var(--kte-spacing-2);
       }
       .kte-waitlist-card__position {
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
         font-size: 14px;
       }
       .kte-waitlist-card__notified {

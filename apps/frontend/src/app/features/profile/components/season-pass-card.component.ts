@@ -100,18 +100,18 @@ import {
   styles: [
     `
       :host { display: block; }
-      .pass-card { background: #1a1a1a; color: #f5f5f5; border: 1px solid #2e2e2e; }
-      .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #2e2e2e; }
-      .label { color: #aaaaaa; }
-      .loan-heading { margin: 18px 0 8px; font-size: 14px; color: #aaaaaa; text-transform: uppercase; letter-spacing: .5px; }
-      .empty { color: #777777; font-size: 13px; }
-      .loan-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #2e2e2e; }
+      .pass-card { background: var(--kte-surface); color: var(--kte-ink); border: 1px solid var(--kte-border); }
+      .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--kte-line); }
+      .label { color: var(--kte-muted); }
+      .loan-heading { margin: 18px 0 8px; font-size: 14px; color: var(--kte-muted); text-transform: uppercase; letter-spacing: .5px; }
+      .empty { color: var(--kte-faint); font-size: 13px; }
+      .loan-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--kte-line); }
       .loan-row:last-child { border-bottom: none; }
       .loan-title { font-weight: 600; }
-      .loan-meta { font-size: 12px; color: #aaaaaa; margin-top: 2px; }
+      .loan-meta { font-size: 12px; color: var(--kte-muted); margin-top: 2px; }
       mat-card-actions { padding: 8px 16px 16px; }
       .loan-cta {
-        font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+        font-family: var(--kte-font-display);
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -120,8 +120,9 @@ import {
         margin-left: 8px;
         padding: 2px 8px;
         font-size: 12px;
-        background: rgba(255, 255, 255, 0.12);
-        border-radius: 12px;
+        background: var(--kte-brand-tint);
+        color: var(--kte-brand-deep);
+        border-radius: var(--kte-radius);
         text-transform: uppercase;
         letter-spacing: 0.06em;
       }

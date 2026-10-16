@@ -151,8 +151,8 @@ const PITCH_RECT = { x: 130, y: 110, width: 340, height: 180 };
         display: block;
       }
       .kte-heatmap-wrapper {
-        background: #0F0F0F;
-        border-radius: 12px;
+        background: var(--kte-ink);
+        border-radius: 12px; /* deliberate exception: no 12px token */
         padding: 16px;
       }
       .kte-heatmap-svg {

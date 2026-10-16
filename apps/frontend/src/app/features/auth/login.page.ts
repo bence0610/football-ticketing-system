@@ -135,9 +135,9 @@ import { AuthService } from '../../core/auth/auth.service';
       .kte-auth-form__error {
         margin: 0;
         padding: var(--kte-spacing-3) var(--kte-spacing-4);
-        background: rgba(244, 67, 54, 0.08);
-        color: #b71c1c;
-        border-radius: var(--kte-radius-md);
+        background: var(--kte-danger-bg);
+        color: var(--kte-danger);
+        border-radius: var(--kte-radius);
         font-size: 14px;
       }
       .kte-auth-form__submit {

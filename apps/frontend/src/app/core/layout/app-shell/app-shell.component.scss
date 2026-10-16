@@ -62,7 +62,7 @@
     }
 
     a.kte-active {
-      background: rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.12); /* deliberate exception: translucent overlay on brand-colored toolbar */
     }
   }
 
@@ -109,7 +109,7 @@
     justify-content: space-between;
     padding: var(--kte-spacing-4) var(--kte-spacing-6);
     border-top: 1px solid var(--kte-color-border);
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--kte-muted);
     font-size: 13px;
     background: var(--kte-color-surface);
   }

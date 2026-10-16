@@ -110,8 +110,8 @@ const PADDING_Y = 24;
       }
       .kte-chart {
         margin: 0;
-        background: #FFFFFF;
-        border-radius: 12px;
+        background: var(--kte-surface);
+        border-radius: 12px; /* deliberate exception: no 12px token */
         padding: 16px;
       }
       .kte-chart__svg {
@@ -122,7 +122,7 @@ const PADDING_Y = 24;
         margin-top: 8px;
         text-align: center;
         font-size: 12px;
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--kte-muted);
       }
     `,
   ],

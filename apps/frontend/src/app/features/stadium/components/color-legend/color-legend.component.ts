@@ -40,10 +40,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       .kte-legend {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
-        border-radius: var(--kte-radius-md);
+        border-radius: var(--kte-radius);
         padding: 12px 14px;
         box-shadow: var(--kte-shadow-sm);
-        border: 1px solid var(--kte-color-border);
+        border: 1px solid var(--kte-border);
         font-size: 12px;
         min-width: 180px;
       }
@@ -53,7 +53,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
 
       ul {
@@ -68,7 +68,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
           display: flex;
           align-items: center;
           gap: 8px;
-          color: #4b5563;
+          color: var(--kte-muted);
         }
       }
 
@@ -80,15 +80,15 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       }
 
       .kte-legend__swatch--available {
-        background: #34d399;
+        background: var(--kte-seat-free);
       }
 
       .kte-legend__swatch--locked {
-        background: #fb923c;
+        background: var(--kte-seat-locked);
       }
 
       .kte-legend__swatch--sold {
-        background: #9ca3af;
+        background: var(--kte-seat-sold);
       }
 
       .kte-legend__swatch--season-pass {
@@ -100,12 +100,12 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
             transparent 3px,
             transparent 6px
           ),
-          #7e22ce;
+          var(--kte-seat-pass);
       }
 
       .kte-legend__swatch--disabled {
-        background: #ffffff;
-        border: 1px solid var(--kte-color-border);
+        background: var(--kte-surface);
+        border: 1px solid var(--kte-border);
       }
     `,
   ],

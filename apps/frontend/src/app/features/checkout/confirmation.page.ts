@@ -121,10 +121,10 @@ interface ConfirmationState {
         font-size: 64px;
         width: 64px;
         height: 64px;
-        color: #2e7d32;
+        color: var(--kte-success);
       }
       .kte-confirmation__lead {
-        color: rgba(0, 0, 0, 0.7);
+        color: var(--kte-muted);
       }
       .kte-confirmation__order-id {
         display: flex;
@@ -133,6 +133,8 @@ interface ConfirmationState {
         gap: 4px;
       }
       .kte-confirmation__order-id strong {
+        /* Monospace deliberate: payment-intent id is tabular data.
+           Left as a literal — no token for a mono stack. */
         font-family: 'Roboto Mono', monospace;
         font-size: 13px;
       }
@@ -151,8 +153,8 @@ interface ConfirmationState {
         align-items: center;
         text-align: left;
         padding: var(--kte-spacing-2);
-        border-radius: var(--kte-radius-md);
-        background: rgba(10, 61, 98, 0.05);
+        border-radius: var(--kte-radius);
+        background: var(--kte-brand-tint);
       }
       .kte-confirmation__price {
         font-weight: 600;

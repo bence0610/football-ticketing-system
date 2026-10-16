@@ -31,14 +31,18 @@ export class StripeService {
     const elements = stripe.elements({
       clientSecret,
       locale: 'hu',
+      // Stripe Elements appearance values must be concrete strings — the
+      // Elements iframe does not inherit the host page's CSS custom
+      // properties. Keep these in sync with --kte-brand-deep,
+      // --kte-surface, --kte-ink, --kte-font-body, --kte-radius-sm.
       appearance: {
         theme: 'stripe',
         variables: {
-          colorPrimary: '#0a3d62',
-          colorBackground: '#ffffff',
-          colorText: '#1a1a1a',
-          fontFamily: 'Inter, sans-serif',
-          borderRadius: '8px',
+          colorPrimary: '#4A1D6A',  // --kte-brand-deep
+          colorBackground: '#FFFFFF', // --kte-surface
+          colorText: '#14121A',       // --kte-ink
+          fontFamily: 'IBM Plex Sans, system-ui, sans-serif',
+          borderRadius: '8px',        // --kte-radius-sm
         },
       },
     });

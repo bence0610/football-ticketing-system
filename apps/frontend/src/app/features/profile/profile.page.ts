@@ -38,11 +38,19 @@ const TIER_LABEL: Readonly<Record<LoyaltyTier, string>> = {
   platinum: 'Platina',
 };
 
+/**
+ * Loyalty tier chip background colors on the profile page. Values mirror
+ * design tokens (--kte-seat-pass, --kte-faint, --kte-gold, --kte-brand-deep)
+ * from styles.scss — kept as raw hex because tier colors are bound via
+ * `[style.background-color]` inline, which does not reliably resolve CSS
+ * custom properties cross-browser. The gold value is reserved for the
+ * loyalty tier badge/card only (--kte-gold).
+ */
 const TIER_COLOR: Readonly<Record<LoyaltyTier, string>> = {
-  bronze: '#cd7f32',
-  silver: '#9e9e9e',
-  gold: '#ffc905',
-  platinum: '#0a3d62',
+  bronze: '#1F5C8B',   // --kte-seat-pass
+  silver: '#9D96A8',   // --kte-faint
+  gold: '#C9A227',     // --kte-gold (reserved loyalty color)
+  platinum: '#4A1D6A', // --kte-brand-deep
 };
 
 const WAITLIST_POLL_MS = 5_000;
@@ -92,7 +100,7 @@ const WAITLIST_POLL_MS = 5_000;
               <mat-chip-set>
                 <mat-chip
                   [style.background-color]="tierColor()"
-                  [style.color]="user.loyaltyTier === 'gold' ? '#1a1a1a' : 'white'"
+                  [style.color]="'#ffffff'"
                   highlighted
                 >
                   <mat-icon>workspace_premium</mat-icon>
@@ -206,22 +214,25 @@ const WAITLIST_POLL_MS = 5_000;
         width: 72px;
         height: 72px;
         border-radius: 50%;
-        background: var(--kte-color-primary);
-        color: white;
+        background: var(--kte-brand-deep);
+        color: var(--kte-surface);
         font-size: 28px;
         font-weight: 700;
         display: flex;
         align-items: center;
         justify-content: center;
         letter-spacing: 0.04em;
+        font-family: var(--kte-font-display);
       }
       .kte-profile__identity h1 {
         margin: 0 0 4px;
         font-size: 24px;
+        font-family: var(--kte-font-display);
+        color: var(--kte-ink);
       }
       .kte-profile__identity p {
         margin: 0;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
       }
       .kte-profile__phone {
         display: inline-flex;
@@ -236,7 +247,8 @@ const WAITLIST_POLL_MS = 5_000;
       }
       .kte-profile__loyalty strong {
         font-size: 18px;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
+        font-family: var(--kte-font-display);
       }
       .kte-profile__tickets,
       .kte-profile__history,
@@ -249,7 +261,7 @@ const WAITLIST_POLL_MS = 5_000;
       .kte-profile__empty {
         padding: var(--kte-spacing-6);
         text-align: center;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
       }
       .kte-profile__actions {
         display: flex;

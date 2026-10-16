@@ -244,8 +244,8 @@ const MAX_RETRY_ATTEMPTS = 3;
       }
       .kte-section-card {
         position: relative;
-        border: 2px solid var(--kte-color-border, #d1d5db);
-        background: #ffffff;
+        border: 2px solid var(--kte-border);
+        background: var(--kte-surface);
         border-radius: var(--kte-radius-lg);
         padding: var(--kte-spacing-4);
         cursor: pointer;
@@ -260,15 +260,15 @@ const MAX_RETRY_ATTEMPTS = 3;
         box-shadow: var(--kte-shadow-md);
       }
       .kte-section-card--selected {
-        border-color: var(--kte-color-primary);
-        box-shadow: 0 0 0 3px rgba(10, 61, 98, 0.15);
+        border-color: var(--kte-brand-deep);
+        box-shadow: 0 0 0 3px rgba(74, 29, 106, 0.15);
       }
       .kte-section-card__badge {
         align-self: flex-start;
-        background: var(--kte-color-primary);
-        color: #ffffff;
+        background: var(--kte-brand-deep);
+        color: var(--kte-surface);
         padding: 4px 10px;
-        border-radius: var(--kte-radius-md);
+        border-radius: var(--kte-radius);
         font-weight: 700;
         letter-spacing: 0.08em;
       }
@@ -279,11 +279,12 @@ const MAX_RETRY_ATTEMPTS = 3;
       .kte-section-card__price {
         font-size: 22px;
         font-weight: 700;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
+        font-family: var(--kte-font-display);
       }
       .kte-section-card__season {
         font-size: 12px;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
       }
       .kte-season-pass__checkout {
         display: grid;
@@ -301,13 +302,13 @@ const MAX_RETRY_ATTEMPTS = 3;
       }
       .kte-season-pass__note {
         margin: var(--kte-spacing-2) 0;
-        color: rgba(0, 0, 0, 0.7);
+        color: var(--kte-muted);
       }
       .kte-season-pass__error {
-        background: rgba(244, 67, 54, 0.08);
-        color: #b71c1c;
+        background: var(--kte-danger-bg);
+        color: var(--kte-danger);
         padding: var(--kte-spacing-3);
-        border-radius: var(--kte-radius-md);
+        border-radius: var(--kte-radius);
         margin: var(--kte-spacing-2) 0;
       }
       .kte-season-pass__support {
@@ -315,9 +316,9 @@ const MAX_RETRY_ATTEMPTS = 3;
         gap: var(--kte-spacing-2);
         align-items: flex-start;
         padding: var(--kte-spacing-3);
-        background: rgba(255, 152, 0, 0.1);
-        color: #b26500;
-        border-radius: var(--kte-radius-md);
+        background: var(--kte-warn-bg);
+        color: var(--kte-warn);
+        border-radius: var(--kte-radius);
         margin: var(--kte-spacing-2) 0;
       }
       .kte-season-pass__support p {

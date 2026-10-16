@@ -92,7 +92,7 @@ import { HufCurrencyPipe } from '../../../../shared/pipes/huf-currency.pipe';
         gap: 16px;
         padding: 24px;
         border-radius: var(--kte-radius-lg);
-        background: #ffffff;
+        background: var(--kte-surface);
         box-shadow: var(--kte-shadow-sm);
         height: 100%;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -114,10 +114,10 @@ import { HufCurrencyPipe } from '../../../../shared/pipes/huf-currency.pipe';
         letter-spacing: 0.16em;
         text-transform: uppercase;
         font-weight: 700;
-        color: var(--kte-color-primary);
-        background: rgba(10, 61, 98, 0.08);
+        color: var(--kte-brand-deep);
+        background: var(--kte-brand-tint);
         padding: 4px 10px;
-        border-radius: 999px;
+        border-radius: var(--kte-radius-pill);
       }
 
       .kte-match-card__badge {
@@ -126,17 +126,17 @@ import { HufCurrencyPipe } from '../../../../shared/pipes/huf-currency.pipe';
         letter-spacing: 0.14em;
         font-weight: 700;
         padding: 4px 10px;
-        border-radius: 999px;
+        border-radius: var(--kte-radius-pill);
       }
 
       .kte-match-card__badge--home {
-        background: var(--kte-color-accent);
-        color: var(--kte-color-primary);
+        background: var(--kte-brand-mid);
+        color: var(--kte-surface);
       }
 
       .kte-match-card__badge--away {
-        background: rgba(10, 61, 98, 0.85);
-        color: #ffffff;
+        background: var(--kte-brand-deep);
+        color: var(--kte-surface);
       }
 
       .kte-match-card__teams {
@@ -147,18 +147,18 @@ import { HufCurrencyPipe } from '../../../../shared/pipes/huf-currency.pipe';
       }
 
       .kte-match-card__team {
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 22px;
         font-weight: 700;
         line-height: 1.1;
       }
 
       .kte-match-card__team--home {
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
 
       .kte-match-card__separator {
-        color: #9ca3af;
+        color: var(--kte-faint);
         font-weight: 600;
         font-size: 14px;
       }
@@ -175,14 +175,14 @@ import { HufCurrencyPipe } from '../../../../shared/pipes/huf-currency.pipe';
         align-items: center;
         gap: 6px;
         font-size: 13px;
-        color: #4b5563;
+        color: var(--kte-muted);
       }
 
       .kte-match-card__meta dt {
         margin: 0;
         display: inline-flex;
         align-items: center;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
 
       .kte-match-card__meta dd {
@@ -202,7 +202,7 @@ import { HufCurrencyPipe } from '../../../../shared/pipes/huf-currency.pipe';
         gap: 12px;
         margin-top: auto;
         padding-top: 8px;
-        border-top: 1px dashed var(--kte-color-border);
+        border-top: 1px dashed var(--kte-border);
       }
 
       .kte-match-card__status {
@@ -215,25 +215,25 @@ import { HufCurrencyPipe } from '../../../../shared/pipes/huf-currency.pipe';
       }
 
       .kte-match-card__status--on_sale {
-        background: rgba(34, 197, 94, 0.15);
-        color: #15803d;
+        background: var(--kte-success-bg);
+        color: var(--kte-success);
       }
 
       .kte-match-card__status--scheduled {
-        background: rgba(59, 130, 246, 0.15);
-        color: #1d4ed8;
+        background: var(--kte-brand-tint);
+        color: var(--kte-brand-deep);
       }
 
       .kte-match-card__status--sold_out {
-        background: rgba(239, 68, 68, 0.15);
-        color: #b91c1c;
+        background: var(--kte-danger-bg);
+        color: var(--kte-danger);
       }
 
       .kte-match-card__status--postponed,
       .kte-match-card__status--cancelled,
       .kte-match-card__status--finished {
-        background: #e5e7eb;
-        color: #4b5563;
+        background: var(--kte-line);
+        color: var(--kte-muted);
       }
     `,
   ],

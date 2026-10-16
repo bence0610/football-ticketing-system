@@ -135,7 +135,7 @@ interface CartRow extends CartItem {
         margin: 0;
       }
       .kte-cart__count {
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
       }
       .kte-cart__empty {
         text-align: center;
@@ -146,7 +146,7 @@ interface CartRow extends CartItem {
         font-size: 56px;
         width: 56px;
         height: 56px;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
       .kte-cart__items {
         display: grid;
@@ -166,7 +166,7 @@ interface CartRow extends CartItem {
         font-size: 16px;
       }
       .kte-cart__row-info span {
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
         font-size: 13px;
       }
       .kte-cart__row-seat {
@@ -183,7 +183,8 @@ interface CartRow extends CartItem {
       }
       .kte-cart__price {
         font-weight: 600;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
+        font-family: var(--kte-font-display);
       }
       .kte-cart__countdown {
         display: inline-flex;
@@ -193,11 +194,11 @@ interface CartRow extends CartItem {
         font-weight: 600;
       }
       .kte-cart__countdown--warn {
-        color: #d32f2f;
+        color: var(--kte-danger);
       }
       .kte-cart__summary {
         border-radius: var(--kte-radius-lg);
-        background: white;
+        background: var(--kte-surface);
         box-shadow: var(--kte-shadow-md);
       }
       .kte-cart__summary-row {
@@ -210,7 +211,7 @@ interface CartRow extends CartItem {
       }
       .kte-cart__warning {
         margin: var(--kte-spacing-3) 0 var(--kte-spacing-3);
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
         font-size: 13px;
         display: flex;
         gap: 6px;

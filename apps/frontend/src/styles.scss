@@ -44,7 +44,7 @@ $kte-warn: mat.define-palette(mat.$red-palette);
 $kte-theme: mat.define-light-theme((
   color: (primary: $kte-primary, accent: $kte-accent, warn: $kte-warn),
   typography: mat.define-typography-config(
-    $font-family: 'Inter, "Helvetica Neue", sans-serif'
+    $font-family: 'IBM Plex Sans, system-ui, sans-serif'
   ),
   density: 0,
 ));
@@ -52,22 +52,74 @@ $kte-theme: mat.define-light-theme((
 @include mat.all-component-themes($kte-theme);
 
 :root {
-  --kte-color-primary: #0a3d62;
-  --kte-color-accent: #ffc905;
-  --kte-color-text: #1a1a1a;
-  --kte-color-bg: #f6f7fb;
-  --kte-color-surface: #ffffff;
-  --kte-color-border: #e1e5ee;
-  --kte-radius-md: 8px;
-  --kte-radius-lg: 16px;
-  --kte-shadow-sm: 0 1px 2px rgba(10, 61, 98, 0.08);
-  --kte-shadow-md: 0 6px 18px rgba(10, 61, 98, 0.12);
-  --kte-spacing-1: 4px;
-  --kte-spacing-2: 8px;
-  --kte-spacing-3: 12px;
-  --kte-spacing-4: 16px;
-  --kte-spacing-6: 24px;
-  --kte-spacing-8: 32px;
+  /* brand */
+  --kte-brand-deep: #4A1D6A;
+  --kte-brand-mid:  #6B2D96;
+  --kte-brand-tint: #F3EDF8;
+  --kte-brand-edge: #DFD2EC;
+
+  /* text and surfaces */
+  --kte-ink:     #14121A;
+  --kte-muted:   #5B5566;
+  --kte-faint:   #9D96A8;
+  --kte-surface: #FFFFFF;
+  --kte-page:    #F7F6F9;
+  --kte-border:  #E7E4EC;
+  --kte-line:    #EFECF3;
+
+  /* loyalty — RESERVED. Only the loyalty tier badge/card may use these.
+     Never for buttons, links, focus rings or decoration. */
+  --kte-gold:      #C9A227;
+  --kte-gold-bg:   #FBF4DF;
+  --kte-gold-edge: #E8D79B;
+  --kte-gold-ink:  #6B5310;
+
+  /* seat / status semantics — differ in lightness, not only hue */
+  --kte-seat-free:     #2E7D4F;
+  --kte-seat-locked:   #C77700;
+  --kte-seat-sold:     #8A1C1C;
+  --kte-seat-pass:     #1F5C8B;
+  --kte-seat-disabled: #C9C6CF;
+
+  /* feedback */
+  --kte-success:    #2E7D4F;
+  --kte-success-bg: #E7F3EC;
+  --kte-warn:       #8A5300;
+  --kte-warn-bg:    #FBF1E0;
+  --kte-danger:     #8A1C1C;
+  --kte-danger-bg:  #F7E7E6;
+  --kte-danger-ink: #6B1616;
+
+  /* shape */
+  --kte-radius-sm:   8px;
+  --kte-radius:      10px;
+  --kte-radius-lg:   16px;
+  --kte-radius-pill: 999px;
+
+  /* type */
+  --kte-font-display: 'Archivo', system-ui, sans-serif;
+  --kte-font-body: 'IBM Plex Sans', system-ui, sans-serif;
+
+  /* -----------------------------------------------------------------------
+     Legacy aliases kept for backward compatibility with files that still
+     reference the pre-refactor token names. These point at the new tokens
+     above; do not add new usages — new code must use the semantic tokens.
+     --------------------------------------------------------------------- */
+  --kte-color-primary: var(--kte-brand-deep);
+  --kte-color-accent:  var(--kte-brand-mid);
+  --kte-color-text:    var(--kte-ink);
+  --kte-color-bg:      var(--kte-page);
+  --kte-color-surface: var(--kte-surface);
+  --kte-color-border:  var(--kte-border);
+  --kte-radius-md:     var(--kte-radius);
+  --kte-shadow-sm:     0 1px 2px rgba(20, 18, 26, 0.08);
+  --kte-shadow-md:     0 6px 18px rgba(20, 18, 26, 0.12);
+  --kte-spacing-1:     4px;
+  --kte-spacing-2:     8px;
+  --kte-spacing-3:     12px;
+  --kte-spacing-4:     16px;
+  --kte-spacing-6:     24px;
+  --kte-spacing-8:     32px;
 }
 
 html, body {
@@ -76,9 +128,9 @@ html, body {
 
 body {
   margin: 0;
-  font-family: 'Inter', 'Helvetica Neue', sans-serif;
-  color: var(--kte-color-text);
-  background: var(--kte-color-bg);
+  font-family: var(--kte-font-body);
+  color: var(--kte-ink);
+  background: var(--kte-page);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -87,17 +139,17 @@ body {
 }
 
 /* Loan initiation dialog (KTE-051) — overrides Material's default overlay
-   so the design's #222222 surface and rgba(0,0,0,0.72) backdrop come through. */
+   so the design's dark ink surface and backdrop come through. */
 .kte-loan-dialog-backdrop {
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(20, 18, 26, 0.72);
 }
 
 .kte-loan-dialog-panel .mat-mdc-dialog-container {
   --mdc-dialog-container-color: transparent;
-  --mdc-dialog-container-shape: 8px;
+  --mdc-dialog-container-shape: var(--kte-radius-sm);
   padding: 0;
   background: transparent;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 24px 48px rgba(20, 18, 26, 0.45);
 }
 
 .kte-loan-dialog-panel .mat-mdc-dialog-surface {

@@ -73,11 +73,13 @@ import { Pad2Pipe, TimeUntilPipe } from '../../../../shared/pipes/time-until.pip
       }
 
       .kte-countdown {
-        background: linear-gradient(135deg, #ffffff 0%, #f5f7fb 100%);
+        /* Gradient stop uses a one-off tint of --kte-page; left as a literal
+           since no token exists for an intermediate surface shade. */
+        background: linear-gradient(135deg, var(--kte-surface) 0%, #F5F7FB 100%);
         border-radius: var(--kte-radius-lg);
         padding: 32px;
         box-shadow: var(--kte-shadow-md);
-        border-left: 6px solid var(--kte-color-accent);
+        border-left: 6px solid var(--kte-brand-mid);
       }
 
       .kte-countdown__header {
@@ -91,17 +93,17 @@ import { Pad2Pipe, TimeUntilPipe } from '../../../../shared/pipes/time-until.pip
         font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.18em;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
         font-weight: 700;
       }
 
       .kte-countdown__matchup {
         margin: 0;
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 32px;
         font-weight: 700;
         letter-spacing: -0.01em;
-        color: var(--kte-color-text);
+        color: var(--kte-ink);
         display: flex;
         align-items: baseline;
         gap: 12px;
@@ -109,19 +111,19 @@ import { Pad2Pipe, TimeUntilPipe } from '../../../../shared/pipes/time-until.pip
       }
 
       .kte-countdown__home {
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
 
       .kte-countdown__vs {
         font-size: 18px;
         font-weight: 600;
-        color: #6b7280;
+        color: var(--kte-muted);
       }
 
       .kte-countdown__meta {
         margin: 0;
         font-size: 14px;
-        color: #4b5563;
+        color: var(--kte-muted);
         display: flex;
         align-items: center;
         gap: 8px;
@@ -130,7 +132,7 @@ import { Pad2Pipe, TimeUntilPipe } from '../../../../shared/pipes/time-until.pip
           font-size: 18px;
           width: 18px;
           height: 18px;
-          color: var(--kte-color-primary);
+          color: var(--kte-brand-deep);
         }
       }
 
@@ -144,19 +146,19 @@ import { Pad2Pipe, TimeUntilPipe } from '../../../../shared/pipes/time-until.pip
         display: flex;
         flex-direction: column;
         align-items: center;
-        background: var(--kte-color-primary);
-        color: #ffffff;
-        border-radius: var(--kte-radius-md);
+        background: var(--kte-brand-deep);
+        color: var(--kte-surface);
+        border-radius: var(--kte-radius);
         padding: 16px 12px;
         box-shadow: var(--kte-shadow-sm);
       }
 
       .kte-countdown__value {
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 36px;
         font-weight: 700;
         line-height: 1;
-        color: var(--kte-color-accent);
+        color: var(--kte-brand-tint);
         font-variant-numeric: tabular-nums;
       }
 
@@ -173,15 +175,15 @@ import { Pad2Pipe, TimeUntilPipe } from '../../../../shared/pipes/time-until.pip
         align-items: center;
         gap: 12px;
         padding: 16px;
-        border-radius: var(--kte-radius-md);
-        background: rgba(255, 201, 5, 0.18);
-        color: var(--kte-color-primary);
+        border-radius: var(--kte-radius);
+        background: var(--kte-brand-tint);
+        color: var(--kte-brand-deep);
         font-weight: 600;
       }
 
       .kte-countdown--empty {
         padding: 32px;
-        color: #4b5563;
+        color: var(--kte-muted);
       }
     `,
   ],

@@ -68,28 +68,29 @@ export interface TicketQrDialogData {
   styles: [
     `
       .qr-dialog {
-        color: #f5f5f5;
+        color: var(--kte-ink);
       }
       .qr {
         display: block;
         margin: 16px auto;
         width: 280px;
         height: 280px;
-        background: #fff;
-        border-radius: 12px;
+        background: var(--kte-surface);
+        border: 1px solid var(--kte-border);
+        border-radius: var(--kte-radius);
         padding: 12px;
       }
       .seat {
-        color: #aaaaaa;
+        color: var(--kte-muted);
         margin: 0 0 12px;
       }
       .hint {
-        color: #aaaaaa;
+        color: var(--kte-muted);
         font-size: 13px;
         text-align: center;
       }
       .error {
-        color: #ff6f6f;
+        color: var(--kte-danger);
       }
       .loader {
         display: flex;
@@ -98,11 +99,11 @@ export interface TicketQrDialogData {
       }
       .token-section {
         margin-top: 16px;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: 1px solid var(--kte-line);
         padding-top: 12px;
       }
       .token-label {
-        color: #888888;
+        color: var(--kte-muted);
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.05em;
@@ -112,7 +113,7 @@ export interface TicketQrDialogData {
         display: flex;
         align-items: center;
         gap: 8px;
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--kte-page);
         border-radius: 6px;
         padding: 6px 8px;
       }
@@ -120,7 +121,7 @@ export interface TicketQrDialogData {
         flex: 1;
         font-family: monospace;
         font-size: 11px;
-        color: #aaaaaa;
+        color: var(--kte-muted);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -131,7 +132,7 @@ export interface TicketQrDialogData {
         width: 32px;
         height: 32px;
         line-height: 32px;
-        color: #aaaaaa;
+        color: var(--kte-muted);
       }
       .copy-btn mat-icon {
         font-size: 16px;

@@ -50,9 +50,9 @@ import { MatIconModule } from '@angular/material/icon';
         padding: 56px 48px;
         border-radius: var(--kte-radius-lg);
         background:
-          radial-gradient(circle at 85% 20%, rgba(255, 201, 5, 0.18), transparent 60%),
-          linear-gradient(135deg, var(--kte-color-primary) 0%, #052545 100%);
-        color: #ffffff;
+          radial-gradient(circle at 85% 20%, rgba(243, 237, 248, 0.18), transparent 60%),
+          linear-gradient(135deg, var(--kte-brand-deep) 0%, var(--kte-ink) 100%);
+        color: var(--kte-surface);
         overflow: hidden;
         box-shadow: var(--kte-shadow-md);
       }
@@ -64,7 +64,7 @@ import { MatIconModule } from '@angular/material/icon';
         width: 320px;
         height: 320px;
         border-radius: 50%;
-        background: radial-gradient(circle, rgba(255, 201, 5, 0.12), transparent 70%);
+        background: radial-gradient(circle, rgba(243, 237, 248, 0.12), transparent 70%);
         pointer-events: none;
       }
 
@@ -76,16 +76,16 @@ import { MatIconModule } from '@angular/material/icon';
         height: 200px;
         border-radius: 50%;
         background: rgba(255, 255, 255, 0.05);
-        border: 4px solid var(--kte-color-accent);
-        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.32);
+        border: 4px solid var(--kte-brand-tint);
+        box-shadow: 0 12px 36px rgba(20, 18, 26, 0.32);
       }
 
       .kte-hero__crest-mark {
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-weight: 800;
         font-size: 64px;
         letter-spacing: 0.04em;
-        color: var(--kte-color-accent);
+        color: var(--kte-brand-tint);
       }
 
       .kte-hero__content {
@@ -101,13 +101,13 @@ import { MatIconModule } from '@angular/material/icon';
         font-size: 13px;
         letter-spacing: 0.16em;
         text-transform: uppercase;
-        color: var(--kte-color-accent);
+        color: var(--kte-brand-tint);
         font-weight: 600;
       }
 
       h1 {
         margin: 0;
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-weight: 800;
         font-size: clamp(36px, 5vw, 56px);
         line-height: 1.05;
@@ -137,8 +137,8 @@ import { MatIconModule } from '@angular/material/icon';
       .kte-hero__secondary-cta {
         height: 48px;
         padding: 0 24px;
-        color: var(--kte-color-accent);
-        border-color: var(--kte-color-accent) !important;
+        color: var(--kte-brand-tint);
+        border-color: var(--kte-brand-tint) !important;
       }
 
       @media (max-width: 720px) {

@@ -188,15 +188,15 @@ import { WaitlistJoinButtonComponent } from './components/waitlist-join-button/w
 
       .kte-stadium__header h1 {
         margin: 0;
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 32px;
         font-weight: 700;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
 
       .kte-stadium__header p {
         margin: 4px 0 0;
-        color: #4b5563;
+        color: var(--kte-muted);
       }
 
       .kte-stadium__toolbar {
@@ -211,7 +211,7 @@ import { WaitlistJoinButtonComponent } from './components/waitlist-join-button/w
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        color: #4b5563;
+        color: var(--kte-muted);
         font-size: 13px;
       }
 
@@ -252,19 +252,19 @@ import { WaitlistJoinButtonComponent } from './components/waitlist-join-button/w
         align-items: center;
         gap: 16px;
         padding: 16px 20px;
-        background: rgba(201, 75, 30, 0.08);
-        border-left: 4px solid #C94B1E;
-        border-radius: var(--kte-radius-md);
+        background: var(--kte-danger-bg);
+        border-left: 4px solid var(--kte-danger);
+        border-radius: var(--kte-radius);
       }
       .kte-stadium__sold-out mat-icon {
-        color: #C94B1E;
+        color: var(--kte-danger);
         font-size: 28px;
         width: 28px;
         height: 28px;
       }
       .kte-stadium__sold-out p {
         margin: 4px 0 0;
-        color: #555;
+        color: var(--kte-muted);
         font-size: 14px;
       }
       @media (max-width: 768px) {
@@ -280,17 +280,17 @@ import { WaitlistJoinButtonComponent } from './components/waitlist-join-button/w
         align-items: center;
         gap: 12px;
         padding: 64px 24px;
-        background: #ffffff;
+        background: var(--kte-surface);
         border-radius: var(--kte-radius-lg);
         box-shadow: var(--kte-shadow-sm);
-        color: #6b7280;
+        color: var(--kte-muted);
         text-align: center;
 
         mat-icon {
           font-size: 48px;
           width: 48px;
           height: 48px;
-          color: var(--kte-color-primary);
+          color: var(--kte-brand-deep);
         }
       }
 

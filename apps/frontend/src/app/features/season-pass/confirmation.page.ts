@@ -118,10 +118,10 @@ interface ConfirmationState {
         font-size: 64px;
         width: 64px;
         height: 64px;
-        color: #2e7d32;
+        color: var(--kte-success);
       }
       .kte-season-pass-confirmation__lead {
-        color: rgba(0, 0, 0, 0.7);
+        color: var(--kte-muted);
       }
       .kte-season-pass-confirmation__order-id {
         display: flex;
@@ -142,7 +142,7 @@ interface ConfirmationState {
       }
       .kte-season-pass-confirmation__grid dt {
         font-weight: 600;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
       }
       .kte-season-pass-confirmation__grid dd {
         margin: 0;

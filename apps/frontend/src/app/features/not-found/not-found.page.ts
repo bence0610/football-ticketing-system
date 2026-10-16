@@ -43,7 +43,7 @@ import { MatIconModule } from '@angular/material/icon';
 
       p {
         margin: 0 0 24px;
-        color: rgba(0, 0, 0, 0.7);
+        color: var(--kte-muted);
       }
     `,
   ],

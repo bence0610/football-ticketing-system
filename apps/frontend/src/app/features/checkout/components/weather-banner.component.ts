@@ -43,13 +43,13 @@ const COVERED_SECTORS = new Set<string>(['VIP']);
         gap: var(--kte-spacing-3);
         align-items: center;
         padding: var(--kte-spacing-4);
-        background: rgba(33, 150, 243, 0.1);
-        border-left: 4px solid #1976d2;
-        border-radius: var(--kte-radius-md);
+        background: var(--kte-brand-tint);
+        border-left: 4px solid var(--kte-seat-pass);
+        border-radius: var(--kte-radius);
         margin-bottom: var(--kte-spacing-4);
       }
       .kte-weather__icon {
-        color: #1976d2;
+        color: var(--kte-seat-pass);
         font-size: 36px;
         width: 36px;
         height: 36px;

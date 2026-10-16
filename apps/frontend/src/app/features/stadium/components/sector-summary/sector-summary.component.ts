@@ -63,10 +63,10 @@ import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/s
 
       .kte-sector-summary__title {
         margin: 0 0 12px;
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 20px;
         font-weight: 700;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
         letter-spacing: -0.005em;
       }
 
@@ -78,7 +78,7 @@ import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/s
 
       .kte-sector-card {
         padding: 16px;
-        border-radius: var(--kte-radius-md);
+        border-radius: var(--kte-radius);
         cursor: pointer;
         transition: transform 0.15s ease, box-shadow 0.15s ease;
         border: 2px solid transparent;
@@ -90,8 +90,8 @@ import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/s
       }
 
       .kte-sector-card--active {
-        border-color: var(--kte-color-accent);
-        box-shadow: 0 0 0 4px rgba(255, 201, 5, 0.18);
+        border-color: var(--kte-brand-mid);
+        box-shadow: 0 0 0 4px rgba(107, 45, 150, 0.18);
       }
 
       .kte-sector-card__header {
@@ -102,17 +102,17 @@ import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/s
       }
 
       .kte-sector-card__section {
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 24px;
         font-weight: 700;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
 
       .kte-sector-card__compass {
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: #6b7280;
+        color: var(--kte-muted);
       }
 
       .kte-sector-card__numbers {
@@ -120,14 +120,14 @@ import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/s
         display: flex;
         align-items: baseline;
         gap: 6px;
-        color: #4b5563;
+        color: var(--kte-muted);
         font-size: 13px;
       }
 
       .kte-sector-card__numbers strong {
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 22px;
-        color: #15803d;
+        color: var(--kte-success);
       }
 
       .kte-sector-card__legend {
@@ -135,7 +135,7 @@ import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/s
         justify-content: space-between;
         margin-top: 8px;
         font-size: 11px;
-        color: #6b7280;
+        color: var(--kte-muted);
 
         span {
           display: flex;
@@ -152,11 +152,11 @@ import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/s
       }
 
       .dot--locked {
-        background: #fb923c;
+        background: var(--kte-seat-locked);
       }
 
       .dot--sold {
-        background: #9ca3af;
+        background: var(--kte-seat-sold);
       }
     `,
   ],

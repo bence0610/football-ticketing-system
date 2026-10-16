@@ -115,15 +115,15 @@ import { ChatbotStore } from './state/chatbot.signals';
         width: 360px;
         height: 520px;
         max-height: calc(100vh - 32px);
-        background: #1A1A1A;
-        color: #F5F5F5;
-        border-radius: 16px;
-        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+        background: var(--kte-ink);
+        color: var(--kte-surface);
+        border-radius: var(--kte-radius-lg);
+        box-shadow: 0 18px 48px rgba(20, 18, 26, 0.32);
         overflow: hidden;
       }
       .kte-chatbot-panel__header {
-        background: #C94B1E;
-        color: #FFFFFF;
+        background: var(--kte-brand-mid);
+        color: var(--kte-surface);
         padding: 12px 12px 12px 16px;
         display: flex;
         align-items: center;
@@ -151,7 +151,8 @@ import { ChatbotStore } from './state/chatbot.signals';
         display: flex;
         flex-direction: column;
         gap: 16px;
-        color: #DDDDDD;
+        /* On the dark panel background a light near-white reads as "muted". */
+        color: rgba(255, 255, 255, 0.75);
         text-align: center;
         padding: 16px 0;
       }
@@ -161,8 +162,8 @@ import { ChatbotStore } from './state/chatbot.signals';
         gap: 8px;
       }
       .kte-chatbot-panel__chip {
-        background: #2E2E2E;
-        color: #F5F5F5;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--kte-surface);
         border: none;
         border-radius: 20px;
         padding: 10px 14px;
@@ -172,7 +173,7 @@ import { ChatbotStore } from './state/chatbot.signals';
         transition: background 0.15s ease;
       }
       .kte-chatbot-panel__chip:hover:not(:disabled) {
-        background: #3A3A3A;
+        background: rgba(255, 255, 255, 0.14);
       }
       .kte-chatbot-panel__chip:disabled {
         opacity: 0.5;
@@ -183,7 +184,7 @@ import { ChatbotStore } from './state/chatbot.signals';
         gap: 4px;
         padding: 8px 12px;
         align-self: flex-start;
-        background: #2E2E2E;
+        background: rgba(255, 255, 255, 0.08);
         border-radius: 14px;
         margin-bottom: 8px;
       }
@@ -191,7 +192,7 @@ import { ChatbotStore } from './state/chatbot.signals';
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: #C94B1E;
+        background: var(--kte-brand-tint);
         animation: kte-chatbot-pulse 1.2s infinite ease-in-out;
       }
       .kte-chatbot-panel__dot:nth-child(2) {
@@ -207,24 +208,24 @@ import { ChatbotStore } from './state/chatbot.signals';
       .kte-chatbot-panel__error {
         margin-top: 8px;
         padding: 8px 12px;
-        background: rgba(244, 67, 54, 0.15);
-        border-left: 3px solid #f44336;
+        background: rgba(138, 28, 28, 0.18); /* --kte-danger tint */
+        border-left: 3px solid var(--kte-danger);
         font-size: 13px;
-        color: #ff8a80;
+        color: var(--kte-danger-bg);
         border-radius: 6px;
       }
       .kte-chatbot-panel__form {
         display: flex;
         padding: 8px;
-        border-top: 1px solid #2E2E2E;
-        background: #1A1A1A;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: var(--kte-ink);
         gap: 4px;
       }
       .kte-chatbot-panel__input {
         flex: 1;
-        background: #0F0F0F;
-        color: #F5F5F5;
-        border: 1px solid #2E2E2E;
+        background: rgba(0, 0, 0, 0.35);
+        color: var(--kte-surface);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 20px;
         padding: 10px 14px;
         font-size: 14px;
@@ -232,7 +233,7 @@ import { ChatbotStore } from './state/chatbot.signals';
         transition: border-color 0.15s ease;
       }
       .kte-chatbot-panel__input:focus {
-        border-color: #C94B1E;
+        border-color: var(--kte-brand-mid);
       }
       .kte-chatbot-panel__input:disabled {
         opacity: 0.6;

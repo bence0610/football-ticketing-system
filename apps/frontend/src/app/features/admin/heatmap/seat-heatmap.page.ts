@@ -100,9 +100,9 @@ const REFRESH_MS = 60_000;
         display: flex;
         gap: 24px;
         flex-wrap: wrap;
-        background: #FFFFFF;
+        background: var(--kte-surface);
         padding: 12px 16px;
-        border-radius: 8px;
+        border-radius: var(--kte-radius-sm);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
       }
       .kte-heatmap-page__summary > div {
@@ -113,17 +113,17 @@ const REFRESH_MS = 60_000;
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--kte-muted);
       }
       .kte-heatmap-page__summary strong {
         font-size: 18px;
-        color: #C94B1E;
+        color: var(--kte-brand-mid);
       }
       .kte-heatmap-page__refresh {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        color: rgba(0, 0, 0, 0.5);
+        color: var(--kte-muted);
         font-size: 13px;
       }
       .kte-heatmap-page__loader {
@@ -132,21 +132,21 @@ const REFRESH_MS = 60_000;
         gap: 12px;
         justify-content: center;
         padding: 64px 0;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
       }
       .kte-heatmap-page__error {
         display: inline-flex;
         align-items: center;
         gap: 8px;
         padding: 16px;
-        background: rgba(244, 67, 54, 0.08);
-        color: #b71c1c;
-        border-radius: 8px;
+        background: var(--kte-danger-bg);
+        color: var(--kte-danger);
+        border-radius: var(--kte-radius-sm);
       }
       .kte-heatmap-page__empty {
         padding: 64px;
         text-align: center;
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--kte-muted);
       }
     `,
   ],

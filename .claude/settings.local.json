@@ -93,7 +93,12 @@
       "Bash(docker rmi *)",
       "Bash(docker run *)",
       "Bash(docker image *)",
-      "Bash(npm --version)"
+      "Bash(npm --version)",
+      "Bash(powershell.exe \"Get-PSDrive C | Select-Object Used,Free\")",
+      "Bash(Get-PSDrive C)",
+      "Bash(Select-Object Used,Free)",
+      "Bash(npm start *)",
+      "WebFetch(domain:localhost)"
     ]
   }
 }

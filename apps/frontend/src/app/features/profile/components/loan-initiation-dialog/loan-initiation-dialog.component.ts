@@ -338,8 +338,8 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     `
       :host {
         display: block;
-        color: #f5f5f5;
-        font-family: 'Inter', system-ui, sans-serif;
+        color: #ffffff;
+        font-family: var(--kte-font-body);
       }
 
       .loan-dialog {
@@ -363,13 +363,13 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       }
       .loan-dialog__header h2 {
         margin: 0;
-        font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+        font-family: var(--kte-font-display);
         font-weight: 700;
         font-size: 20px;
         line-height: 1.2;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: #f5f5f5;
+        color: #ffffff;
       }
       .loan-dialog__close {
         background: transparent;
@@ -385,7 +385,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       }
       .loan-dialog__close:hover {
         background: #2e2e2e;
-        color: #f5f5f5;
+        color: #ffffff;
       }
 
       .loan-dialog__steps {
@@ -414,7 +414,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       }
       .loan-dialog__step.is-active .loan-dialog__step-dot,
       .loan-dialog__step.is-done .loan-dialog__step-dot {
-        background: #c94b1e;
+        background: var(--kte-brand-mid);
       }
       .loan-dialog__step.is-active .loan-dialog__step-dot {
         transform: scale(1.15);
@@ -461,9 +461,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         line-height: 1.4;
       }
       .loan-dialog__banner--error {
-        border: 1px solid #ef5350;
-        background: rgba(239, 83, 80, 0.08);
-        color: #ef5350;
+        border: 1px solid var(--kte-danger);
+        background: rgba(138, 28, 28, 0.12); /* --kte-danger tint */
+        color: var(--kte-danger);
       }
 
       /* Match list */
@@ -501,10 +501,10 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         border-color: #5a5a5a;
       }
       .loan-dialog__match:focus-visible:not(.is-occupied) {
-        border-color: #c94b1e;
+        border-color: var(--kte-brand-mid);
       }
       .loan-dialog__match.is-selected {
-        border-color: #c94b1e;
+        border-color: var(--kte-brand-mid);
         background: #2a2625;
       }
       .loan-dialog__match.is-occupied {
@@ -522,7 +522,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         transition: background 0.15s ease;
       }
       .loan-dialog__match.is-selected .loan-dialog__match-bar {
-        background: #c94b1e;
+        background: var(--kte-brand-mid);
       }
       .loan-dialog__match-info {
         flex: 1;
@@ -531,7 +531,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       .loan-dialog__match-title {
         font-size: 14px;
         font-weight: 600;
-        color: #f5f5f5;
+        color: #ffffff;
         line-height: 1.3;
       }
       .loan-dialog__match-meta {
@@ -541,15 +541,15 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         line-height: 1.3;
       }
       .loan-dialog__match-check {
-        color: #c94b1e;
+        color: var(--kte-brand-mid);
         flex-shrink: 0;
       }
       .loan-dialog__match-tag {
         flex-shrink: 0;
         padding: 4px 8px;
         border-radius: 12px;
-        background: rgba(239, 83, 80, 0.12);
-        color: #ef5350;
+        background: rgba(138, 28, 28, 0.18); /* --kte-danger tint */
+        color: var(--kte-danger);
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.5px;
@@ -565,12 +565,12 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         border-radius: 4px;
         padding: 8px 12px;
         font-size: 13px;
-        color: #f5f5f5;
+        color: #ffffff;
         align-self: flex-start;
         max-width: 100%;
       }
       .loan-dialog__chip mat-icon {
-        color: #c94b1e;
+        color: var(--kte-brand-mid);
         font-size: 18px;
         width: 18px;
         height: 18px;
@@ -598,20 +598,20 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         transition: border-color 0.15s ease;
       }
       .loan-dialog__input-wrapper:focus-within {
-        border-color: #c94b1e;
+        border-color: var(--kte-brand-mid);
       }
       .loan-dialog__input-wrapper.is-valid {
-        border-color: #4caf50;
+        border-color: var(--kte-success);
       }
       .loan-dialog__input-wrapper.is-invalid {
-        border-color: #ef5350;
+        border-color: var(--kte-danger);
       }
       .loan-dialog__input {
         flex: 1;
         background: transparent;
         border: 0;
         outline: none;
-        color: #f5f5f5;
+        color: #ffffff;
         font-size: 14px;
         padding: 12px 0;
         font-family: inherit;
@@ -625,14 +625,14 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         height: 18px;
       }
       .loan-dialog__input-icon--ok {
-        color: #4caf50;
+        color: var(--kte-success);
       }
       .loan-dialog__input-icon--err {
-        color: #ef5350;
+        color: var(--kte-danger);
       }
       .loan-dialog__field-error {
         font-size: 12px;
-        color: #ef5350;
+        color: var(--kte-danger);
       }
 
       /* Summary step */
@@ -666,14 +666,14 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       }
       .loan-dialog__summary-value {
         font-size: 14px;
-        color: #f5f5f5;
+        color: #ffffff;
         font-weight: 500;
         word-break: break-word;
       }
       .loan-dialog__hint {
         margin: 0;
         padding-left: 12px;
-        border-left: 2px solid #c94b1e;
+        border-left: 2px solid var(--kte-brand-mid);
         font-size: 13px;
         color: #ababab;
         font-weight: 400;
@@ -692,7 +692,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         width: 64px;
         height: 64px;
         border-radius: 50%;
-        border: 2px solid #4caf50;
+        border: 2px solid var(--kte-success);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -702,14 +702,14 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         font-size: 32px;
         width: 32px;
         height: 32px;
-        color: #4caf50;
+        color: var(--kte-success);
       }
       .loan-dialog__success-title {
         margin: 0;
-        font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+        font-family: var(--kte-font-display);
         font-weight: 700;
         font-size: 22px;
-        color: #4caf50;
+        color: var(--kte-success);
         text-transform: uppercase;
         letter-spacing: 0.5px;
         text-align: center;
@@ -799,7 +799,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         padding: 10px 20px;
         border-radius: 4px;
         border: 1px solid transparent;
-        font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+        font-family: var(--kte-font-display);
         font-weight: 700;
         font-size: 14px;
         text-transform: uppercase;
@@ -813,11 +813,11 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         opacity: 0.45;
       }
       .kte-btn--primary {
-        background: #c94b1e;
+        background: var(--kte-brand-mid);
         color: #ffffff;
       }
       .kte-btn--primary:not(:disabled):hover {
-        background: #b84118;
+        background: var(--kte-brand-deep);
       }
       .kte-btn--primary.is-loading {
         opacity: 0.7;
@@ -829,7 +829,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       }
       .kte-btn--secondary:not(:disabled):hover {
         background: #2e2e2e;
-        color: #f5f5f5;
+        color: #ffffff;
       }
       .loan-dialog__btn-spinner {
         --mdc-circular-progress-active-indicator-color: #ffffff;

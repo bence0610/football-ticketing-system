@@ -37,17 +37,17 @@ import { MatIconModule } from '@angular/material/icon';
         align-items: center;
         gap: 10px;
         padding: 10px 14px;
-        border-radius: 999px;
-        background: #ffffff;
+        border-radius: var(--kte-radius-pill);
+        background: var(--kte-surface);
         box-shadow: var(--kte-shadow-sm);
         cursor: pointer;
         font-size: 13px;
         font-weight: 600;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
 
       .kte-a11y-toggle__icon {
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
     `,
   ],

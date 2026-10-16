@@ -152,17 +152,34 @@ function extractTicketId(token: string): string | null {
   `,
   styles: [
     `
+      :host {
+        display: block;
+        background: var(--kte-ink);
+        min-height: 100%;
+        color: #ffffff;
+      }
+
       .kte-gate-page {
         display: flex;
         justify-content: center;
         align-items: flex-start;
         padding: 2rem 1rem;
         min-height: 60vh;
+        background: var(--kte-ink);
+        color: #ffffff;
       }
 
       .kte-gate-card {
         width: 100%;
         max-width: 480px;
+        background: var(--kte-ink);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .kte-gate-card mat-card-title,
+      .kte-gate-card mat-card-subtitle {
+        color: #ffffff;
       }
 
       .kte-gate-card mat-card-title {
@@ -180,7 +197,7 @@ function extractTicketId(token: string): string | null {
         display: flex;
         align-items: center;
         gap: 0.4rem;
-        color: var(--mat-sys-error, #b00020);
+        color: var(--kte-danger-bg);
         font-size: 0.875rem;
         margin-top: 0.5rem;
       }
@@ -190,19 +207,19 @@ function extractTicketId(token: string): string | null {
         flex-direction: column;
         align-items: center;
         padding: 1.5rem 1rem;
-        border-radius: 8px;
+        border-radius: var(--kte-radius-sm);
         text-align: center;
         gap: 0.5rem;
       }
 
       .kte-gate-result--ok {
-        background: #e8f5e9;
-        color: #1b5e20;
+        background: var(--kte-success-bg);
+        color: var(--kte-success);
       }
 
       .kte-gate-result--fail {
-        background: #fce4ec;
-        color: #880e4f;
+        background: var(--kte-danger-bg);
+        color: var(--kte-danger-ink);
       }
 
       .kte-gate-result__icon {

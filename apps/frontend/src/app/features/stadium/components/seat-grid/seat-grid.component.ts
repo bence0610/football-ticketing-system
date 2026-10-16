@@ -77,7 +77,7 @@ interface SeatRow {
       }
 
       .kte-seat-grid {
-        background: #ffffff;
+        background: var(--kte-surface);
         border-radius: var(--kte-radius-lg);
         padding: 24px;
         box-shadow: var(--kte-shadow-sm);
@@ -89,15 +89,15 @@ interface SeatRow {
 
       .kte-seat-grid__header h3 {
         margin: 0;
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 24px;
         font-weight: 700;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
 
       .kte-seat-grid__header p {
         margin: 4px 0 0;
-        color: #6b7280;
+        color: var(--kte-muted);
         font-size: 13px;
       }
 
@@ -105,13 +105,13 @@ interface SeatRow {
         text-align: center;
         margin-bottom: 12px;
         padding: 6px;
-        background: rgba(29, 131, 72, 0.12);
-        color: #15803d;
+        background: var(--kte-success-bg);
+        color: var(--kte-success);
         font-size: 12px;
         font-weight: 600;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        border-radius: var(--kte-radius-md);
+        border-radius: var(--kte-radius);
       }
 
       .kte-seat-grid__rows {
@@ -146,8 +146,8 @@ interface SeatRow {
         height: 28px;
         border-radius: 6px;
         border: 1px solid transparent;
-        background: var(--seat-bg, #cbd5e1);
-        color: var(--seat-fg, #1f2937);
+        background: var(--seat-bg, var(--kte-seat-disabled));
+        color: var(--seat-fg, var(--kte-ink));
         font-size: 10px;
         font-weight: 700;
         cursor: pointer;
@@ -160,7 +160,7 @@ interface SeatRow {
 
       .kte-seat:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(10, 61, 98, 0.18);
+        box-shadow: 0 4px 8px rgba(20, 18, 26, 0.18);
       }
 
       .kte-seat:disabled {
@@ -169,22 +169,22 @@ interface SeatRow {
       }
 
       .kte-seat--available {
-        --seat-bg: #34d399;
-        --seat-fg: #064e3b;
+        --seat-bg: var(--kte-seat-free);
+        --seat-fg: #ffffff;
       }
 
       .kte-seat--locked {
-        --seat-bg: #fb923c;
-        --seat-fg: #7c2d12;
+        --seat-bg: var(--kte-seat-locked);
+        --seat-fg: #ffffff;
       }
 
       .kte-seat--sold {
-        --seat-bg: #9ca3af;
-        --seat-fg: #1f2937;
+        --seat-bg: var(--kte-seat-sold);
+        --seat-fg: #ffffff;
       }
 
       .kte-seat--season_pass {
-        --seat-bg: #7e22ce;
+        --seat-bg: var(--kte-seat-pass);
         --seat-fg: #ffffff;
         background-image: repeating-linear-gradient(
           135deg,
@@ -199,20 +199,20 @@ interface SeatRow {
       }
 
       .kte-seat--disabled {
-        --seat-bg: #ffffff;
-        --seat-fg: #9ca3af;
-        border-color: var(--kte-color-border);
+        --seat-bg: var(--kte-surface);
+        --seat-fg: var(--kte-faint);
+        border-color: var(--kte-border);
       }
 
       .kte-seat--selected {
-        outline: 3px solid var(--kte-color-accent);
+        outline: 3px solid var(--kte-brand-mid);
         outline-offset: 2px;
         transform: translateY(-2px);
       }
 
       .kte-seat--accessible {
         background-image:
-          linear-gradient(45deg, transparent 45%, rgba(10, 61, 98, 0.4) 45%, rgba(10, 61, 98, 0.4) 55%, transparent 55%);
+          linear-gradient(45deg, transparent 45%, rgba(20, 18, 26, 0.4) 45%, rgba(20, 18, 26, 0.4) 55%, transparent 55%);
       }
 
       .kte-seat__icon {
@@ -222,8 +222,8 @@ interface SeatRow {
         font-size: 12px;
         width: 12px;
         height: 12px;
-        background: var(--kte-color-primary);
-        color: #ffffff;
+        background: var(--kte-brand-deep);
+        color: var(--kte-surface);
         border-radius: 50%;
       }
 
@@ -234,7 +234,7 @@ interface SeatRow {
       .kte-seat-grid__empty {
         margin: 16px 0 0;
         text-align: center;
-        color: #6b7280;
+        color: var(--kte-muted);
       }
 
       .kte-seat-grid__placeholder {
@@ -244,17 +244,17 @@ interface SeatRow {
         justify-content: center;
         gap: 8px;
         padding: 48px 24px;
-        background: #ffffff;
+        background: var(--kte-surface);
         border-radius: var(--kte-radius-lg);
         box-shadow: var(--kte-shadow-sm);
-        color: #6b7280;
+        color: var(--kte-muted);
         text-align: center;
 
         mat-icon {
           font-size: 36px;
           width: 36px;
           height: 36px;
-          color: var(--kte-color-primary);
+          color: var(--kte-brand-deep);
         }
       }
     `,

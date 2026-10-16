@@ -73,11 +73,18 @@ export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
   expired: 'Lejárt',
 };
 
+/**
+ * Status chip background colors. Values mirror the semantic design tokens
+ * (--kte-warn, --kte-success, --kte-faint, --kte-brand-mid, --kte-danger)
+ * from styles.scss — kept as raw hex here because they are bound inline
+ * via `[style.background]`, which does not reliably resolve CSS custom
+ * properties cross-browser. Keep these in sync with styles.scss.
+ */
 export const TICKET_STATUS_COLORS: Record<TicketStatus, string> = {
-  pending_payment: '#FFC700',
-  paid: '#4CAF50',
-  cancelled: '#777777',
-  refunded: '#777777',
-  used: '#4B8EC9',
-  expired: '#C94B1E',
+  pending_payment: '#C77700', // --kte-seat-locked (warning amber)
+  paid: '#2E7D4F',             // --kte-success
+  cancelled: '#9D96A8',        // --kte-faint
+  refunded: '#9D96A8',         // --kte-faint
+  used: '#1F5C8B',             // --kte-seat-pass
+  expired: '#8A1C1C',          // --kte-danger
 };

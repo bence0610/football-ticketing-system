@@ -95,16 +95,16 @@ import { RevenueSummaryCardComponent } from '../components/revenue-summary-card.
         gap: 12px;
         justify-content: center;
         padding: 48px 0;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--kte-muted);
       }
       .kte-revenue__error {
         display: inline-flex;
         align-items: center;
         gap: 8px;
         padding: 16px;
-        background: rgba(244, 67, 54, 0.08);
-        color: #b71c1c;
-        border-radius: 8px;
+        background: var(--kte-danger-bg);
+        color: var(--kte-danger);
+        border-radius: var(--kte-radius-sm);
       }
       .kte-revenue__cards {
         display: grid;
@@ -112,8 +112,8 @@ import { RevenueSummaryCardComponent } from '../components/revenue-summary-card.
         gap: 16px;
       }
       .kte-revenue__table {
-        background: #FFFFFF;
-        border-radius: 12px;
+        background: var(--kte-surface);
+        border-radius: var(--kte-radius);
         padding: 16px;
       }
       .kte-revenue__table header {
@@ -121,12 +121,13 @@ import { RevenueSummaryCardComponent } from '../components/revenue-summary-card.
       }
       .kte-revenue__table h2 {
         margin: 0;
-        color: #222222;
+        color: var(--kte-ink);
         font-size: 18px;
+        font-family: var(--kte-font-display);
       }
       .kte-revenue__table p {
         margin: 4px 0 0;
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--kte-muted);
         font-size: 13px;
       }
       @media (max-width: 900px) {

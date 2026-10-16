@@ -43,10 +43,10 @@ export interface DiscountBreakdown {
   `,
   styles: [
     `
-      .breakdown { background: #1a1a1a; border: 1px solid #2e2e2e; border-radius: 12px; padding: 18px; color: #f5f5f5; }
+      .breakdown { background: var(--kte-surface); border: 1px solid var(--kte-border); border-radius: var(--kte-radius); padding: 18px; color: var(--kte-ink); }
       .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
-      .row.discount { color: #4caf50; }
-      .row.total { border-top: 1px solid #2e2e2e; margin-top: 6px; padding-top: 12px; font-size: 18px; font-weight: 700; color: #c94b1e; }
+      .row.discount { color: var(--kte-success); }
+      .row.total { border-top: 1px solid var(--kte-line); margin-top: 6px; padding-top: 12px; font-size: 18px; font-weight: 700; color: var(--kte-brand-deep); font-family: var(--kte-font-display); }
       .label { display: flex; align-items: center; gap: 6px; }
       .value { font-variant-numeric: tabular-nums; }
     `,

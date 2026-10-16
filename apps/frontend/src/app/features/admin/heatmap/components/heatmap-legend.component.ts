@@ -22,9 +22,9 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
-        background: #FFFFFF;
+        background: var(--kte-surface);
         padding: 12px 16px;
-        border-radius: 8px;
+        border-radius: var(--kte-radius-sm);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
       }
       .kte-heatmap-legend__entry {
@@ -32,7 +32,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
         align-items: center;
         gap: 6px;
         font-size: 13px;
-        color: #333333;
+        color: var(--kte-ink);
       }
       .kte-heatmap-legend__swatch {
         display: inline-block;

@@ -52,8 +52,8 @@ import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
       }
       .kte-revenue-table {
         width: 100%;
-        background: #FFFFFF;
-        border-radius: 8px;
+        background: var(--kte-surface);
+        border-radius: var(--kte-radius-sm);
         overflow: hidden;
       }
       .kte-revenue-table__num {
@@ -62,7 +62,7 @@ import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
       .kte-revenue-table__empty {
         padding: 24px;
         text-align: center;
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--kte-muted);
       }
     `,
   ],

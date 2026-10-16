@@ -47,11 +47,11 @@ import { ChatbotStore } from './state/chatbot.signals';
         width: 56px;
         height: 56px;
         border-radius: 50%;
-        background: #C94B1E;
-        color: #FFFFFF;
+        background: var(--kte-brand-mid);
+        color: var(--kte-surface);
         border: none;
         cursor: pointer;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32);
+        box-shadow: 0 6px 18px rgba(20, 18, 26, 0.32);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -60,10 +60,10 @@ import { ChatbotStore } from './state/chatbot.signals';
       }
       .kte-chatbot-fab:hover {
         transform: translateY(-2px);
-        background: #A33B14;
+        background: var(--kte-brand-deep);
       }
       .kte-chatbot-fab--open {
-        background: #2E2E2E;
+        background: var(--kte-ink);
       }
       .kte-chatbot-fab mat-icon {
         font-size: 24px;

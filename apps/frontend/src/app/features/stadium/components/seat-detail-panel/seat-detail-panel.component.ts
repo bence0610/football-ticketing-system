@@ -124,7 +124,7 @@ import { Pad2Pipe } from '../../../../shared/pipes/time-until.pipe';
       }
 
       .kte-seat-detail {
-        background: #ffffff;
+        background: var(--kte-surface);
         border-radius: var(--kte-radius-lg);
         padding: 24px;
         box-shadow: var(--kte-shadow-md);
@@ -136,10 +136,10 @@ import { Pad2Pipe } from '../../../../shared/pipes/time-until.pipe';
 
       .kte-seat-detail__header h3 {
         margin: 4px 0;
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 28px;
         font-weight: 700;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
 
       .kte-seat-detail__chip {
@@ -147,16 +147,16 @@ import { Pad2Pipe } from '../../../../shared/pipes/time-until.pipe';
         text-transform: uppercase;
         letter-spacing: 0.16em;
         font-weight: 700;
-        color: var(--kte-color-accent);
-        background: var(--kte-color-primary);
+        color: var(--kte-brand-tint);
+        background: var(--kte-brand-deep);
         padding: 4px 10px;
-        border-radius: 999px;
+        border-radius: var(--kte-radius-pill);
         display: inline-block;
       }
 
       .kte-seat-detail__category {
         margin: 0;
-        color: #6b7280;
+        color: var(--kte-muted);
         font-size: 13px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
@@ -174,7 +174,7 @@ import { Pad2Pipe } from '../../../../shared/pipes/time-until.pipe';
         justify-content: space-between;
         gap: 12px;
         padding-bottom: 8px;
-        border-bottom: 1px dashed var(--kte-color-border);
+        border-bottom: 1px dashed var(--kte-border);
       }
 
       .kte-seat-detail__list dt {
@@ -182,19 +182,19 @@ import { Pad2Pipe } from '../../../../shared/pipes/time-until.pipe';
         font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: #6b7280;
+        color: var(--kte-muted);
       }
 
       .kte-seat-detail__list dd {
         margin: 0;
         font-weight: 600;
-        color: var(--kte-color-text);
+        color: var(--kte-ink);
       }
 
       .kte-seat-detail__price {
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 22px;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
       }
 
       .kte-seat-detail__cta {
@@ -203,9 +203,9 @@ import { Pad2Pipe } from '../../../../shared/pipes/time-until.pipe';
       }
 
       .kte-seat-detail__lock {
-        background: rgba(255, 201, 5, 0.18);
-        border: 1px solid var(--kte-color-accent);
-        border-radius: var(--kte-radius-md);
+        background: var(--kte-warn-bg);
+        border: 1px solid var(--kte-warn);
+        border-radius: var(--kte-radius);
         padding: 14px;
         display: flex;
         flex-direction: column;
@@ -217,10 +217,10 @@ import { Pad2Pipe } from '../../../../shared/pipes/time-until.pipe';
         align-items: center;
         gap: 8px;
         font-weight: 700;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
 
         mat-icon {
-          color: var(--kte-color-primary);
+          color: var(--kte-brand-deep);
         }
       }
 
@@ -237,14 +237,14 @@ import { Pad2Pipe } from '../../../../shared/pipes/time-until.pipe';
       .kte-seat-detail--empty {
         align-items: center;
         text-align: center;
-        color: #6b7280;
+        color: var(--kte-muted);
         padding: 32px;
 
         mat-icon {
           font-size: 36px;
           width: 36px;
           height: 36px;
-          color: var(--kte-color-primary);
+          color: var(--kte-brand-deep);
         }
       }
     `,

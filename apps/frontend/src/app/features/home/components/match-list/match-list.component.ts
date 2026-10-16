@@ -48,16 +48,16 @@ import { MatchListItemComponent } from '../match-list-item/match-list-item.compo
 
       .kte-match-list__header h2 {
         margin: 0;
-        font-family: 'Barlow Condensed', 'Inter', sans-serif;
+        font-family: var(--kte-font-display);
         font-size: 28px;
         font-weight: 700;
-        color: var(--kte-color-primary);
+        color: var(--kte-brand-deep);
         letter-spacing: -0.01em;
       }
 
       .kte-match-list__header p {
         margin: 4px 0 0;
-        color: #4b5563;
+        color: var(--kte-muted);
       }
 
       .kte-match-list__grid {
@@ -70,23 +70,23 @@ import { MatchListItemComponent } from '../match-list-item/match-list-item.compo
         display: flex;
         align-items: center;
         gap: 12px;
-        color: #4b5563;
+        color: var(--kte-muted);
       }
 
       .kte-match-list__error {
         padding: 16px;
-        border-radius: var(--kte-radius-md);
-        background: rgba(239, 68, 68, 0.1);
-        color: #b91c1c;
+        border-radius: var(--kte-radius);
+        background: var(--kte-danger-bg);
+        color: var(--kte-danger);
       }
 
       .kte-match-list__empty {
         padding: 24px;
-        border-radius: var(--kte-radius-md);
-        background: #ffffff;
-        color: #4b5563;
+        border-radius: var(--kte-radius);
+        background: var(--kte-surface);
+        color: var(--kte-muted);
         text-align: center;
-        border: 1px dashed var(--kte-color-border);
+        border: 1px dashed var(--kte-border);
       }
     `,
   ],

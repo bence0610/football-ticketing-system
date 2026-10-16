@@ -79,11 +79,11 @@ import { MatchListItem } from '../../../../shared/models/match.model';
 
         strong {
           font-weight: 600;
-          color: var(--kte-color-primary);
+          color: var(--kte-brand-deep);
         }
 
         small {
-          color: #6b7280;
+          color: var(--kte-muted);
           font-size: 12px;
         }
       }

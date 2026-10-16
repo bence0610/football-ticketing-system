@@ -62,7 +62,7 @@ const SECTORS: readonly SectorPath[] = [
           font-size="14"
           font-weight="700"
           text-anchor="middle"
-          font-family="Barlow Condensed, Inter, sans-serif"
+          font-family="Archivo, system-ui, sans-serif"
           aria-label="pálya"
         >
           PÁLYA
@@ -94,7 +94,7 @@ const SECTORS: readonly SectorPath[] = [
               font-size="20"
               font-weight="700"
               fill="#ffffff"
-              font-family="Barlow Condensed, Inter, sans-serif"
+              font-family="Archivo, system-ui, sans-serif"
               pointer-events="none"
             >
               {{ sector.section }}
@@ -126,7 +126,7 @@ const SECTORS: readonly SectorPath[] = [
         max-width: 720px;
         margin: 0 auto;
         padding: 16px;
-        background: linear-gradient(135deg, #0a3d62, #052545);
+        background: linear-gradient(135deg, var(--kte-brand-deep), var(--kte-ink));
         border-radius: var(--kte-radius-lg);
         box-shadow: var(--kte-shadow-md);
       }
@@ -148,12 +148,12 @@ const SECTORS: readonly SectorPath[] = [
       }
 
       .kte-map__sector:focus-visible path {
-        stroke: var(--kte-color-accent);
+        stroke: var(--kte-brand-mid);
         stroke-width: 4;
       }
 
       .kte-map__sector--active path {
-        stroke: var(--kte-color-accent);
+        stroke: var(--kte-brand-mid);
         stroke-width: 4;
       }
     `,
@@ -178,19 +178,25 @@ export class StadiumMapComponent {
     return SECTOR_COMPASS_LABEL[section] ?? section;
   }
 
+  /**
+   * SVG presentation attribute fallback — browsers accept CSS custom
+   * properties in `fill` only inconsistently, so we return raw hex that
+   * mirror the design-token values (--kte-brand-deep, --kte-seat-sold,
+   * --kte-seat-locked, --kte-brand-mid). Keep in sync with styles.scss.
+   */
   protected fillFor(section: string): string {
     const summary = this.sectorSummary.find((s) => s.section === section);
     if (!summary) {
-      return '#0a3d62';
+      return '#4A1D6A'; // --kte-brand-deep
     }
     const occupancy = summary.occupancyRatio;
     if (occupancy >= 0.95) {
-      return '#9ca3af';
+      return '#8A1C1C'; // --kte-seat-sold
     }
     if (occupancy >= 0.6) {
-      return '#f59e0b';
+      return '#C77700'; // --kte-seat-locked
     }
-    return '#1a5697';
+    return '#6B2D96'; // --kte-brand-mid
   }
 
   protected getSummaryText(section: string): string {

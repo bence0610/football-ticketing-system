@@ -32,12 +32,13 @@ import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
       }
       .kte-summary {
         position: relative;
-        background: #222222;
-        color: #F5F5F5;
-        border-radius: 14px;
+        background: var(--kte-surface);
+        color: var(--kte-ink);
+        border: 1px solid var(--kte-border);
+        border-radius: var(--kte-radius);
         overflow: hidden;
         min-height: 124px;
-        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
+        box-shadow: var(--kte-shadow-md);
       }
       .kte-summary__accent {
         position: absolute;
@@ -45,7 +46,7 @@ import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
         top: 0;
         bottom: 0;
         width: 3px;
-        background: #C94B1E;
+        background: var(--kte-brand-mid);
       }
       .kte-summary__body {
         display: flex;
@@ -54,11 +55,11 @@ import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
         padding: 20px 24px 20px 28px;
       }
       .kte-summary__icon {
-        background: rgba(201, 75, 30, 0.16);
-        color: #C94B1E;
+        background: var(--kte-brand-tint);
+        color: var(--kte-brand-deep);
         width: 48px;
         height: 48px;
-        border-radius: 12px;
+        border-radius: var(--kte-radius);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -77,15 +78,16 @@ import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
         font-size: 13px;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: #BBBBBB;
+        color: var(--kte-muted);
       }
       .kte-summary__value {
         font-size: 26px;
         font-weight: 700;
+        font-family: var(--kte-font-display);
       }
       .kte-summary__subtitle {
         font-size: 12px;
-        color: #999999;
+        color: var(--kte-faint);
       }
     `,
   ],

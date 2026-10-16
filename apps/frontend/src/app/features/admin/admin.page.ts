@@ -78,13 +78,13 @@ import { MatButtonModule } from '@angular/material/button';
         gap: 6px;
       }
       .kte-admin__nav-active {
-        background: rgba(201, 75, 30, 0.12);
-        color: #C94B1E;
+        background: var(--kte-brand-tint);
+        color: var(--kte-brand-deep);
         font-weight: 600;
       }
       .kte-admin__content {
-        background: #FAFAFA;
-        border-radius: 12px;
+        background: var(--kte-page);
+        border-radius: var(--kte-radius);
         padding: 8px;
         min-height: 400px;
       }
