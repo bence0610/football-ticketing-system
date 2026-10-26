@@ -11,6 +11,7 @@ import {
   Ticket,
   TicketStatus,
 } from '../src/database/entities';
+import { ChatbotContextService } from '../src/modules/chatbot/chatbot-context.service';
 import { closeTestApp, createTestApp, TestContext } from './helpers/app.helper';
 import { createGateUser, seedMinimalFixture, truncateAll } from './helpers/db.helper';
 import {
@@ -328,6 +329,187 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
 
     const statuses = [respA.status, respB.status].sort((a, b) => a - b);
     expect(statuses).toEqual([201, 409]);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Seat-occupancy regression suite                                     */
+  /*                                                                      */
+  /* These cover the business rule in `OCCUPYING_TICKET_STATUSES`:       */
+  /* a seat is held by any ticket in PENDING_PAYMENT / PAID / USED.      */
+  /* CANCELLED, REFUNDED and EXPIRED release the seat.                   */
+  /* ------------------------------------------------------------------ */
+
+  async function fetchSeatMap(matchId: string): Promise<Array<{ id: string; status: string }>> {
+    const response = await request(server).get(`/api/matches/${matchId}/seats`);
+    expect(response.status).toBe(200);
+    return response.body.seats as Array<{ id: string; status: string }>;
+  }
+
+  function findSeat(
+    seats: Array<{ id: string; status: string }>,
+    seatId: string,
+  ): { id: string; status: string } {
+    const row = seats.find((s) => s.id === seatId);
+    if (!row) {
+      throw new Error(`Seat ${seatId} not present in seat map`);
+    }
+    return row;
+  }
+
+  /**
+   * Simulates a gate operator scanning a ticket. The ScanTicketDto demands a
+   * JWT QR token (class-validator MinLength(20)), so we first fetch the
+   * owner's QR via the owner-only endpoint and present it on the scan.
+   */
+  async function scanTicket(
+    ownerAccessToken: string,
+    gateToken: string,
+    ticketId: string,
+  ): Promise<SupertestResponse> {
+    const qrResp = await request(server)
+      .get(`/api/tickets/${ticketId}/qr`)
+      .set('Authorization', `Bearer ${ownerAccessToken}`);
+    expect(qrResp.status).toBe(200);
+    const qrToken: string = qrResp.body.token;
+    return request(server)
+      .patch(`/api/tickets/${ticketId}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token: qrToken });
+  }
+
+  it('a scanned (USED) ticket keeps its seat occupied on the seat map', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const fan = await registerFan('used-map');
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-used-1@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+    const { ticketId } = await buyTicket(fan, match, seatA);
+
+    const scanResp = await scanTicket(fan.accessToken, gateToken, ticketId);
+    expect(scanResp.status).toBe(200);
+    expect(scanResp.body.success).toBe(true);
+    expect(scanResp.body.result).toBe('ok');
+
+    const dbTicket = await ctx.dataSource
+      .getRepository(Ticket)
+      .findOne({ where: { id: ticketId } });
+    expect(dbTicket?.status).toBe(TicketStatus.USED);
+
+    const seats = await fetchSeatMap(match.id);
+    const seatARow = findSeat(seats, seatA.id);
+    // The business rule: USED tickets still occupy their seat. The seat map
+    // reports this status as 'sold' (the SeatAvailability enum does not
+    // distinguish USED from PAID — the seat is simply not available).
+    expect(seatARow.status).not.toBe('available');
+    expect(seatARow.status).toBe('sold');
+  });
+
+  it('a scanned (USED) seat cannot be purchased again — availability check rejects the lock', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const firstFan = await registerFan('used-rebuy-1');
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-used-2@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+    const { ticketId } = await buyTicket(firstFan, match, seatA);
+
+    const scanResp = await scanTicket(firstFan.accessToken, gateToken, ticketId);
+    expect(scanResp.status).toBe(200);
+    expect(scanResp.body.result).toBe('ok');
+
+    // A different fan now tries to buy the same seat. The seat-map
+    // availability check must reject the lock attempt with 409 BEFORE
+    // Stripe is involved and before the DB unique constraint can fire.
+    const secondFan = await registerFan('used-rebuy-2');
+    const lockResponse = await request(server)
+      .post(`/api/matches/${match.id}/seats/${seatA.id}/lock`)
+      .set('Authorization', `Bearer ${secondFan.accessToken}`)
+      .send();
+    expect(lockResponse.status).toBe(409);
+    expect(ctx.stripeStub.paymentIntentsCreateMock).toHaveBeenCalledTimes(1); // only the first purchase
+
+    // No second ticket row was created.
+    const ticketCount = await ctx.dataSource
+      .getRepository(Ticket)
+      .count({ where: { matchId: match.id, seatId: seatA.id } });
+    expect(ticketCount).toBe(1);
+  });
+
+  it('cancelling a ticket releases the seat so a new purchase succeeds', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const firstFan = await registerFan('cancel-release-1');
+    const { ticketId } = await buyTicket(firstFan, match, seatA);
+
+    // Seat is sold right after the first purchase.
+    let seats = await fetchSeatMap(match.id);
+    expect(findSeat(seats, seatA.id).status).toBe('sold');
+
+    // Admin / refund flow cancels the ticket.
+    await ctx.dataSource
+      .getRepository(Ticket)
+      .update({ id: ticketId }, { status: TicketStatus.CANCELLED });
+
+    // Seat must now be available on the public seat map — this is the half
+    // of the business rule the OCCUPYING_TICKET_STATUSES refactor guarantees.
+    seats = await fetchSeatMap(match.id);
+    expect(findSeat(seats, seatA.id).status).toBe('available');
+
+    // And a brand-new buyer can lock + purchase the seat. Note: the production
+    // schema enforces UNIQUE(match_id, seat_id) on `tickets`, so even a
+    // CANCELLED row would collide with a fresh PAID insert. Repurchase on a
+    // cancelled seat is therefore a cold-reset path: the admin workflow
+    // deletes the stale row before releasing the seat for resale, which is
+    // what we simulate here. The alternative — relaxing the UNIQUE constraint
+    // — is out of scope for this change (addressed under the admin refund
+    // workflow backlog).
+    await ctx.dataSource.getRepository(Ticket).delete({ id: ticketId });
+
+    const secondFan = await registerFan('cancel-release-2');
+    const ownerToken = await lockSeat(secondFan.accessToken, match.id, seatA.id);
+    const { paymentIntentId } = await createIntent(secondFan.accessToken, match.id, [
+      { seatId: seatA.id, ownerToken },
+    ]);
+    const intent = ctx.stripeStub.getStoredIntent(paymentIntentId);
+    expect(intent).toBeDefined();
+    const webhookResponse = await deliverWebhook(intent!);
+    expect(webhookResponse.status).toBe(200);
+    await flushAsync();
+
+    const newTicket = await ctx.dataSource
+      .getRepository(Ticket)
+      .findOne({ where: { stripePaymentIntentId: intent!.id, userId: secondFan.userId } });
+    expect(newTicket).not.toBeNull();
+    expect(newTicket?.status).toBe(TicketStatus.PAID);
+  });
+
+  it('chatbot context free-seat count agrees with the seat map after a scan', async () => {
+    const { match, seatA, seatB } = await seedMinimalFixture(ctx.dataSource);
+    // Capacity is 2 (seatA + seatB). After purchasing and scanning seatA,
+    // the free-seat count must still be 1 — the scanned seat remains held.
+    const fan = await registerFan('chatbot-agree');
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-chatbot@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+    const { ticketId } = await buyTicket(fan, match, seatA);
+    const scanResp = await scanTicket(fan.accessToken, gateToken, ticketId);
+    expect(scanResp.body.result).toBe('ok');
+
+    // Reach the service directly — ChatbotContextService has no public HTTP
+    // route (it is consumed internally by ChatbotService), so DI retrieval
+    // is the legitimate test entry point.
+    const chatbotContext = ctx.app.get(ChatbotContextService);
+    // Flush any cached snapshot from a prior test run.
+    await ctx.redis.flushdb();
+    const snapshot = await chatbotContext.getUpcomingMatchesSnapshot();
+    const matchSnapshot = snapshot.upcomingMatches.find((m) => m.id === match.id);
+    expect(matchSnapshot).toBeDefined();
+
+    // Count free seats on the seat map.
+    const seatMap = await fetchSeatMap(match.id);
+    const seatMapFreeCount = seatMap.filter((s) => s.status === 'available').length;
+
+    // seatB is free, seatA is occupied (USED). Both views must agree.
+    expect(seatMapFreeCount).toBe(1);
+    expect(findSeat(seatMap, seatA.id).status).toBe('sold');
+    expect(findSeat(seatMap, seatB.id).status).toBe('available');
+    expect(matchSnapshot!.availableSeats).toBe(seatMapFreeCount);
+    expect(matchSnapshot!.soldSeats).toBe(1);
   });
 
   it('idempotent webhook — double delivery produces one ticket and one loyalty transaction', async () => {

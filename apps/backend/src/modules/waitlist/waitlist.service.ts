@@ -9,18 +9,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { LessThan, Not, Repository } from 'typeorm';
-import {
-  Match,
-  MatchStatus,
-  Ticket,
-  TicketStatus,
-  Waitlist,
-  WaitlistStatus,
-} from '../../database/entities';
+import { Match, MatchStatus, Ticket, Waitlist, WaitlistStatus } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
+import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { JoinWaitlistDto, WaitlistEntryDto } from './dto';
-
-const ACTIVE_TICKET_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
 
 const ACTIVE_WAITLIST_STATUSES: WaitlistStatus[] = [WaitlistStatus.ACTIVE, WaitlistStatus.NOTIFIED];
 
@@ -230,13 +222,16 @@ export class WaitlistService {
   }
 
   /**
-   * Returns how many seats are currently held (paid + pending) on the match.
+   * Returns how many seats are currently held on the match.
+   * "Held" = any ticket whose status is in {@link OCCUPYING_TICKET_STATUSES}
+   * (PENDING_PAYMENT, PAID, USED). USED is included because a scanned ticket
+   * means the holder is in the stadium — the seat is not available again.
    */
   async getActiveTicketCount(matchId: string): Promise<number> {
     return this.ticketRepository
       .createQueryBuilder('t')
       .where('t.matchId = :matchId', { matchId })
-      .andWhere('t.status IN (:...statuses)', { statuses: ACTIVE_TICKET_STATUSES })
+      .andWhere('t.status IN (:...statuses)', { statuses: [...OCCUPYING_TICKET_STATUSES] })
       .getCount();
   }
 

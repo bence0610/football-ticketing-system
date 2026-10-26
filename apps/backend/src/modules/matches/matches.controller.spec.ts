@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { MatchesController } from './matches.controller';
 import { MatchesService } from './matches.service';
 import { Match, MatchStatus, Competition, Ticket, TicketStatus } from '../../database/entities';
+import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 
 /**
  * Integration tests for MatchesController.
@@ -118,7 +119,7 @@ function makeTicketRepoMock(tickets: Ticket[]) {
       // Aggregate by matchId — mirrors the SQL GROUP BY the service executes
       Object.values(
         tickets
-          .filter((t) => [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT].includes(t.status))
+          .filter((t) => OCCUPYING_TICKET_STATUSES.includes(t.status))
           .reduce<Record<string, { matchId: string; soldCount: number }>>((acc, t) => {
             if (!acc[t.matchId]) acc[t.matchId] = { matchId: t.matchId, soldCount: 0 };
             acc[t.matchId].soldCount += 1;

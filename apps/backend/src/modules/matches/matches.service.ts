@@ -3,10 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppConfig } from '../../config';
-import { Match, MatchStatus, Ticket, TicketStatus } from '../../database/entities';
+import { Match, MatchStatus, Ticket } from '../../database/entities';
+import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { MatchDetailDto, MatchListItemDto, QueryMatchesDto } from './dto';
-
-const ACTIVE_TICKET_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
 
 const UPCOMING_STATUSES: MatchStatus[] = [MatchStatus.ON_SALE, MatchStatus.SCHEDULED];
 
@@ -90,7 +89,8 @@ export class MatchesService {
 
   /**
    * Returns a `Map<matchId, soldCount>` for the supplied match ids.
-   * Sold = paid OR pending_payment (i.e. unavailable to other buyers).
+   * Sold = any ticket occupying its seat (PENDING_PAYMENT / PAID / USED).
+   * See {@link OCCUPYING_TICKET_STATUSES} for the business rule.
    */
   private async aggregateSoldTickets(matchIds: string[]): Promise<Map<string, number>> {
     const result = new Map<string, number>();
@@ -103,7 +103,9 @@ export class MatchesService {
       .select('ticket.matchId', 'matchId')
       .addSelect('COUNT(ticket.id)', 'soldCount')
       .where('ticket.matchId IN (:...matchIds)', { matchIds })
-      .andWhere('ticket.status IN (:...statuses)', { statuses: ACTIVE_TICKET_STATUSES })
+      .andWhere('ticket.status IN (:...statuses)', {
+        statuses: [...OCCUPYING_TICKET_STATUSES],
+      })
       .groupBy('ticket.matchId')
       .getRawMany<{ matchId: string; soldCount: string | number }>();
 

@@ -98,7 +98,13 @@
       "Bash(Get-PSDrive C)",
       "Bash(Select-Object Used,Free)",
       "Bash(npm start *)",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; \"started\")",
+      "Bash(docker version *)",
+      "Bash(dir \"C:\\\\Users\\\\User\\\\szakdolgozat\\\\.claude\\\\worktrees\\\\agent-a1f852164fdcd297a\\\\apps\\\\backend\\\\src\\\\modules\\\\tickets\" /b)",
+      "Bash(docker exec *)",
+      "Bash(docker rm *)",
+      "Bash(break)"
     ]
   }
 }

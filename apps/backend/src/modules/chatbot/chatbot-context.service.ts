@@ -4,10 +4,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { In, MoreThan, Repository } from 'typeorm';
 import { ChatbotConfig } from '../../config';
-import { Match, MatchStatus, Ticket, TicketStatus } from '../../database/entities';
+import { Match, MatchStatus, Ticket } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
-
-const ACTIVE_TICKET_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
+import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 
 const UPCOMING_STATUSES: MatchStatus[] = [MatchStatus.ON_SALE, MatchStatus.SCHEDULED];
 
@@ -99,7 +98,7 @@ export class ChatbotContextService {
       .select('t.matchId', 'matchId')
       .addSelect('COUNT(t.id)', 'soldCount')
       .where('t.matchId IN (:...matchIds)', { matchIds })
-      .andWhere('t.status IN (:...statuses)', { statuses: ACTIVE_TICKET_STATUSES })
+      .andWhere('t.status IN (:...statuses)', { statuses: [...OCCUPYING_TICKET_STATUSES] })
       .groupBy('t.matchId')
       .getRawMany<{ matchId: string; soldCount: string | number }>();
     for (const row of rows) {

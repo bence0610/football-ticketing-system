@@ -2,18 +2,10 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { In, Repository } from 'typeorm';
-import {
-  Match,
-  Seat,
-  SeasonPass,
-  SeasonPassStatus,
-  Ticket,
-  TicketStatus,
-} from '../../database/entities';
+import { Match, Seat, SeasonPass, SeasonPassStatus, Ticket } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
+import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { MatchSeatsResponseDto, SeatAvailability, SeatStatusDto, SectorSummaryDto } from './dto';
-
-const ACTIVE_TICKET_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
 
 @Injectable()
 export class SeatsService {
@@ -55,15 +47,15 @@ export class SeatsService {
     });
 
     const tickets = await this.ticketRepository.find({
-      where: { matchId, status: In(ACTIVE_TICKET_STATUSES) },
+      where: { matchId, status: In([...OCCUPYING_TICKET_STATUSES]) },
       select: ['seatId', 'status'],
     });
     // Defensive in-code filter: only count tickets whose status is in
-    // ACTIVE_TICKET_STATUSES (PAID / PENDING_PAYMENT) as occupying a seat.
-    // CANCELLED, REFUNDED, EXPIRED tickets must leave the seat available.
+    // OCCUPYING_TICKET_STATUSES (PENDING_PAYMENT / PAID / USED) as occupying
+    // a seat. CANCELLED, REFUNDED, EXPIRED tickets must leave the seat available.
     const soldSeatIds = new Set<string>(
       tickets
-        .filter((ticket) => ACTIVE_TICKET_STATUSES.includes(ticket.status))
+        .filter((ticket) => OCCUPYING_TICKET_STATUSES.includes(ticket.status))
         .map((ticket) => ticket.seatId),
     );
 
@@ -105,7 +97,7 @@ export class SeatsService {
     });
 
     const tickets = await this.ticketRepository.find({
-      where: { matchId, seatId: In(seatIds), status: In(ACTIVE_TICKET_STATUSES) },
+      where: { matchId, seatId: In(seatIds), status: In([...OCCUPYING_TICKET_STATUSES]) },
       select: ['seatId'],
     });
     const soldSeatIds = new Set<string>(tickets.map((t) => t.seatId));

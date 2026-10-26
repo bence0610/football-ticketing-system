@@ -2,11 +2,10 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { In, Repository } from 'typeorm';
-import { Match, Seat, Ticket, TicketStatus } from '../../database/entities';
+import { Match, Seat, Ticket } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
+import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { MatchOccupancyDto, SectorOccupancyDto } from './dto/occupancy.dto';
-
-const ACTIVE_TICKET_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
 
 @Injectable()
 export class AdminOccupancyService {
@@ -38,7 +37,7 @@ export class AdminOccupancyService {
     });
 
     const tickets = await this.ticketRepository.find({
-      where: { matchId, status: In(ACTIVE_TICKET_STATUSES) },
+      where: { matchId, status: In([...OCCUPYING_TICKET_STATUSES]) },
       select: ['seatId'],
     });
     const soldSeatIds = new Set(tickets.map((t) => t.seatId));

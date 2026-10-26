@@ -11,7 +11,17 @@ import {
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { ProfileDto, ProfileTicketDto, ProfileTicketsDto, UpdateProfileDto } from './dto';
 
-const ACTIVE_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.PENDING_PAYMENT];
+/**
+ * Statuses that mark a ticket as "still relevant" on the user's profile — i.e.
+ * worth showing with a QR code and a forward-looking kickoff. This is NOT the
+ * seat-occupancy rule (see OCCUPYING_TICKET_STATUSES): a USED ticket does
+ * occupy its seat, but on the profile page it should not display as active
+ * because the holder has already entered the stadium.
+ */
+const PROFILE_ACTIVE_TICKET_STATUSES: TicketStatus[] = [
+  TicketStatus.PAID,
+  TicketStatus.PENDING_PAYMENT,
+];
 
 @Injectable()
 export class UsersService {
@@ -64,7 +74,7 @@ export class UsersService {
     const now = Date.now();
     const items: ProfileTicketDto[] = rows.map((ticket) => {
       const kickoff = ticket.match?.kickoffAt?.getTime() ?? 0;
-      const isActive = ACTIVE_STATUSES.includes(ticket.status) && kickoff >= now;
+      const isActive = PROFILE_ACTIVE_TICKET_STATUSES.includes(ticket.status) && kickoff >= now;
       return {
         id: ticket.id,
         matchId: ticket.matchId,
