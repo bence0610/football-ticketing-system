@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
+  HttpException,
   Inject,
   Injectable,
   Logger,
@@ -21,6 +23,9 @@ import {
   SeasonPass,
   SeasonPassPrice,
   SeasonPassStatus,
+  Ticket,
+  TicketSource,
+  TicketStatus,
   User,
 } from '../../database/entities';
 import { CronConfig, LoyaltyConfig, MailConfig, StripeConfig } from '../../config';
@@ -35,6 +40,18 @@ import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-respon
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
 
 const ACTIVE_SEASON_LABEL = '2026/2027';
+
+function isDuplicateKeyError(err: unknown): boolean {
+  if (err == null || typeof err !== 'object') return false;
+  const e = err as Record<string, unknown>;
+  if (e['code'] === 'ER_DUP_ENTRY') return true;
+  const driver = e['driverError'];
+  if (driver != null && typeof driver === 'object') {
+    if ((driver as Record<string, unknown>)['code'] === 'ER_DUP_ENTRY') return true;
+  }
+  if (typeof e['message'] === 'string' && e['message'].includes('ER_DUP_ENTRY')) return true;
+  return false;
+}
 
 @Injectable()
 export class SeasonPassesService {
@@ -319,6 +336,114 @@ export class SeasonPassesService {
     return pass;
   }
 
+  /**
+   * Lazily materialises the owner's SEASON_PASS Ticket for a given match,
+   * then returns a QR token the holder can present at the gate.
+   *
+   * Guards:
+   *  - Pass must be ACTIVE and have a seat assigned.
+   *  - No ACCEPTED loan may exist for this (pass, match) — that would mean
+   *    the right of entry belongs to the borrower.
+   *  - No existing LOAN Ticket for the same (match, seat) — means the
+   *    borrower already consumed that entry.
+   *
+   * Two simultaneous requests for the same (pass, match) are safe: the
+   * second request sees the ticket created by the first and returns it.
+   */
+  async getMatchQr(
+    passId: string,
+    matchId: string,
+    userId: string,
+  ): Promise<{ ticketId: string; dataUrl: string; token: string }> {
+    const pass = await this.getOwnedPass(passId, userId);
+    if (pass.status !== SeasonPassStatus.ACTIVE) {
+      throw new BadRequestException('Season pass is not active');
+    }
+    if (!pass.seatId) {
+      throw new BadRequestException('Season pass has no seat assigned');
+    }
+
+    const match = await this.matchRepository.findOne({ where: { id: matchId } });
+    if (!match) {
+      throw new NotFoundException('Match not found');
+    }
+
+    const ticket = await this.materializeSeasonPassTicket(pass, matchId);
+    const result = await this.qrService.generateForTicket(ticket.id, ticket.qrJti);
+    return { ticketId: ticket.id, dataUrl: result.dataUrl, token: result.token };
+  }
+
+  /**
+   * Single source of truth for the owner's SEASON_PASS Ticket.
+   *
+   * Creates (or finds) the Ticket row that represents the pass holder's
+   * right of entry for the given match. Guards against:
+   *  - An active loan (ACCEPTED) for this (pass, match)
+   *  - An existing LOAN Ticket (meaning the right was already transferred
+   *    to a borrower, and may even have been used)
+   *
+   * Concurrent calls for the same (pass, match) resolve to the same row:
+   * on a duplicate-key race the loser re-fetches and returns the winner's row.
+   */
+  private async materializeSeasonPassTicket(pass: SeasonPass, matchId: string): Promise<Ticket> {
+    const seatId = pass.seatId!;
+
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        // Guard: active loan blocks the owner's right of entry
+        const activeLoan = await manager.getRepository(PassLoan).findOne({
+          where: { seasonPassId: pass.id, matchId, status: PassLoanStatus.ACCEPTED },
+        });
+        if (activeLoan) {
+          throw new ConflictException('Season pass is currently loaned out for this match');
+        }
+
+        const ticketRepo = manager.getRepository(Ticket);
+
+        // Guard: a remaining LOAN Ticket means the seat was loaned and the
+        // borrower may have already entered — the owner cannot reclaim it
+        const loanTicket = await ticketRepo.findOne({
+          where: { matchId, seatId, source: TicketSource.LOAN },
+        });
+        if (loanTicket) {
+          throw new ConflictException(
+            'Entry right for this match was already transferred to a borrower',
+          );
+        }
+
+        // Idempotent: return the ticket if it already exists
+        const existing = await ticketRepo.findOne({
+          where: { matchId, seatId, source: TicketSource.SEASON_PASS },
+        });
+        if (existing) return existing;
+
+        const ticket = ticketRepo.create({
+          matchId,
+          seatId,
+          userId: pass.userId,
+          seasonPassId: pass.id,
+          status: TicketStatus.PAID,
+          source: TicketSource.SEASON_PASS,
+          pricePaid: '0.00',
+          currency: 'HUF',
+          qrCode: `KTE-SP-${randomUUID()}`,
+          qrJti: this.qrService.generateJti(),
+        });
+        return ticketRepo.save(ticket);
+      });
+    } catch (err: unknown) {
+      if (err instanceof HttpException) throw err;
+      // Duplicate key: a concurrent request inserted first — re-fetch
+      if (isDuplicateKeyError(err)) {
+        const found = await this.dataSource.getRepository(Ticket).findOne({
+          where: { matchId, seatId, source: TicketSource.SEASON_PASS },
+        });
+        if (found) return found;
+      }
+      throw err;
+    }
+  }
+
   async createLoan(passId: string, lenderUserId: string, dto: CreateLoanDto): Promise<PassLoan> {
     const pass = await this.getOwnedPass(passId, lenderUserId);
     if (pass.status !== SeasonPassStatus.ACTIVE) {
@@ -378,10 +503,34 @@ export class SeasonPassesService {
 
   /**
    * Borrower-side acceptance flow.
-   * Generates the QR token (jti persisted on the loan row for rotation).
+   *
+   * Inside a single transaction:
+   *  1. Validates the invitation and marks the loan ACCEPTED.
+   *  2. Checks the owner's SEASON_PASS Ticket status. If already USED
+   *     (owner entered the stadium), the loan is marked REVOKED and a 409
+   *     is returned — a used right of entry cannot be transferred.
+   *  3. Deletes the owner's SEASON_PASS Ticket (if PAID) and revokes its
+   *     QR — the owner's right of entry is gone for this match.
+   *  4. Creates a LOAN Ticket owned by the borrower, satisfying the
+   *     uq_tickets_match_seat constraint. The LOAN Ticket is the only
+   *     valid right of entry for this (match, seat) going forward.
+   *
+   * Why hard-delete the owner's ticket instead of a status change:
+   *  The unique constraint on (match_id, seat_id) means only ONE row can
+   *  exist for a given seat per match. Changing the owner's ticket to
+   *  CANCELLED would leave the row in place, preventing the LOAN Ticket
+   *  insert. Deletion + revocation achieves the same security goal: the
+   *  old QR token is denylist-blocked so any cached copy is harmless.
+   *  The LOAN Ticket immediately occupies the unique slot, ensuring the
+   *  seat never appears purchasable between the delete and the insert.
    */
   async acceptLoan(invitationToken: string, borrowerUserId: string): Promise<PassLoan> {
-    return this.dataSource.transaction(async (manager) => {
+    // Set to true inside the transaction when the owner has already entered.
+    // We commit the REVOKED status first, then throw outside the transaction
+    // so the terminal state is persisted before the 409 is surfaced.
+    let ownerAlreadyEntered = false;
+
+    const { loan, loanTicket } = await this.dataSource.transaction(async (manager) => {
       const loanRepo = manager.getRepository(PassLoan);
       const loan = await loanRepo.findOne({
         where: { invitationToken },
@@ -406,18 +555,80 @@ export class SeasonPassesService {
         throw new ForbiddenException('Invitation was issued to a different email address');
       }
 
+      const pass = loan.seasonPass!;
+      if (!pass.seatId) {
+        throw new BadRequestException('Season pass has no seat assigned');
+      }
+
+      const ticketRepo = manager.getRepository(Ticket);
+
+      // Fetch the owner's ticket early so we can check its status before
+      // committing to the acceptance path.
+      const ownerTicket = await ticketRepo.findOne({
+        where: {
+          matchId: loan.matchId,
+          seatId: pass.seatId,
+          source: TicketSource.SEASON_PASS,
+        },
+      });
+
+      // Guard: owner already entered — the exercised entry right cannot be
+      // transferred retroactively. Mark the loan REVOKED (terminal state)
+      // and let the transaction commit that status before we throw 409.
+      if (ownerTicket?.status === TicketStatus.USED) {
+        loan.status = PassLoanStatus.REVOKED;
+        loan.cancelledAt = new Date();
+        loan.cancellationReason = 'Owner already entered the stadium for this match';
+        await loanRepo.save(loan);
+        ownerAlreadyEntered = true;
+        return { loan, loanTicket: null as Ticket | null };
+      }
+
       loan.borrowerUserId = borrowerUserId;
       loan.status = PassLoanStatus.ACCEPTED;
       loan.acceptedAt = new Date();
       loan.qrJti = this.qrService.generateJti();
       await loanRepo.save(loan);
 
-      void this.dispatchAcceptanceEmails(loan).catch((error: Error) => {
-        this.logger.error(`Loan acceptance emails failed loan=${loan.id}: ${error.message}`);
-      });
+      // Invalidate the owner's SEASON_PASS Ticket for this match if it
+      // was already materialised. See method JSDoc for the rationale.
+      if (ownerTicket) {
+        if (ownerTicket.qrJti) {
+          await this.qrService.revoke(ownerTicket.qrJti);
+        }
+        await ticketRepo.delete(ownerTicket.id);
+      }
 
-      return loan;
+      // Create the borrower's LOAN Ticket — the single right of entry for
+      // this (match, seat) from this point forward.
+      const loanTicket = ticketRepo.create({
+        matchId: loan.matchId,
+        seatId: pass.seatId,
+        userId: borrowerUserId,
+        seasonPassId: pass.id,
+        status: TicketStatus.PAID,
+        source: TicketSource.LOAN,
+        pricePaid: '0.00',
+        currency: 'HUF',
+        qrCode: `KTE-LOAN-${randomUUID()}`,
+        qrJti: this.qrService.generateJti(),
+      });
+      const savedTicket = await ticketRepo.save(loanTicket);
+
+      return { loan, loanTicket: savedTicket as Ticket | null };
     });
+
+    if (ownerAlreadyEntered) {
+      throw new ConflictException(
+        'A bérletestulajdonos már belépett erre a mérkőzésre. Az érvényesített belépőjog nem ruházható át.',
+      );
+    }
+
+    void this.dispatchAcceptanceEmails(loan, loanTicket!).catch((error: Error) => {
+      this.logger.error(`Loan acceptance emails failed loan=${loan.id}: ${error.message}`);
+    });
+
+    return loan;
   }
 
   async cancelLoan(
@@ -430,7 +641,7 @@ export class SeasonPassesService {
       const loanRepo = manager.getRepository(PassLoan);
       const loan = await loanRepo.findOne({
         where: { id: loanId, seasonPassId: passId },
-        relations: ['match', 'borrower', 'lender'],
+        relations: ['match', 'borrower', 'lender', 'seasonPass'],
       });
       if (!loan) {
         throw new NotFoundException('Loan not found');
@@ -452,6 +663,34 @@ export class SeasonPassesService {
       }
       await loanRepo.save(loan);
 
+      // If the loan was accepted, a LOAN Ticket exists for the borrower.
+      // Revoke its QR and handle it based on whether the borrower has
+      // already entered the stadium.
+      if (wasAccepted && loan.seasonPass?.seatId) {
+        const ticketRepo = manager.getRepository(Ticket);
+        const loanTicket = await ticketRepo.findOne({
+          where: {
+            matchId: loan.matchId,
+            seatId: loan.seasonPass.seatId,
+            source: TicketSource.LOAN,
+          },
+        });
+        if (loanTicket) {
+          if (loanTicket.qrJti) {
+            await this.qrService.revoke(loanTicket.qrJti);
+          }
+          if (loanTicket.status !== TicketStatus.USED) {
+            // Borrower has not entered yet — hard-delete the LOAN Ticket so
+            // the owner can re-materialise their SEASON_PASS Ticket and the
+            // uq_tickets_match_seat slot is freed for them.
+            await ticketRepo.delete(loanTicket.id);
+          }
+          // If USED: the borrower already entered. Revoking the QR is
+          // enough; the USED record must stay so the seat remains occupied
+          // and no new usable entry can be produced for this match.
+        }
+      }
+
       // Notify both parties when an accepted loan is cancelled. Pending loans
       // notify only the borrower (lender just cancelled, no need to mail self).
       void this.dispatchCancellationEmails(loan, wasAccepted).catch((error: Error) => {
@@ -465,6 +704,10 @@ export class SeasonPassesService {
   /**
    * Marks an accepted loan as COMPLETED once the match is over and
    * awards loyalty points to the lender. Idempotent.
+   *
+   * Also revokes the LOAN Ticket's QR if the borrower did not show up
+   * (ticket is still PAID) so stale tokens cannot be presented after the
+   * match. The ExpireTicketsJob will expire the PAID ticket itself.
    */
   async completeLoan(loan: PassLoan): Promise<void> {
     if (loan.status !== PassLoanStatus.ACCEPTED) {
@@ -479,6 +722,18 @@ export class SeasonPassesService {
         loan.qrRevokedAt = new Date();
       }
       await loanRepo.save(loan);
+
+      // Revoke the LOAN Ticket's QR if the borrower never entered
+      const loanTicket = await manager.getRepository(Ticket).findOne({
+        where: {
+          matchId: loan.matchId,
+          seasonPassId: loan.seasonPassId,
+          source: TicketSource.LOAN,
+        },
+      });
+      if (loanTicket?.qrJti && loanTicket.status === TicketStatus.PAID) {
+        await this.qrService.revoke(loanTicket.qrJti);
+      }
     });
 
     try {
@@ -523,7 +778,13 @@ export class SeasonPassesService {
     });
   }
 
-  private async dispatchAcceptanceEmails(loan: PassLoan): Promise<void> {
+  /**
+   * Sends acceptance emails to both borrower and lender.
+   *
+   * The borrower's email includes a QR generated from the LOAN Ticket
+   * (type='ticket') so it is accepted by the unified gate scan path.
+   */
+  private async dispatchAcceptanceEmails(loan: PassLoan, loanTicket: Ticket): Promise<void> {
     if (!loan.match || !loan.lender || !loan.borrowerUserId || !loan.seasonPass) {
       return;
     }
@@ -533,7 +794,12 @@ export class SeasonPassesService {
     }
     const matchSummary = this.renderer.matchSummary(loan.match);
     const seatLabel = loan.seasonPass.seat ? this.renderer.formatSeat(loan.seasonPass.seat) : '-';
-    const qrResult = await this.qrService.generateForLoan(loan.id, loan.qrJti ?? undefined);
+
+    // Generate QR from the LOAN Ticket so the gate scan path works
+    const qrResult = await this.qrService.generateForTicket(
+      loanTicket.id,
+      loanTicket.qrJti ?? undefined,
+    );
     const qrUrl = `${this.mailConfig.baseUrl}/profile/loans/${loan.id}`;
 
     // Borrower email (with QR)

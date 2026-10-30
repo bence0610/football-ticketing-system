@@ -10,6 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { TicketQrResponseDto } from '../tickets/dto/ticket-response.dto';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
@@ -136,6 +137,7 @@ export class SeasonPassesController {
   @Post('loans/accept/:token')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: PassLoanResponseDto })
   async acceptLoan(
     @Param('token') token: string,
@@ -144,6 +146,32 @@ export class SeasonPassesController {
     const userId = extractUserId(req);
     const loan = await this.seasonPassesService.acceptLoan(token, userId);
     return loanToDto(loan);
+  }
+
+  /**
+   * Lazily materialises the pass holder's SEASON_PASS Ticket for the given
+   * match (if it does not yet exist) and returns a gate-ready QR token.
+   *
+   * Blocked if an active loan exists for this (pass, match) — in that
+   * case the right of entry belongs to the borrower, not the holder.
+   */
+  @Get(':passId/qr/:matchId')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'QR kód lekérése bérletesnek egy adott meccsre' })
+  @ApiOkResponse({ type: TicketQrResponseDto })
+  async getMatchQr(
+    @Param('passId') passId: string,
+    @Param('matchId') matchId: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<TicketQrResponseDto> {
+    const userId = extractUserId(req);
+    const { ticketId, dataUrl, token } = await this.seasonPassesService.getMatchQr(
+      passId,
+      matchId,
+      userId,
+    );
+    return { ticketId, dataUrl, token };
   }
 
   @Delete(':id/loans/:loanId')

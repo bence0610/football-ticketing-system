@@ -104,7 +104,9 @@
       "Bash(dir \"C:\\\\Users\\\\User\\\\szakdolgozat\\\\.claude\\\\worktrees\\\\agent-a1f852164fdcd297a\\\\apps\\\\backend\\\\src\\\\modules\\\\tickets\" /b)",
       "Bash(docker exec *)",
       "Bash(docker rm *)",
-      "Bash(break)"
+      "Bash(break)",
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\" 2>&1; Write-Output \"Docker Desktop starting...\")",
+      "PowerShell(Get-Item *)"
     ]
   }
 }

@@ -20,6 +20,7 @@ describe('PaymentsService', () => {
 
   const mockTicketRepo = {
     find: jest.fn(),
+    findOne: jest.fn(),
     createQueryBuilder: jest.fn(),
   };
   const mockMatchRepo = { findOne: jest.fn() };
@@ -29,9 +30,13 @@ describe('PaymentsService', () => {
   const mockStripe = {
     paymentIntents: { create: jest.fn(), retrieve: jest.fn() },
     webhooks: { constructEvent: jest.fn() },
+    refunds: { create: jest.fn() },
   };
   const mockSeatLockService = { release: jest.fn() };
-  const mockDataSource = { transaction: jest.fn() };
+  const mockDataSource = {
+    transaction: jest.fn(),
+    getRepository: jest.fn().mockReturnValue({ findOne: jest.fn().mockResolvedValue(null) }),
+  };
   const mockLoyaltyService = { award: jest.fn() };
   const mockQrService = {
     generateJti: jest.fn().mockReturnValue('test-jti'),
@@ -98,6 +103,9 @@ describe('PaymentsService', () => {
         qrJti: 'test-jti',
       };
       mockTicketRepo.find.mockResolvedValue([]);
+      mockTicketRepo.findOne.mockResolvedValue(null); // seat is free — no occupying ticket
+      mockRedis.get.mockResolvedValue('tok-1'); // lock still present
+      mockStripe.refunds.create.mockResolvedValue({ id: 're_test', amount: 0 });
       mockMatchRepo.findOne.mockResolvedValue({
         id: 'm-1',
         homeTeam: 'KTE',

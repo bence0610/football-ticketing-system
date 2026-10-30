@@ -99,6 +99,7 @@ export class TicketsService {
       const ticket = await ticketRepo.findOne({
         where: { id: ticketId },
         relations: ['match', 'seat'],
+        lock: { mode: 'pessimistic_write' },
       });
       if (!ticket) {
         return { success: false, result: 'invalid', message: 'ticket_not_found' };
@@ -136,6 +137,7 @@ export class TicketsService {
         result: 'ok',
         ticketId: ticket.id,
         scannedAt: now.toISOString(),
+        source: ticket.source,
         match: ticket.match
           ? {
               id: ticket.match.id,

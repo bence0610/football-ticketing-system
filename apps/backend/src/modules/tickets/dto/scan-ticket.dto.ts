@@ -58,6 +58,9 @@ export class TicketScanResponseDto {
   @ApiProperty({ required: false })
   message?: string;
 
+  @ApiProperty({ required: false, description: 'Ticket source: single | season_pass | loan' })
+  source?: string;
+
   @ApiProperty({ required: false, type: ScanMatchInfoDto })
   match?: ScanMatchInfoDto;
 

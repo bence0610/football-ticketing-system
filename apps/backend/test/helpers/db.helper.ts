@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { hash } from 'bcrypt';
 import { DataSource } from 'typeorm';
 import {
@@ -7,6 +8,8 @@ import {
   MatchStatus,
   Seat,
   SeatCategory,
+  SeasonPass,
+  SeasonPassStatus,
   User,
   UserRole,
 } from '../../src/database/entities';
@@ -103,6 +106,35 @@ export async function seedMinimalFixture(dataSource: DataSource): Promise<Minima
   );
 
   return { match, seatA, seatB };
+}
+
+export interface SeasonPassFixture {
+  pass: SeasonPass;
+}
+
+/**
+ * Creates an ACTIVE season pass directly in the DB, linked to the given
+ * user and seat. Used by E2E tests that need to skip the Stripe payment flow.
+ */
+export async function seedSeasonPass(
+  dataSource: DataSource,
+  options: { userId: string; seatId: string },
+): Promise<SeasonPass> {
+  const repo = dataSource.getRepository(SeasonPass);
+  return repo.save(
+    repo.create({
+      userId: options.userId,
+      seatId: options.seatId,
+      seasonLabel: '2026/2027',
+      validFrom: new Date('2026-07-01'),
+      validUntil: new Date('2027-06-30'),
+      status: SeasonPassStatus.ACTIVE,
+      pricePaid: '30000.00',
+      currency: 'HUF',
+      qrCode: `KTE-SP-${randomUUID()}`,
+      autoRenew: false,
+    }),
+  );
 }
 
 export interface GateUserFixture {

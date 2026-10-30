@@ -21,6 +21,7 @@ export class EmailTemplateService implements OnModuleInit {
     'loan-cancelled': 'loan-cancelled.hbs',
     'tier-upgraded': 'tier-upgraded.hbs',
     'waitlist-notification': 'waitlist-notification.hbs',
+    'seat-refund': 'seat-refund.hbs',
   };
 
   async onModuleInit(): Promise<void> {

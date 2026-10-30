@@ -4,16 +4,26 @@ import request from 'supertest';
 import type { Response as SupertestResponse } from 'supertest';
 import { Server } from 'http';
 import {
+  Competition,
   LoyaltyTransaction,
   LoyaltyTransactionSource,
   Match,
+  MatchStatus,
+  PassLoan,
+  PassLoanStatus,
   Seat,
   Ticket,
+  TicketSource,
   TicketStatus,
 } from '../src/database/entities';
 import { ChatbotContextService } from '../src/modules/chatbot/chatbot-context.service';
 import { closeTestApp, createTestApp, TestContext } from './helpers/app.helper';
-import { createGateUser, seedMinimalFixture, truncateAll } from './helpers/db.helper';
+import {
+  createGateUser,
+  seedMinimalFixture,
+  seedSeasonPass,
+  truncateAll,
+} from './helpers/db.helper';
 import {
   buildPaymentIntentSucceededEvent,
   buildStripeWebhookHeader,
@@ -54,6 +64,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     await ctx.redis.flushdb();
     ctx.stripeStub.paymentIntentsCreateMock.mockClear();
     ctx.stripeStub.paymentIntentsRetrieveMock.mockClear();
+    ctx.stripeStub.refundCreateMock.mockClear();
   });
 
   /* ------------------------------------------------------------------ */
@@ -510,6 +521,650 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     expect(findSeat(seatMap, seatB.id).status).toBe('available');
     expect(matchSnapshot!.availableSeats).toBe(seatMapFreeCount);
     expect(matchSnapshot!.soldSeats).toBe(1);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Season-pass + loan entry scenarios (unified gate)                  */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Materialises and scans a season-pass QR.
+   * Calls the new GET /api/season-passes/:passId/qr/:matchId endpoint, then
+   * presents the returned token at the gate scan endpoint.
+   */
+  async function getSeasonPassQr(
+    accessToken: string,
+    passId: string,
+    matchId: string,
+  ): Promise<{ ticketId: string; token: string }> {
+    const resp = await request(server)
+      .get(`/api/season-passes/${passId}/qr/${matchId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(resp.status).toBe(200);
+    return { ticketId: resp.body.ticketId as string, token: resp.body.token as string };
+  }
+
+  async function getLoanTicketForBorrower(
+    accessToken: string,
+  ): Promise<{ id: string; source: string }> {
+    const resp = await request(server)
+      .get('/api/tickets/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(resp.status).toBe(200);
+    const loan = (resp.body as Array<{ id: string; source: string }>).find(
+      (t) => t.source === TicketSource.LOAN,
+    );
+    if (!loan) throw new Error('No loan ticket found for borrower');
+    return loan;
+  }
+
+  async function createAndAcceptLoan(
+    ownerToken: string,
+    passId: string,
+    matchId: string,
+    borrowerEmail: string,
+    borrowerToken: string,
+  ): Promise<{ loanId: string }> {
+    const createResp = await request(server)
+      .post(`/api/season-passes/${passId}/loans`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ matchId, borrowerEmail });
+    expect(createResp.status).toBe(201);
+    const loanId: string = createResp.body.id as string;
+
+    const loanRow = await ctx.dataSource
+      .getRepository(PassLoan)
+      .findOneOrFail({ where: { id: loanId } });
+
+    const acceptResp = await request(server)
+      .post(`/api/season-passes/loans/accept/${loanRow.invitationToken}`)
+      .set('Authorization', `Bearer ${borrowerToken}`);
+    expect(acceptResp.status).toBe(200);
+
+    return { loanId };
+  }
+
+  it('scenario 1 — season-pass holder obtains a QR and enters the stadium', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const holder = await registerFan('sp-holder-1');
+    const pass = await seedSeasonPass(ctx.dataSource, {
+      userId: holder.userId,
+      seatId: seatA.id,
+    });
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-sp-1@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    const { ticketId, token } = await getSeasonPassQr(holder.accessToken, pass.id, match.id);
+    expect(ticketId).toBeDefined();
+
+    const scanResp = await request(server)
+      .patch(`/api/tickets/${ticketId}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token });
+    expect(scanResp.status).toBe(200);
+    expect(scanResp.body.success).toBe(true);
+    expect(scanResp.body.result).toBe('ok');
+    expect(scanResp.body.source).toBe(TicketSource.SEASON_PASS);
+
+    const ticket = await ctx.dataSource
+      .getRepository(Ticket)
+      .findOneOrFail({ where: { id: ticketId } });
+    expect(ticket.status).toBe(TicketStatus.USED);
+    expect(ticket.source).toBe(TicketSource.SEASON_PASS);
+  });
+
+  it('scenario 2 — full loan: owner lends, borrower accepts, borrower enters at gate', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const owner = await registerFan('loan-owner-2');
+    const borrower = await registerFan('loan-borrower-2');
+    const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-loan-2@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    await createAndAcceptLoan(
+      owner.accessToken,
+      pass.id,
+      match.id,
+      borrower.email,
+      borrower.accessToken,
+    );
+
+    const loanTicket = await getLoanTicketForBorrower(borrower.accessToken);
+    expect(loanTicket.source).toBe(TicketSource.LOAN);
+
+    const qrResp = await request(server)
+      .get(`/api/tickets/${loanTicket.id}/qr`)
+      .set('Authorization', `Bearer ${borrower.accessToken}`);
+    expect(qrResp.status).toBe(200);
+
+    const scanResp = await request(server)
+      .patch(`/api/tickets/${loanTicket.id}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token: qrResp.body.token });
+    expect(scanResp.status).toBe(200);
+    expect(scanResp.body.success).toBe(true);
+    expect(scanResp.body.result).toBe('ok');
+    expect(scanResp.body.source).toBe(TicketSource.LOAN);
+  });
+
+  it('scenario 3 — after acceptance the owner cannot enter that match on that seat', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const owner = await registerFan('loan-owner-3');
+    const borrower = await registerFan('loan-borrower-3');
+    const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-loan-3@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    // Owner materialises their ticket first
+    const { ticketId: ownerTicketId, token: ownerToken } = await getSeasonPassQr(
+      owner.accessToken,
+      pass.id,
+      match.id,
+    );
+
+    // Loan is created and accepted — owner's ticket is deleted and QR revoked
+    await createAndAcceptLoan(
+      owner.accessToken,
+      pass.id,
+      match.id,
+      borrower.email,
+      borrower.accessToken,
+    );
+
+    // Owner's original token is rejected (ticket was deleted)
+    const ownerScan = await request(server)
+      .patch(`/api/tickets/${ownerTicketId}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token: ownerToken });
+    expect(ownerScan.status).toBe(200);
+    expect(ownerScan.body.success).toBe(false);
+
+    // Owner's season-pass QR endpoint is also blocked for this match
+    const ownerQr2 = await request(server)
+      .get(`/api/season-passes/${pass.id}/qr/${match.id}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`);
+    expect(ownerQr2.status).toBe(409);
+  });
+
+  it("scenario 4 — borrower's entry does not free the seat for sale", async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const owner = await registerFan('seat-lock-owner-4');
+    const borrower = await registerFan('seat-lock-borrower-4');
+    const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-lock-4@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    await createAndAcceptLoan(
+      owner.accessToken,
+      pass.id,
+      match.id,
+      borrower.email,
+      borrower.accessToken,
+    );
+
+    // Borrower enters
+    const loanTicket = await getLoanTicketForBorrower(borrower.accessToken);
+    const qrResp = await request(server)
+      .get(`/api/tickets/${loanTicket.id}/qr`)
+      .set('Authorization', `Bearer ${borrower.accessToken}`);
+    await request(server)
+      .patch(`/api/tickets/${loanTicket.id}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token: qrResp.body.token });
+
+    // Seat must NOT become available — the USED LOAN Ticket still occupies it
+    const lockResp = await request(server)
+      .post(`/api/matches/${match.id}/seats/${seatA.id}/lock`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send();
+    expect(lockResp.status).toBe(409);
+
+    // Only one ticket row for this (match, seat)
+    const count = await ctx.dataSource
+      .getRepository(Ticket)
+      .count({ where: { matchId: match.id, seatId: seatA.id } });
+    expect(count).toBe(1);
+  });
+
+  it('scenario 5 — revocation before use: borrower QR rejected, owner can enter again', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const owner = await registerFan('revoke-pre-owner-5');
+    const borrower = await registerFan('revoke-pre-borrower-5');
+    const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-revoke-pre-5@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    const { loanId } = await createAndAcceptLoan(
+      owner.accessToken,
+      pass.id,
+      match.id,
+      borrower.email,
+      borrower.accessToken,
+    );
+
+    // Capture borrower's QR token before cancellation
+    const loanTicket = await getLoanTicketForBorrower(borrower.accessToken);
+    const borrowerQr = await request(server)
+      .get(`/api/tickets/${loanTicket.id}/qr`)
+      .set('Authorization', `Bearer ${borrower.accessToken}`);
+    expect(borrowerQr.status).toBe(200);
+    const borrowerToken: string = borrowerQr.body.token as string;
+    const borrowerTicketId: string = loanTicket.id;
+
+    // Owner cancels the loan
+    const cancelResp = await request(server)
+      .delete(`/api/season-passes/${pass.id}/loans/${loanId}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({ reason: 'Changed mind' });
+    expect(cancelResp.status).toBe(200);
+
+    // Borrower's QR is rejected (ticket deleted)
+    const borrowerScan = await request(server)
+      .patch(`/api/tickets/${borrowerTicketId}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token: borrowerToken });
+    expect(borrowerScan.status).toBe(200);
+    expect(borrowerScan.body.success).toBe(false);
+
+    // Owner can re-materialise their ticket and enter
+    const { ticketId: newTicketId, token: ownerToken } = await getSeasonPassQr(
+      owner.accessToken,
+      pass.id,
+      match.id,
+    );
+    const ownerScan = await request(server)
+      .patch(`/api/tickets/${newTicketId}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token: ownerToken });
+    expect(ownerScan.status).toBe(200);
+    expect(ownerScan.body.success).toBe(true);
+    expect(ownerScan.body.result).toBe('ok');
+  });
+
+  it('scenario 6 — revocation after borrower entered: no new usable entry for either party', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const owner = await registerFan('revoke-post-owner-6');
+    const borrower = await registerFan('revoke-post-borrower-6');
+    const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-revoke-post-6@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    const { loanId } = await createAndAcceptLoan(
+      owner.accessToken,
+      pass.id,
+      match.id,
+      borrower.email,
+      borrower.accessToken,
+    );
+
+    // Borrower enters
+    const loanTicket = await getLoanTicketForBorrower(borrower.accessToken);
+    const qrResp = await request(server)
+      .get(`/api/tickets/${loanTicket.id}/qr`)
+      .set('Authorization', `Bearer ${borrower.accessToken}`);
+    const scanResp = await request(server)
+      .patch(`/api/tickets/${loanTicket.id}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token: qrResp.body.token });
+    expect(scanResp.body.success).toBe(true);
+
+    // Owner tries to cancel AFTER the borrower entered
+    const cancelResp = await request(server)
+      .delete(`/api/season-passes/${pass.id}/loans/${loanId}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({ reason: 'Post-entry cancel attempt' });
+    expect(cancelResp.status).toBe(200);
+
+    // Owner trying to get a QR must be blocked — a USED LOAN Ticket still
+    // occupies the (match, seat) slot
+    const ownerQr = await request(server)
+      .get(`/api/season-passes/${pass.id}/qr/${match.id}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`);
+    expect(ownerQr.status).toBe(409);
+
+    // Only the USED loan ticket remains — no second usable entry
+    const tickets = await ctx.dataSource
+      .getRepository(Ticket)
+      .find({ where: { matchId: match.id, seatId: seatA.id } });
+    expect(tickets).toHaveLength(1);
+    expect(tickets[0].status).toBe(TicketStatus.USED);
+    expect(tickets[0].source).toBe(TicketSource.LOAN);
+  });
+
+  it('scenario 7 — loan on match A does not affect owner entry on match B', async () => {
+    const { match: matchA, seatA } = await seedMinimalFixture(ctx.dataSource);
+
+    // Create a second match independently
+    const matchB = await ctx.dataSource.getRepository(Match).save(
+      ctx.dataSource.getRepository(Match).create({
+        homeTeam: 'Kecskeméti TE',
+        awayTeam: 'Next Match Rivals',
+        competition: Competition.NB1,
+        venue: 'Széktói Stadion',
+        kickoffAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        status: MatchStatus.ON_SALE,
+        capacity: 2,
+        basePrice: '5000.00',
+        isSeasonPassEligible: true,
+      }),
+    );
+
+    const owner = await registerFan('next-match-owner-7');
+    const borrower = await registerFan('next-match-borrower-7');
+    const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-next-7@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    // Owner loans match A to the borrower
+    await createAndAcceptLoan(
+      owner.accessToken,
+      pass.id,
+      matchA.id,
+      borrower.email,
+      borrower.accessToken,
+    );
+
+    // Owner can still enter match B — the loan only affects match A
+    const { ticketId: ticketB, token: tokenB } = await getSeasonPassQr(
+      owner.accessToken,
+      pass.id,
+      matchB.id,
+    );
+    const scanResp = await request(server)
+      .patch(`/api/tickets/${ticketB}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token: tokenB });
+    expect(scanResp.status).toBe(200);
+    expect(scanResp.body.success).toBe(true);
+    expect(scanResp.body.result).toBe('ok');
+  });
+
+  it('scenario 8 — same QR presented at two gates simultaneously: exactly one scan succeeds', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const holder = await registerFan('concurrent-sp-8');
+    const pass = await seedSeasonPass(ctx.dataSource, {
+      userId: holder.userId,
+      seatId: seatA.id,
+    });
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-concurrent-8@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    const { ticketId, token } = await getSeasonPassQr(holder.accessToken, pass.id, match.id);
+
+    // Two concurrent scans with the SAME token — genuine concurrency via Promise.all
+    const [scanA, scanB] = await Promise.all([
+      request(server)
+        .patch(`/api/tickets/${ticketId}/scan`)
+        .set('Authorization', `Bearer ${gateToken}`)
+        .send({ token }),
+      request(server)
+        .patch(`/api/tickets/${ticketId}/scan`)
+        .set('Authorization', `Bearer ${gateToken}`)
+        .send({ token }),
+    ]);
+
+    expect(scanA.status).toBe(200);
+    expect(scanB.status).toBe(200);
+
+    const results = [scanA.body.result as string, scanB.body.result as string];
+    // Exactly one scan succeeds
+    expect(results.filter((r) => r === 'ok')).toHaveLength(1);
+
+    // DB shows the ticket as USED (exactly once)
+    const ticket = await ctx.dataSource
+      .getRepository(Ticket)
+      .findOneOrFail({ where: { id: ticketId } });
+    expect(ticket.status).toBe(TicketStatus.USED);
+  });
+
+  it('scenario 9 — acceptLoan refused when owner already entered: USED ticket intact, no LOAN ticket, loan REVOKED', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const owner = await registerFan('accept-after-entry-owner-9');
+    const borrower = await registerFan('accept-after-entry-borrower-9');
+    const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
+    const gate = await createGateUser(ctx.dataSource, {
+      email: 'gate-accept-after-entry-9@kte.hu',
+    });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    // Owner materialises their QR and enters the stadium
+    const { ticketId: ownerTicketId, token: ownerQrToken } = await getSeasonPassQr(
+      owner.accessToken,
+      pass.id,
+      match.id,
+    );
+    const scanResp = await request(server)
+      .patch(`/api/tickets/${ownerTicketId}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token: ownerQrToken });
+    expect(scanResp.status).toBe(200);
+    expect(scanResp.body.success).toBe(true);
+    expect(scanResp.body.result).toBe('ok');
+
+    const usedTicket = await ctx.dataSource
+      .getRepository(Ticket)
+      .findOneOrFail({ where: { id: ownerTicketId } });
+    expect(usedTicket.status).toBe(TicketStatus.USED);
+
+    // Owner creates a loan invitation after having already entered
+    const createResp = await request(server)
+      .post(`/api/season-passes/${pass.id}/loans`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .send({ matchId: match.id, borrowerEmail: borrower.email });
+    expect(createResp.status).toBe(201);
+    const loanId: string = createResp.body.id as string;
+
+    const loanRow = await ctx.dataSource
+      .getRepository(PassLoan)
+      .findOneOrFail({ where: { id: loanId } });
+
+    // Borrower tries to accept — must be refused with 409
+    const acceptResp = await request(server)
+      .post(`/api/season-passes/loans/accept/${loanRow.invitationToken}`)
+      .set('Authorization', `Bearer ${borrower.accessToken}`);
+    expect(acceptResp.status).toBe(409);
+
+    // Owner's USED ticket must remain intact
+    const ownerTicketAfter = await ctx.dataSource
+      .getRepository(Ticket)
+      .findOneOrFail({ where: { id: ownerTicketId } });
+    expect(ownerTicketAfter.status).toBe(TicketStatus.USED);
+    expect(ownerTicketAfter.source).toBe(TicketSource.SEASON_PASS);
+
+    // No LOAN ticket was created for this (match, seat)
+    const loanTickets = await ctx.dataSource
+      .getRepository(Ticket)
+      .find({ where: { matchId: match.id, seatId: seatA.id, source: TicketSource.LOAN } });
+    expect(loanTickets).toHaveLength(0);
+
+    // The loan must end in REVOKED state — a clear terminal signal
+    const finalLoan = await ctx.dataSource
+      .getRepository(PassLoan)
+      .findOneOrFail({ where: { id: loanId } });
+    expect(finalLoan.status).toBe(PassLoanStatus.REVOKED);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Expired-lock timing scenarios                                       */
+  /* ------------------------------------------------------------------ */
+
+  it('scenario 10 — lock expired, seat still free: ticket is issued, no refund requested', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const fan = await registerFan('lock-expired-free-10');
+
+    const ownerToken = await lockSeat(fan.accessToken, match.id, seatA.id);
+    const { paymentIntentId } = await createIntent(fan.accessToken, match.id, [
+      { seatId: seatA.id, ownerToken },
+    ]);
+    const intent = ctx.stripeStub.getStoredIntent(paymentIntentId)!;
+
+    // Simulate lock expiry: delete the Redis key before the webhook fires
+    await ctx.redis.del(RedisKeys.seatLock(match.id, seatA.id));
+
+    const webhookResp = await deliverWebhook(intent);
+    expect(webhookResp.status).toBe(200);
+    await flushAsync();
+
+    // Ticket was issued despite the expired lock (seat was still free in DB)
+    const ticket = await ctx.dataSource.getRepository(Ticket).findOne({
+      where: { stripePaymentIntentId: intent.id, userId: fan.userId },
+    });
+    expect(ticket).not.toBeNull();
+    expect(ticket?.status).toBe(TicketStatus.PAID);
+
+    // No refund was requested
+    expect(ctx.stripeStub.refundCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('scenario 11 — lock expired, seat taken by another buyer: no ticket for late buyer, full refund requested, winner ticket untouched', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const fan1 = await registerFan('lock-expired-taken-1-11');
+    const fan2 = await registerFan('lock-expired-taken-2-11');
+
+    // fan1: lock + create intent
+    const ownerToken1 = await lockSeat(fan1.accessToken, match.id, seatA.id);
+    const { paymentIntentId: pid1 } = await createIntent(fan1.accessToken, match.id, [
+      { seatId: seatA.id, ownerToken: ownerToken1 },
+    ]);
+    const intent1 = ctx.stripeStub.getStoredIntent(pid1)!;
+
+    // Simulate fan1's lock expiry
+    await ctx.redis.del(RedisKeys.seatLock(match.id, seatA.id));
+
+    // fan2 acquires the now-free seat and completes the purchase
+    const ownerToken2 = await lockSeat(fan2.accessToken, match.id, seatA.id);
+    const { paymentIntentId: pid2 } = await createIntent(fan2.accessToken, match.id, [
+      { seatId: seatA.id, ownerToken: ownerToken2 },
+    ]);
+    const intent2 = ctx.stripeStub.getStoredIntent(pid2)!;
+    const webhook2 = await deliverWebhook(intent2);
+    expect(webhook2.status).toBe(200);
+    await flushAsync();
+
+    const fan2Ticket = await ctx.dataSource.getRepository(Ticket).findOne({
+      where: { stripePaymentIntentId: pid2, userId: fan2.userId },
+    });
+    expect(fan2Ticket).not.toBeNull();
+
+    // fan1's late webhook arrives — seatA is now taken
+    const webhook1 = await deliverWebhook(intent1);
+    expect(webhook1.status).toBe(200);
+    await flushAsync();
+
+    // No ticket for fan1
+    const fan1Ticket = await ctx.dataSource.getRepository(Ticket).findOne({
+      where: { stripePaymentIntentId: pid1 },
+    });
+    expect(fan1Ticket).toBeNull();
+
+    // Full refund was requested for fan1
+    expect(ctx.stripeStub.refundCreateMock).toHaveBeenCalledTimes(1);
+    expect(ctx.stripeStub.refundCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_intent: pid1 }),
+      expect.anything(),
+    );
+
+    // fan2's ticket is untouched
+    const fan2TicketAfter = await ctx.dataSource
+      .getRepository(Ticket)
+      .findOneOrFail({ where: { id: fan2Ticket!.id } });
+    expect(fan2TicketAfter.status).toBe(TicketStatus.PAID);
+
+    // Seat map shows seatA as occupied (by fan2)
+    const seats = await fetchSeatMap(match.id);
+    expect(findSeat(seats, seatA.id).status).toBe('sold');
+  });
+
+  it('scenario 12 — mixed basket: seatA taken, seatB free → ticket for seatB only, partial refund for seatA', async () => {
+    const { match, seatA, seatB } = await seedMinimalFixture(ctx.dataSource);
+    const fan1 = await registerFan('mixed-basket-fan1-12');
+    const fan2 = await registerFan('mixed-basket-fan2-12');
+
+    // fan1 locks both seats and creates a 2-seat intent
+    const ownerTokenA = await lockSeat(fan1.accessToken, match.id, seatA.id);
+    const ownerTokenB = await lockSeat(fan1.accessToken, match.id, seatB.id);
+    const { paymentIntentId: pid1, amount: totalAmount } = await createIntent(
+      fan1.accessToken,
+      match.id,
+      [
+        { seatId: seatA.id, ownerToken: ownerTokenA },
+        { seatId: seatB.id, ownerToken: ownerTokenB },
+      ],
+    );
+    const intent1 = ctx.stripeStub.getStoredIntent(pid1)!;
+
+    // fan1's locks expire
+    await ctx.redis.del(RedisKeys.seatLock(match.id, seatA.id));
+    await ctx.redis.del(RedisKeys.seatLock(match.id, seatB.id));
+
+    // fan2 buys only seatA in the meantime
+    const ownerToken2 = await lockSeat(fan2.accessToken, match.id, seatA.id);
+    const { paymentIntentId: pid2 } = await createIntent(fan2.accessToken, match.id, [
+      { seatId: seatA.id, ownerToken: ownerToken2 },
+    ]);
+    await deliverWebhook(ctx.stripeStub.getStoredIntent(pid2)!);
+    await flushAsync();
+
+    // fan1's webhook arrives: seatA is taken, seatB is still free
+    const webhook1 = await deliverWebhook(intent1);
+    expect(webhook1.status).toBe(200);
+    await flushAsync();
+
+    // Exactly one ticket for fan1 — only seatB
+    const fan1Tickets = await ctx.dataSource.getRepository(Ticket).find({
+      where: { stripePaymentIntentId: pid1, userId: fan1.userId },
+    });
+    expect(fan1Tickets).toHaveLength(1);
+    expect(fan1Tickets[0].seatId).toBe(seatB.id);
+    expect(fan1Tickets[0].status).toBe(TicketStatus.PAID);
+
+    // Partial refund for seatA only (less than the full basket total)
+    expect(ctx.stripeStub.refundCreateMock).toHaveBeenCalledTimes(1);
+    const refundArgs = ctx.stripeStub.refundCreateMock.mock.calls[0][0] as {
+      payment_intent: string;
+      amount: number;
+    };
+    expect(refundArgs.payment_intent).toBe(pid1);
+    // The refund covers one seat's share; the full basket is two seats
+    const stripeTotal = totalAmount * 100;
+    expect(refundArgs.amount).toBeGreaterThan(0);
+    expect(refundArgs.amount).toBeLessThan(stripeTotal);
+  });
+
+  it('scenario 13 — webhook and confirm arrive concurrently: exactly one ticket, no error state', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const fan = await registerFan('concurrent-finalize-13');
+
+    const ownerToken = await lockSeat(fan.accessToken, match.id, seatA.id);
+    const { paymentIntentId } = await createIntent(fan.accessToken, match.id, [
+      { seatId: seatA.id, ownerToken },
+    ]);
+    const intent = ctx.stripeStub.getStoredIntent(paymentIntentId)!;
+
+    // Genuine concurrency: fire both paths simultaneously
+    const [webhookResp, confirmResp] = await Promise.all([
+      deliverWebhook(intent),
+      request(server)
+        .post('/api/payments/confirm')
+        .set('Authorization', `Bearer ${fan.accessToken}`)
+        .send({ paymentIntentId }),
+    ]);
+
+    await flushAsync();
+
+    // Both paths must succeed (no 5xx)
+    expect(webhookResp.status).toBe(200);
+    expect([200, 201]).toContain(confirmResp.status);
+
+    // Exactly one ticket must exist — the concurrent path must not duplicate
+    const tickets = await ctx.dataSource.getRepository(Ticket).find({
+      where: { stripePaymentIntentId: paymentIntentId },
+    });
+    expect(tickets).toHaveLength(1);
+    expect(tickets[0].status).toBe(TicketStatus.PAID);
+
+    // No refund was triggered — this is a clean concurrent finalization
+    expect(ctx.stripeStub.refundCreateMock).not.toHaveBeenCalled();
   });
 
   it('idempotent webhook — double delivery produces one ticket and one loyalty transaction', async () => {

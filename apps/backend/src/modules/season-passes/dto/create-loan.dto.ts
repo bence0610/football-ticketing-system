@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateLoanDto {
   @ApiProperty({ description: 'Match identifier the loan applies to.' })
@@ -15,5 +15,7 @@ export class CreateLoanDto {
 
 export class CancelLoanDto {
   @ApiProperty({ required: false, example: 'Mégsem tudok jönni' })
+  @IsOptional()
+  @IsString()
   reason?: string;
 }

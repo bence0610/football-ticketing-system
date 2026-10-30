@@ -21,7 +21,9 @@ import {
   Ticket,
   TicketSource,
   TicketStatus,
+  User,
 } from '../../database/entities';
+import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import { EmailService } from '../email/email.service';
@@ -37,6 +39,17 @@ import {
   PaymentIntentSeatLineDto,
 } from './dto';
 import { STRIPE_CLIENT } from './stripe.provider';
+
+function isDuplicateKeyError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as { code?: string }).code;
+  return (
+    code === 'ER_DUP_ENTRY' ||
+    code === '23505' ||
+    error.message.includes('ER_DUP_ENTRY') ||
+    error.message.includes('Duplicate entry')
+  );
+}
 
 interface SeatLine {
   seat: Seat;
@@ -298,32 +311,122 @@ export class PaymentsService {
       const seatById = new Map(seats.map((s) => [s.id, s]));
       const basePrice = Number(match.basePrice);
 
-      createdTickets = await this.dataSource.transaction(async (em) => {
-        const persisted: Ticket[] = [];
-        for (const seatId of seatIds) {
-          const seat = seatById.get(seatId);
-          if (!seat) {
-            this.logger.error(`Seat ${seatId} missing while finalizing payment ${intent.id}`);
-            continue;
-          }
-          const price = Math.round(basePrice * Number(seat.priceModifier));
-          const ticket = em.create(Ticket, {
-            matchId,
-            seatId,
-            userId,
-            status: TicketStatus.PAID,
-            source: TicketSource.SINGLE,
-            pricePaid: price.toFixed(2),
-            currency: 'HUF',
-            qrCode: `KTE-${randomUUID()}`,
-            qrJti: this.qrService.generateJti(),
-            stripePaymentIntentId: intent.id,
+      // Per-seat DB occupancy check: separate fulfillable seats from taken ones.
+      // This is the "can this already-paid purchase be fulfilled?" question —
+      // distinct from the Redis lock check in assertSeatsAvailable which guards
+      // purchase START time. An expired Redis lock alone does not block
+      // fulfillment; only a DB-level occupying ticket does.
+      const occupancyResults = await Promise.all(
+        seatIds.map(async (seatId) => {
+          const occupying = await this.ticketRepository.findOne({
+            where: { matchId, seatId, status: In([...OCCUPYING_TICKET_STATUSES]) },
+            select: ['id'],
           });
-          const saved = await em.save(Ticket, ticket);
-          persisted.push(saved);
+          return { seatId, taken: occupying !== null };
+        }),
+      );
+
+      const fulfillableSeatIds = seatIds.filter((_, i) => !occupancyResults[i].taken);
+      const takenSeatIds = seatIds.filter((_, i) => occupancyResults[i].taken);
+
+      // Log when a lock expired but the seat is still free (sub-case a).
+      for (const seatId of fulfillableSeatIds) {
+        const lockVal = await this.redis.get(RedisKeys.seatLock(matchId, seatId));
+        if (!lockVal) {
+          this.logger.warn(
+            `Payment ${intent.id}: seat lock expired for seat=${seatId} match=${matchId} but seat is still free — completing purchase`,
+          );
         }
-        return persisted;
-      });
+      }
+
+      if (takenSeatIds.length > 0) {
+        this.logger.warn(
+          `Payment ${intent.id}: ${takenSeatIds.length} seat(s) taken since lock expired — will refund: ${takenSeatIds.join(', ')}`,
+        );
+      }
+
+      // Create tickets for fulfillable seats; catch ER_DUP_ENTRY from a
+      // concurrent webhook+confirm race (scenario 13) and re-fetch instead.
+      try {
+        createdTickets = await this.dataSource.transaction(async (em) => {
+          const persisted: Ticket[] = [];
+          for (const seatId of fulfillableSeatIds) {
+            const seat = seatById.get(seatId);
+            if (!seat) {
+              this.logger.error(`Seat ${seatId} missing while finalizing payment ${intent.id}`);
+              continue;
+            }
+            const price = Math.round(basePrice * Number(seat.priceModifier));
+            const ticket = em.create(Ticket, {
+              matchId,
+              seatId,
+              userId,
+              status: TicketStatus.PAID,
+              source: TicketSource.SINGLE,
+              pricePaid: price.toFixed(2),
+              currency: 'HUF',
+              qrCode: `KTE-${randomUUID()}`,
+              qrJti: this.qrService.generateJti(),
+              stripePaymentIntentId: intent.id,
+            });
+            const saved = await em.save(Ticket, ticket);
+            persisted.push(saved);
+          }
+          return persisted;
+        });
+      } catch (txError) {
+        if (isDuplicateKeyError(txError)) {
+          this.logger.warn(
+            `Payment ${intent.id}: concurrent finalization detected (ER_DUP_ENTRY) — re-fetching existing tickets`,
+          );
+          createdTickets = await this.ticketRepository.find({
+            where: { stripePaymentIntentId: intent.id },
+          });
+        } else {
+          throw txError;
+        }
+      }
+
+      // Issue Stripe refund for every seat that was taken before we could
+      // fulfill it (sub-case b). Fire-and-forget the notification email so
+      // the webhook response is never delayed by SMTP latency.
+      if (takenSeatIds.length > 0) {
+        const refundHuf = takenSeatIds.reduce((acc, seatId) => {
+          const seat = seatById.get(seatId);
+          if (!seat) return acc;
+          return acc + Math.round(basePrice * Number(seat.priceModifier));
+        }, 0);
+
+        if (refundHuf > 0) {
+          try {
+            await this.stripe.refunds.create(
+              { payment_intent: intent.id, amount: this.toStripeAmount(refundHuf) },
+              { idempotencyKey: `refund_${intent.id}` },
+            );
+            this.logger.warn(
+              `Payment ${intent.id}: refunded ${refundHuf} HUF for ${takenSeatIds.length} taken seat(s)`,
+            );
+          } catch (refundError) {
+            this.logger.error(
+              `Payment ${intent.id}: Stripe refund failed: ${
+                refundError instanceof Error ? refundError.message : String(refundError)
+              }`,
+            );
+          }
+
+          setImmediate(() => {
+            this.sendRefundNotificationEmail(intent, takenSeatIds, refundHuf).catch(
+              (error: unknown) => {
+                this.logger.error(
+                  `Refund notification email failed for payment ${intent.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                  }`,
+                );
+              },
+            );
+          });
+        }
+      }
     }
 
     // Release any seat lock the buyer owned. Run regardless of whether the
@@ -528,6 +631,45 @@ export class PaymentsService {
         await this.redis.del(lockKey).catch(() => undefined);
       }
     }
+  }
+
+  private async sendRefundNotificationEmail(
+    intent: Stripe.PaymentIntent,
+    takenSeatIds: string[],
+    refundHuf: number,
+  ): Promise<void> {
+    const userId = intent.metadata.userId;
+    const matchId = intent.metadata.matchId;
+    if (!userId || !matchId) return;
+
+    const user = await this.dataSource.getRepository(User).findOne({
+      where: { id: userId },
+      select: ['email', 'firstName'],
+    });
+    if (!user) {
+      this.logger.warn(`Refund notification: user ${userId} not found`);
+      return;
+    }
+
+    const match = await this.matchRepository.findOne({ where: { id: matchId } });
+    if (!match) return;
+
+    const matchTitle = `${match.homeTeam} vs ${match.awayTeam}`;
+    const kickoffLabel = match.kickoffAt.toLocaleString('hu-HU', { timeZone: 'Europe/Budapest' });
+
+    await this.emailService.send({
+      to: user.email,
+      subject: `Visszatérítés folyamatban — ${matchTitle}`,
+      template: 'seat-refund',
+      context: {
+        recipientName: user.firstName,
+        matchTitle,
+        matchKickoffLabel: kickoffLabel,
+        takenSeatCount: takenSeatIds.length,
+        refundLabel: `${refundHuf.toLocaleString('hu-HU')} Ft`,
+      },
+      correlationId: `seat-refund:${intent.id}`,
+    });
   }
 
   private async handlePaymentFailed(intent: Stripe.PaymentIntent): Promise<void> {

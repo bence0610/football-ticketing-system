@@ -21,6 +21,12 @@ export interface StubbedPaymentIntent {
   description?: string;
 }
 
+export interface StubbedRefund {
+  id: string;
+  payment_intent: string;
+  amount: number;
+}
+
 type CreateArgs = Stripe.PaymentIntentCreateParams;
 
 /**
@@ -37,6 +43,7 @@ type CreateArgs = Stripe.PaymentIntentCreateParams;
 export class StripeStub {
   private readonly intentsById = new Map<string, StubbedPaymentIntent>();
   private readonly intentsByIdempotencyKey = new Map<string, StubbedPaymentIntent>();
+  private refundsStore: StubbedRefund[] = [];
 
   public readonly paymentIntentsCreateMock = jest.fn(
     async (params: CreateArgs, options?: Stripe.RequestOptions): Promise<StubbedPaymentIntent> => {
@@ -48,7 +55,7 @@ export class StripeStub {
         }
       }
 
-      const id = `pi_test_${randomBytes(12).toString('hex')}`;
+      const id = `pi_test${randomBytes(12).toString('hex')}`;
       const intent: StubbedPaymentIntent = {
         id,
         object: 'payment_intent',
@@ -83,6 +90,22 @@ export class StripeStub {
     retrieve: this.paymentIntentsRetrieveMock,
   };
 
+  public readonly refundCreateMock = jest.fn(
+    async (params: Stripe.RefundCreateParams): Promise<StubbedRefund> => {
+      const refund: StubbedRefund = {
+        id: `re_test_${randomBytes(12).toString('hex')}`,
+        payment_intent: params.payment_intent ?? '',
+        amount: params.amount ?? 0,
+      };
+      this.refundsStore.push(refund);
+      return refund;
+    },
+  );
+
+  public readonly refunds = {
+    create: this.refundCreateMock,
+  };
+
   public readonly webhooks = {
     constructEvent: (
       rawBody: Buffer | string,
@@ -103,6 +126,10 @@ export class StripeStub {
    */
   getStoredIntent(id: string): StubbedPaymentIntent | undefined {
     return this.intentsById.get(id);
+  }
+
+  getRefunds(): StubbedRefund[] {
+    return [...this.refundsStore];
   }
 
   /**

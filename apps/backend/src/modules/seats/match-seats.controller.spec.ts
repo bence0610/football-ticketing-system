@@ -31,6 +31,9 @@ jest.setTimeout(30_000);
  * This validates the full HTTP layer including path-param parsing, DTO
  * serialisation, and HTTP status codes.
  *
+ * Module is compiled ONCE in beforeAll; shared mocks are reconfigured per
+ * test via setData() to avoid ts-jest cold-start timeouts under parallel load.
+ *
  * Scenarios:
  *  GET /matches/:matchId/seats
  *   - 200 with seat list and sector summary (DB + Redis aggregation)
@@ -125,87 +128,59 @@ function makeTicket(matchId: string, seatId: string, status: TicketStatus): Tick
 }
 
 // ---------------------------------------------------------------------------
-// Repository mock factory
-// ---------------------------------------------------------------------------
-
-/**
- * In-memory Redis double for SeatsService.findSeatsForMatch pipeline calls.
- * Returns a pre-configured set of "locked" seat IDs.
- */
-function makeRedisMock(lockedSeatIds: string[] = []) {
-  // Build a map: key → ownerToken for pipeline GET calls
-  return {
-    pipeline: jest.fn().mockReturnValue({
-      get: jest.fn().mockReturnThis(),
-      exec: jest.fn().mockResolvedValue(
-        // Each entry is [error, value]; value is non-null for locked seats
-        lockedSeatIds.map((id) => [null, `token-${id}`]),
-      ),
-    }),
-    set: jest.fn().mockResolvedValue('OK'),
-    exists: jest.fn().mockResolvedValue(0),
-    ttl: jest.fn().mockResolvedValue(-2),
-    eval: jest.fn().mockResolvedValue(1),
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
 
 describe('MatchSeatsController – integration', () => {
   let app: INestApplication;
 
-  /**
-   * Bootstraps the test application with the given data fixtures.
-   *
-   * @param match         The Match entity returned by matchRepository.findOne
-   * @param seats         Seats returned by seatRepository.find
-   * @param tickets       Tickets returned by ticketRepository.find
-   * @param lockedSeatIds Seat IDs that are currently locked in Redis
-   * @param lockServiceOverrides Override SeatLockService methods per-test
-   */
-  async function buildApp(
-    match: Match | null,
-    seats: Seat[] = [],
-    tickets: Ticket[] = [],
-    lockedSeatIds: string[] = [],
-    lockServiceOverrides: Partial<SeatLockService> = {},
-    seasonPassSeatIds: string[] = [],
-  ): Promise<void> {
-    const matchRepoMock = {
-      findOne: jest.fn().mockResolvedValue(match),
+  // Shared repo mocks — reconfigured per test via setData().
+  let matchRepoMock: { findOne: jest.Mock };
+  let seatRepoMock: { find: jest.Mock };
+  let ticketRepoMock: { find: jest.Mock };
+  let seasonPassRepoMock: { find: jest.Mock };
+
+  // Shared Redis mock — pipeline.exec is reconfigured per test via setData().
+  let redisPipeline: { get: jest.Mock; exec: jest.Mock };
+  let redisMock: {
+    pipeline: jest.Mock;
+    set: jest.Mock;
+    exists: jest.Mock;
+    ttl: jest.Mock;
+    eval: jest.Mock;
+  };
+
+  // Shared SeatLockService mock methods — exposed individually for per-test override.
+  let seatLockAcquire: jest.Mock;
+  let seatLockRelease: jest.Mock;
+  let seatLockIsLocked: jest.Mock;
+  let seatLockGetRemainingTtl: jest.Mock;
+  let seatLockExtend: jest.Mock;
+
+  // Compile the NestJS module once for the whole suite.
+  beforeAll(async () => {
+    matchRepoMock = { findOne: jest.fn() };
+    seatRepoMock = { find: jest.fn() };
+    ticketRepoMock = { find: jest.fn() };
+    seasonPassRepoMock = { find: jest.fn() };
+
+    redisPipeline = {
+      get: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([]),
+    };
+    redisMock = {
+      pipeline: jest.fn().mockReturnValue(redisPipeline),
+      set: jest.fn().mockResolvedValue('OK'),
+      exists: jest.fn().mockResolvedValue(0),
+      ttl: jest.fn().mockResolvedValue(-2),
+      eval: jest.fn().mockResolvedValue(1),
     };
 
-    const seatRepoMock = {
-      find: jest.fn().mockResolvedValue(seats),
-    };
-
-    const ticketRepoMock = {
-      find: jest.fn().mockResolvedValue(tickets),
-    };
-
-    const seasonPassRepoMock = {
-      find: jest.fn().mockResolvedValue(seasonPassSeatIds.map((id) => ({ seatId: id }))),
-    };
-
-    const redisMock = makeRedisMock(lockedSeatIds);
-
-    // Default SeatLockService stub (acquire succeeds, release succeeds)
-    const defaultLockService = {
-      acquire: jest.fn().mockResolvedValue({
-        matchId: MATCH_ID,
-        seatId: SEAT_ID_FREE,
-        ownerToken: OWNER_TOKEN,
-        ttlSeconds: 300,
-      }),
-      release: jest.fn().mockResolvedValue(true),
-      isLocked: jest.fn().mockResolvedValue(false),
-      getRemainingTtl: jest.fn().mockResolvedValue(300),
-      extend: jest.fn().mockResolvedValue(true),
-    };
-
-    const seatLockServiceMock = Object.assign(defaultLockService, lockServiceOverrides);
+    seatLockAcquire = jest.fn();
+    seatLockRelease = jest.fn();
+    seatLockIsLocked = jest.fn();
+    seatLockGetRemainingTtl = jest.fn();
+    seatLockExtend = jest.fn();
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [MatchSeatsController],
@@ -216,7 +191,16 @@ describe('MatchSeatsController – integration', () => {
         { provide: getRepositoryToken(Match), useValue: matchRepoMock },
         { provide: getRepositoryToken(SeasonPass), useValue: seasonPassRepoMock },
         { provide: REDIS_CLIENT, useValue: redisMock },
-        { provide: SeatLockService, useValue: seatLockServiceMock },
+        {
+          provide: SeatLockService,
+          useValue: {
+            acquire: seatLockAcquire,
+            release: seatLockRelease,
+            isLocked: seatLockIsLocked,
+            getRemainingTtl: seatLockGetRemainingTtl,
+            extend: seatLockExtend,
+          },
+        },
         {
           provide: ConfigService,
           useValue: {
@@ -232,11 +216,56 @@ describe('MatchSeatsController – integration', () => {
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
     await app.init();
-  }
+  });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await app?.close();
   });
+
+  // Reset mock call histories and restore default return values between tests
+  // so assertions and side-effects don't bleed across tests.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    matchRepoMock.findOne.mockResolvedValue(null);
+    seatRepoMock.find.mockResolvedValue([]);
+    ticketRepoMock.find.mockResolvedValue([]);
+    seasonPassRepoMock.find.mockResolvedValue([]);
+    redisPipeline.get.mockReturnThis();
+    redisPipeline.exec.mockResolvedValue([]);
+    redisMock.pipeline.mockReturnValue(redisPipeline);
+    redisMock.set.mockResolvedValue('OK');
+    redisMock.exists.mockResolvedValue(0);
+    redisMock.ttl.mockResolvedValue(-2);
+    redisMock.eval.mockResolvedValue(1);
+    seatLockAcquire.mockResolvedValue({
+      matchId: MATCH_ID,
+      seatId: SEAT_ID_FREE,
+      ownerToken: OWNER_TOKEN,
+      ttlSeconds: 300,
+    });
+    seatLockRelease.mockResolvedValue(true);
+    seatLockIsLocked.mockResolvedValue(false);
+    seatLockGetRemainingTtl.mockResolvedValue(300);
+    seatLockExtend.mockResolvedValue(true);
+  });
+
+  /**
+   * Configures the shared repo and Redis mocks to return the given fixtures.
+   * No module is created — the app from beforeAll is reused.
+   */
+  function setData(
+    match: Match | null,
+    seats: Seat[] = [],
+    tickets: Ticket[] = [],
+    lockedSeatIds: string[] = [],
+    seasonPassSeatIds: string[] = [],
+  ): void {
+    matchRepoMock.findOne.mockResolvedValue(match);
+    seatRepoMock.find.mockResolvedValue(seats);
+    ticketRepoMock.find.mockResolvedValue(tickets);
+    seasonPassRepoMock.find.mockResolvedValue(seasonPassSeatIds.map((id) => ({ seatId: id })));
+    redisPipeline.exec.mockResolvedValue(lockedSeatIds.map((id) => [null, `token-${id}`]));
+  }
 
   // -------------------------------------------------------------------------
   // GET /matches/:matchId/seats
@@ -248,7 +277,7 @@ describe('MatchSeatsController – integration', () => {
       const seats = [makeSeat(SEAT_ID_FREE, 'A', '1', 1), makeSeat(SEAT_ID_SOLD, 'A', '1', 2)];
       const tickets = [makeTicket(MATCH_ID, SEAT_ID_SOLD, TicketStatus.PAID)];
 
-      await buildApp(match, seats, tickets);
+      setData(match, seats, tickets);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
@@ -263,7 +292,7 @@ describe('MatchSeatsController – integration', () => {
       const seats = [makeSeat(SEAT_ID_SOLD, 'A', '1', 1)];
       const tickets = [makeTicket(MATCH_ID, SEAT_ID_SOLD, TicketStatus.PAID)];
 
-      await buildApp(match, seats, tickets);
+      setData(match, seats, tickets);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
@@ -277,7 +306,7 @@ describe('MatchSeatsController – integration', () => {
       const seats = [makeSeat(SEAT_ID_SOLD, 'A', '1', 1)];
       const tickets = [makeTicket(MATCH_ID, SEAT_ID_SOLD, TicketStatus.PENDING_PAYMENT)];
 
-      await buildApp(match, seats, tickets);
+      setData(match, seats, tickets);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
@@ -290,7 +319,7 @@ describe('MatchSeatsController – integration', () => {
       const seats = [makeSeat(SEAT_ID_FREE, 'A', '1', 1)];
       const tickets = [makeTicket(MATCH_ID, SEAT_ID_FREE, TicketStatus.CANCELLED)];
 
-      await buildApp(match, seats, tickets);
+      setData(match, seats, tickets);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
@@ -301,8 +330,7 @@ describe('MatchSeatsController – integration', () => {
       const match = makeMatch();
       const seats = [makeSeat(SEAT_ID_FREE, 'A', '1', 1), makeSeat(SEAT_ID_LOCKED, 'A', '1', 2)];
 
-      // Feed only SEAT_ID_LOCKED as locked in Redis
-      await buildApp(match, seats, [], [SEAT_ID_LOCKED]);
+      setData(match, seats, [], [SEAT_ID_LOCKED]);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
@@ -317,7 +345,7 @@ describe('MatchSeatsController – integration', () => {
       const match = makeMatch();
       const seats = [makeSeat(SEAT_ID_DISABLED, 'A', '1', 1, { isActive: false })];
 
-      await buildApp(match, seats, []);
+      setData(match, seats, []);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
@@ -329,7 +357,7 @@ describe('MatchSeatsController – integration', () => {
       const seat = makeSeat(SEAT_ID_FREE, 'VIP', '1', 1);
       seat.priceModifier = '1.50';
 
-      await buildApp(match, [seat], []);
+      setData(match, [seat], []);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
@@ -346,7 +374,7 @@ describe('MatchSeatsController – integration', () => {
       ];
       const tickets = [makeTicket(MATCH_ID, SEAT_ID_SOLD, TicketStatus.PAID)];
 
-      await buildApp(match, seats, tickets, [SEAT_ID_LOCKED]);
+      setData(match, seats, tickets, [SEAT_ID_LOCKED]);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
@@ -368,7 +396,7 @@ describe('MatchSeatsController – integration', () => {
         makeSeat(`${SEAT_ID_FREE}-c`, 'C', '1', 1),
       ];
 
-      await buildApp(match, seats, []);
+      setData(match, seats, []);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
@@ -377,7 +405,7 @@ describe('MatchSeatsController – integration', () => {
     });
 
     it('should return 404 when the matchId is not found', async () => {
-      await buildApp(null, []);
+      setData(null, []);
 
       const res = await request(app.getHttpServer())
         .get(`/matches/${NON_EXISTENT_MATCH_ID}/seats`)
@@ -387,8 +415,6 @@ describe('MatchSeatsController – integration', () => {
     });
 
     it('should return 400 for a non-UUID matchId', async () => {
-      await buildApp(makeMatch(), []);
-
       await request(app.getHttpServer()).get('/matches/not-a-uuid/seats').expect(400);
     });
 
@@ -396,7 +422,7 @@ describe('MatchSeatsController – integration', () => {
       const match = makeMatch();
       const seat = makeSeat(SEAT_ID_ACCESSIBLE, 'A', '1', 1, { isAccessible: true });
 
-      await buildApp(match, [seat], []);
+      setData(match, [seat], []);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
@@ -410,7 +436,7 @@ describe('MatchSeatsController – integration', () => {
 
   describe('POST /matches/:matchId/seats/:seatId/lock', () => {
     it('should return 201 with ownerToken and ttlSeconds on a successful lock', async () => {
-      await buildApp(makeMatch(), [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], []);
+      setData(makeMatch(), [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], []);
 
       const res = await request(app.getHttpServer())
         .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
@@ -424,7 +450,7 @@ describe('MatchSeatsController – integration', () => {
     });
 
     it('should return a valid ISO 8601 expiresAt timestamp', async () => {
-      await buildApp(makeMatch(), [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], []);
+      setData(makeMatch(), [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], []);
 
       const res = await request(app.getHttpServer())
         .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
@@ -439,10 +465,9 @@ describe('MatchSeatsController – integration', () => {
     });
 
     it('should return 409 Conflict when the seat is already locked', async () => {
+      setData(makeMatch(), [makeSeat(SEAT_ID_LOCKED, 'A', '1', 1)], []);
       // SeatLockService.acquire returns null → already locked
-      await buildApp(makeMatch(), [makeSeat(SEAT_ID_LOCKED, 'A', '1', 1)], [], [], {
-        acquire: jest.fn().mockResolvedValue(null),
-      });
+      seatLockAcquire.mockResolvedValue(null);
 
       const res = await request(app.getHttpServer())
         .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_LOCKED}/lock`)
@@ -452,28 +477,20 @@ describe('MatchSeatsController – integration', () => {
     });
 
     it('should call SeatLockService.acquire with the correct matchId and seatId', async () => {
-      const acquireSpy = jest.fn().mockResolvedValue({
-        matchId: MATCH_ID,
-        seatId: SEAT_ID_FREE,
-        ownerToken: OWNER_TOKEN,
-        ttlSeconds: 300,
-      });
-      await buildApp(makeMatch(), [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], [], [], {
-        acquire: acquireSpy,
-      });
+      setData(makeMatch(), [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], []);
 
       await request(app.getHttpServer())
         .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
         .expect(201);
 
-      expect(acquireSpy).toHaveBeenCalledWith(
+      expect(seatLockAcquire).toHaveBeenCalledWith(
         expect.objectContaining({ matchId: MATCH_ID, seatId: SEAT_ID_FREE }),
       );
     });
 
     it('should return 409 when trying to lock a sold seat', async () => {
       const tickets = [makeTicket(MATCH_ID, SEAT_ID_SOLD, TicketStatus.PAID)];
-      await buildApp(makeMatch(), [makeSeat(SEAT_ID_SOLD, 'A', '1', 2)], tickets);
+      setData(makeMatch(), [makeSeat(SEAT_ID_SOLD, 'A', '1', 2)], tickets);
 
       const res = await request(app.getHttpServer())
         .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_SOLD}/lock`)
@@ -483,9 +500,13 @@ describe('MatchSeatsController – integration', () => {
     });
 
     it('should return 409 when trying to lock a season-pass seat', async () => {
-      await buildApp(makeMatch(), [makeSeat(SEAT_ID_SEASON_PASS, 'A', '1', 6)], [], [], {}, [
-        SEAT_ID_SEASON_PASS,
-      ]);
+      setData(
+        makeMatch(),
+        [makeSeat(SEAT_ID_SEASON_PASS, 'A', '1', 6)],
+        [],
+        [],
+        [SEAT_ID_SEASON_PASS],
+      );
 
       const res = await request(app.getHttpServer())
         .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_SEASON_PASS}/lock`)
@@ -495,11 +516,7 @@ describe('MatchSeatsController – integration', () => {
     });
 
     it('should return 409 when trying to lock an inactive seat', async () => {
-      await buildApp(
-        makeMatch(),
-        [makeSeat(SEAT_ID_DISABLED, 'A', '1', 4, { isActive: false })],
-        [],
-      );
+      setData(makeMatch(), [makeSeat(SEAT_ID_DISABLED, 'A', '1', 4, { isActive: false })], []);
 
       const res = await request(app.getHttpServer())
         .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_DISABLED}/lock`)
@@ -509,16 +526,12 @@ describe('MatchSeatsController – integration', () => {
     });
 
     it('should return 400 for a non-UUID seatId', async () => {
-      await buildApp(makeMatch(), []);
-
       await request(app.getHttpServer())
         .post(`/matches/${MATCH_ID}/seats/not-a-uuid/lock`)
         .expect(400);
     });
 
     it('should return 400 for a non-UUID matchId', async () => {
-      await buildApp(makeMatch(), []);
-
       await request(app.getHttpServer())
         .post('/matches/not-a-uuid/seats/some-seat/lock')
         .expect(400);
@@ -531,19 +544,16 @@ describe('MatchSeatsController – integration', () => {
 
   describe('DELETE /matches/:matchId/seats/:seatId/lock', () => {
     it('should return 204 No Content on a successful unlock', async () => {
-      const releaseSpy = jest.fn().mockResolvedValue(true);
-      await buildApp(makeMatch(), [], [], [], { release: releaseSpy });
+      setData(makeMatch());
 
       await request(app.getHttpServer())
         .delete(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock?ownerToken=${OWNER_TOKEN}`)
         .expect(204);
 
-      expect(releaseSpy).toHaveBeenCalledWith(MATCH_ID, SEAT_ID_FREE, OWNER_TOKEN);
+      expect(seatLockRelease).toHaveBeenCalledWith(MATCH_ID, SEAT_ID_FREE, OWNER_TOKEN);
     });
 
     it('should return 404 when the ownerToken query param is missing', async () => {
-      await buildApp(makeMatch(), []);
-
       await request(app.getHttpServer())
         .delete(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
         .expect(404);
@@ -552,8 +562,8 @@ describe('MatchSeatsController – integration', () => {
     it('should still return 204 when the ownerToken does not match (idempotent release)', async () => {
       // SeatLockService.release returns false (token mismatch) but the controller
       // does not throw — DELETE is idempotent as per the API contract.
-      const releaseSpy = jest.fn().mockResolvedValue(false);
-      await buildApp(makeMatch(), [], [], [], { release: releaseSpy });
+      setData(makeMatch());
+      seatLockRelease.mockResolvedValue(false);
 
       await request(app.getHttpServer())
         .delete(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock?ownerToken=wrong-token`)
@@ -561,16 +571,12 @@ describe('MatchSeatsController – integration', () => {
     });
 
     it('should return 400 for non-UUID matchId', async () => {
-      await buildApp(makeMatch(), []);
-
       await request(app.getHttpServer())
         .delete(`/matches/not-a-uuid/seats/${SEAT_ID_FREE}/lock?ownerToken=${OWNER_TOKEN}`)
         .expect(400);
     });
 
     it('should return 400 for non-UUID seatId', async () => {
-      await buildApp(makeMatch(), []);
-
       await request(app.getHttpServer())
         .delete(`/matches/${MATCH_ID}/seats/not-a-uuid/lock?ownerToken=${OWNER_TOKEN}`)
         .expect(400);

@@ -9,7 +9,8 @@ export type EmailTemplateName =
   | 'loan-confirmation'
   | 'loan-cancelled'
   | 'tier-upgraded'
-  | 'waitlist-notification';
+  | 'waitlist-notification'
+  | 'seat-refund';
 
 export interface TicketConfirmationContext {
   recipientName: string;
@@ -75,6 +76,14 @@ export interface WaitlistNotificationContext {
   confirmUrl: string;
 }
 
+export interface SeatRefundContext {
+  recipientName: string;
+  matchTitle: string;
+  matchKickoffLabel: string;
+  takenSeatCount: number;
+  refundLabel: string;
+}
+
 export type EmailContextMap = {
   'ticket-confirmation': TicketConfirmationContext;
   'loan-invitation': LoanInvitationContext;
@@ -82,6 +91,7 @@ export type EmailContextMap = {
   'loan-cancelled': LoanCancelledContext;
   'tier-upgraded': TierUpgradedContext;
   'waitlist-notification': WaitlistNotificationContext;
+  'seat-refund': SeatRefundContext;
 };
 
 export interface SendEmailRequest<T extends EmailTemplateName = EmailTemplateName> {
