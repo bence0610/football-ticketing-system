@@ -13,6 +13,9 @@ import {
   PassLoanStatus,
   Seat,
   SeatCategory,
+  SeasonPass,
+  SeasonPassPrice,
+  SeasonPassStatus,
   Ticket,
   TicketSource,
   TicketStatus,
@@ -1303,5 +1306,149 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       },
     });
     expect(loyaltyRows).toHaveLength(1);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Season-pass purchase webhook scenarios                              */
+  /* ------------------------------------------------------------------ */
+
+  async function seedSeasonPassPrice(section = 'A'): Promise<SeasonPassPrice> {
+    const repo = ctx.dataSource.getRepository(SeasonPassPrice);
+    return repo.save(
+      repo.create({
+        section,
+        sectionLabel: `Szektor ${section}`,
+        seasonLabel: '2026/2027',
+        price: 30000,
+        currency: 'HUF',
+        validFrom: new Date('2026-07-01'),
+        validUntil: new Date('2027-06-30'),
+        isActive: true,
+      }),
+    );
+  }
+
+  async function purchaseSeasonPassIntent(
+    accessToken: string,
+    sectionId: string,
+  ): Promise<{ paymentIntentId: string }> {
+    const resp = await request(server)
+      .post('/api/season-passes/purchase')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ sectionId });
+    expect(resp.status).toBe(201);
+    return { paymentIntentId: resp.body.paymentIntentId as string };
+  }
+
+  it('season-pass purchase scenario a — webhook-only finalisation: exactly one pass, status active, loyalty awarded', async () => {
+    const priceRow = await seedSeasonPassPrice('A');
+    const fan = await registerFan('sp-purchase-a');
+
+    const { paymentIntentId } = await purchaseSeasonPassIntent(fan.accessToken, priceRow.section);
+    const intent = ctx.stripeStub.getStoredIntent(paymentIntentId);
+    expect(intent).toBeDefined();
+
+    expect(intent?.metadata.kind).toBe('season_pass');
+    expect(intent?.metadata.priceRowId).toBe(priceRow.id);
+    expect(intent?.metadata.userId).toBe(fan.userId);
+
+    // Stub returns requires_payment_method — synchronous path skipped
+    const beforePass = await ctx.dataSource
+      .getRepository(SeasonPass)
+      .findOne({ where: { stripePaymentIntentId: intent!.id } });
+    expect(beforePass).toBeNull();
+
+    const webhookResp = await deliverWebhook(intent!);
+    expect(webhookResp.status).toBe(200);
+    await flushAsync();
+
+    const passes = await ctx.dataSource
+      .getRepository(SeasonPass)
+      .find({ where: { stripePaymentIntentId: intent!.id } });
+    expect(passes).toHaveLength(1);
+    expect(passes[0].status).toBe(SeasonPassStatus.ACTIVE);
+    expect(passes[0].userId).toBe(fan.userId);
+
+    const loyalty = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
+      where: { userId: fan.userId, source: LoyaltyTransactionSource.SEASON_PASS_PURCHASE },
+    });
+    expect(loyalty).toHaveLength(1);
+    expect(loyalty[0].referenceId).toBe(`season_pass:${passes[0].id}`);
+  });
+
+  it('season-pass purchase scenario b — double webhook delivery: one pass, one loyalty transaction', async () => {
+    const priceRow = await seedSeasonPassPrice('B');
+    const fan = await registerFan('sp-purchase-b');
+
+    const { paymentIntentId } = await purchaseSeasonPassIntent(fan.accessToken, priceRow.section);
+    const intent = ctx.stripeStub.getStoredIntent(paymentIntentId)!;
+
+    const first = await deliverWebhook(intent);
+    expect(first.status).toBe(200);
+    await flushAsync();
+
+    const second = await deliverWebhook(intent);
+    expect(second.status).toBe(200);
+    await flushAsync();
+
+    const passes = await ctx.dataSource
+      .getRepository(SeasonPass)
+      .find({ where: { stripePaymentIntentId: intent.id } });
+    expect(passes).toHaveLength(1);
+
+    const loyalty = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
+      where: { userId: fan.userId, source: LoyaltyTransactionSource.SEASON_PASS_PURCHASE },
+    });
+    expect(loyalty).toHaveLength(1);
+  });
+
+  it('season-pass purchase scenario c — ticket intent still produces tickets, no season pass created', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const fan = await registerFan('sp-purchase-c');
+
+    await buyTicket(fan, match, seatA);
+
+    const seasonPasses = await ctx.dataSource
+      .getRepository(SeasonPass)
+      .find({ where: { userId: fan.userId } });
+    expect(seasonPasses).toHaveLength(0);
+
+    const tickets = await ctx.dataSource
+      .getRepository(Ticket)
+      .find({ where: { userId: fan.userId } });
+    expect(tickets).toHaveLength(1);
+    expect(tickets[0].status).toBe(TicketStatus.PAID);
+  });
+
+  it('season-pass purchase scenario d — unusable metadata: no pass created, webhook returns 200', async () => {
+    const fan = await registerFan('sp-purchase-d');
+
+    const malformedIntent: StubbedPaymentIntent = {
+      id: `pi_malformed_${Date.now()}`,
+      object: 'payment_intent',
+      client_secret: 'cs_test',
+      status: 'succeeded',
+      amount: 3000000,
+      currency: 'huf',
+      metadata: {
+        kind: 'season_pass',
+        userId: fan.userId,
+        // priceRowId intentionally omitted
+      },
+    };
+
+    const webhookResp = await deliverWebhook(malformedIntent);
+    expect(webhookResp.status).toBe(200);
+    await flushAsync();
+
+    const passes = await ctx.dataSource
+      .getRepository(SeasonPass)
+      .find({ where: { userId: fan.userId } });
+    expect(passes).toHaveLength(0);
+
+    const loyalty = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
+      where: { userId: fan.userId, source: LoyaltyTransactionSource.SEASON_PASS_PURCHASE },
+    });
+    expect(loyalty).toHaveLength(0);
   });
 });

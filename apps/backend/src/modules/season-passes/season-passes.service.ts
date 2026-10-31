@@ -155,10 +155,11 @@ export class SeasonPassesService {
       currency: this.stripeCurrency,
       description: `KTE Jegyportál — Bérlet ${priceRow.sectionLabel} (${priceRow.seasonLabel})`,
       metadata: {
+        kind: 'season_pass',
         userId,
+        priceRowId: priceRow.id,
         section: priceRow.section,
         seasonLabel: priceRow.seasonLabel,
-        purpose: 'season_pass_purchase',
       },
     };
 
@@ -220,6 +221,39 @@ export class SeasonPassesService {
       amount: priceRow.price,
       currency: priceRow.currency,
     };
+  }
+
+  /**
+   * Webhook-driven finalisation for a season-pass PaymentIntent.
+   * Called by PaymentsService when it dispatches on `kind === 'season_pass'`.
+   * Idempotent: a repeated call for the same intent (double webhook delivery)
+   * produces exactly one SeasonPass row and one loyalty transaction.
+   */
+  async finalizeSeasonPassFromIntent(intent: Stripe.PaymentIntent): Promise<void> {
+    const { userId, priceRowId } = intent.metadata;
+    if (!userId || !priceRowId) {
+      this.logger.error(
+        `[season-pass] PaymentIntent ${intent.id} missing required metadata fields — ` +
+          `userId=${userId ?? 'MISSING'} priceRowId=${priceRowId ?? 'MISSING'}. ` +
+          `No SeasonPass will be created.`,
+      );
+      return;
+    }
+
+    const priceRow = await this.seasonPassPriceRepository.findOne({ where: { id: priceRowId } });
+    if (!priceRow) {
+      this.logger.error(
+        `[season-pass] PaymentIntent ${intent.id}: SeasonPassPrice row id=${priceRowId} not found. ` +
+          `No SeasonPass will be created.`,
+      );
+      return;
+    }
+
+    const pass = await this.persistSeasonPassFromIntent(intent, priceRow, userId);
+    await this.awardSeasonPassLoyalty(pass);
+    this.logger.log(
+      `[season-pass] Finalized PaymentIntent ${intent.id} → SeasonPass ${pass.id} for user ${userId}`,
+    );
   }
 
   /**

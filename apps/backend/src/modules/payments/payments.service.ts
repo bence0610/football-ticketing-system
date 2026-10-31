@@ -31,6 +31,7 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { SeatAvailability } from '../seats/dto';
 import { SeatsService } from '../seats/seats.service';
 import { QrService } from '../qr/qr.service';
+import { SeasonPassesService } from '../season-passes/season-passes.service';
 import { TicketRendererService } from '../tickets/ticket-renderer.service';
 import {
   CreatePaymentIntentDto,
@@ -78,6 +79,7 @@ export class PaymentsService {
     private readonly qrService: QrService,
     private readonly emailService: EmailService,
     private readonly ticketRenderer: TicketRendererService,
+    private readonly seasonPassesService: SeasonPassesService,
     configService: ConfigService,
   ) {
     const stripeConfig = configService.getOrThrow<StripeConfig>('stripe');
@@ -201,7 +203,11 @@ export class PaymentsService {
    * safe.
    */
   private async handlePaymentSuccess(intent: Stripe.PaymentIntent): Promise<void> {
-    await this.finalizePaymentIntent(intent);
+    if (intent.metadata.kind === 'season_pass') {
+      await this.seasonPassesService.finalizeSeasonPassFromIntent(intent);
+    } else {
+      await this.finalizePaymentIntent(intent);
+    }
   }
 
   /**

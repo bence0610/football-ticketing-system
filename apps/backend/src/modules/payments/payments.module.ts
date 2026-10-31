@@ -4,6 +4,7 @@ import { Match, Seat, Ticket } from '../../database/entities';
 import { AuthModule } from '../auth/auth.module';
 import { EmailModule } from '../email/email.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
+import { SeasonPassesModule } from '../season-passes/season-passes.module';
 import { SeatsModule } from '../seats/seats.module';
 import { TicketsModule } from '../tickets/tickets.module';
 import { PaymentsController } from './payments.controller';
@@ -17,6 +18,7 @@ import { stripeProvider } from './stripe.provider';
     AuthModule,
     LoyaltyModule,
     EmailModule,
+    SeasonPassesModule,
     SeatsModule,
     TicketsModule,
   ],

@@ -14,6 +14,7 @@ import { TicketRendererService } from '../tickets/ticket-renderer.service';
 import { Match, Seat, Ticket } from '../../database/entities';
 import { SeatAvailability } from '../seats/dto';
 import { SeatsService } from '../seats/seats.service';
+import { SeasonPassesService } from '../season-passes/season-passes.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -43,6 +44,7 @@ describe('PaymentsService', () => {
     generateForTicket: jest.fn(),
   };
   const mockEmailService = { send: jest.fn() };
+  const mockSeasonPassesService = { finalizeSeasonPassFromIntent: jest.fn() };
   const mockTicketRenderer = {
     matchSummary: jest.fn(),
     renderTicketSection: jest.fn(),
@@ -74,6 +76,7 @@ describe('PaymentsService', () => {
         { provide: QrService, useValue: mockQrService },
         { provide: EmailService, useValue: mockEmailService },
         { provide: TicketRendererService, useValue: mockTicketRenderer },
+        { provide: SeasonPassesService, useValue: mockSeasonPassesService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
