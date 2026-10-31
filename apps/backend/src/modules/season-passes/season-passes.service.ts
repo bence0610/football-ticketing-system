@@ -369,6 +369,15 @@ export class SeasonPassesService {
       throw new NotFoundException('Match not found');
     }
 
+    const kickoff = match.kickoffAt.getTime();
+    if (kickoff < pass.validFrom.getTime() || kickoff > pass.validUntil.getTime()) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: 'Ez a mérkőzés nem esik a bérlet érvényességi idejébe.',
+        code: 'match_outside_validity',
+      });
+    }
+
     const ticket = await this.materializeSeasonPassTicket(pass, matchId);
     const result = await this.qrService.generateForTicket(ticket.id, ticket.qrJti);
     return { ticketId: ticket.id, dataUrl: result.dataUrl, token: result.token };
@@ -396,7 +405,12 @@ export class SeasonPassesService {
           where: { seasonPassId: pass.id, matchId, status: PassLoanStatus.ACCEPTED },
         });
         if (activeLoan) {
-          throw new ConflictException('Season pass is currently loaned out for this match');
+          throw new ConflictException({
+            statusCode: 409,
+            message:
+              'A belépési jog átadásra került. A kölcsönzést visszavonhatod, ha vissza szeretnéd kapni a helyedet.',
+            code: 'entry_transferred',
+          });
         }
 
         const ticketRepo = manager.getRepository(Ticket);
@@ -407,9 +421,11 @@ export class SeasonPassesService {
           where: { matchId, seatId, source: TicketSource.LOAN },
         });
         if (loanTicket) {
-          throw new ConflictException(
-            'Entry right for this match was already transferred to a borrower',
-          );
+          throw new ConflictException({
+            statusCode: 409,
+            message: 'A belépési jog már felhasználásra került ennél a mérkőzésnél.',
+            code: 'seat_already_used',
+          });
         }
 
         // Idempotent: return the ticket if it already exists

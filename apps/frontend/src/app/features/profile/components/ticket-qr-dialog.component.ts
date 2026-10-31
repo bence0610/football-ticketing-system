@@ -9,12 +9,16 @@ import {
 } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { Observable } from 'rxjs';
 import { TicketsService } from '../../../core/services/tickets.service';
+import { TicketQrResponse } from '../../../core/models/ticket.models';
 
 export interface TicketQrDialogData {
-  ticketId: string;
+  ticketId?: string;
   matchTitle: string;
   seatLabel: string;
+  /** When provided, the dialog uses this observable instead of fetching via ticketId. */
+  qrLoader$?: Observable<TicketQrResponse>;
 }
 
 @Component({
@@ -156,13 +160,18 @@ export class TicketQrDialogComponent {
     public readonly dialogRef: MatDialogRef<TicketQrDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public readonly data: TicketQrDialogData,
   ) {
-    this.ticketsService.getQr(data.ticketId).subscribe({
+    const loader$ = data.qrLoader$ ?? this.ticketsService.getQr(data.ticketId!);
+    loader$.subscribe({
       next: (response) => {
         this.dataUrl.set(response.dataUrl);
         this.token.set(response.token);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err: unknown) => {
+        if ((err as { status?: number })?.status === 409) {
+          this.dialogRef.close({ loanConflict: true });
+          return;
+        }
         this.error.set('A QR kód betöltése sikertelen. Próbáld újra később.');
         this.loading.set(false);
       },

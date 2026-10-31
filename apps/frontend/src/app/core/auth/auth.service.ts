@@ -2,6 +2,8 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, of, tap } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
+import { HttpContext } from '@angular/common/http';
+import { SILENT_401 } from '../interceptors/error.interceptor';
 import { AuthApiService } from '../../shared/services/auth.api.service';
 import {
   AuthResponse,
@@ -50,7 +52,7 @@ export class AuthService {
    */
   restoreSession(): Observable<AuthResponse | null> {
     const fallbackToken = this.readFallbackToken();
-    return this.api.refresh(fallbackToken ?? undefined).pipe(
+    return this.api.refresh(fallbackToken ?? undefined, new HttpContext().set(SILENT_401, true)).pipe(
       tap((response) => this.applyAuthResponse(response)),
       catchError(() => {
         this.clearLocal();

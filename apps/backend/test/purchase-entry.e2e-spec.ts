@@ -12,6 +12,7 @@ import {
   PassLoan,
   PassLoanStatus,
   Seat,
+  SeatCategory,
   Ticket,
   TicketSource,
   TicketStatus,
@@ -1225,6 +1226,48 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     // Round-tripping: the date portion must match what was seeded
     expect(dto.validFrom.startsWith('2026-07-01')).toBe(true);
     expect(dto.validUntil.startsWith('2027-06-30')).toBe(true);
+  });
+
+  it('season-pass QR: 400 when match kickoff is outside pass validity window', async () => {
+    const matchRepo = ctx.dataSource.getRepository(Match);
+    const seatRepo = ctx.dataSource.getRepository(Seat);
+
+    const seatOut = await seatRepo.save(
+      seatRepo.create({
+        section: 'B',
+        row: '1',
+        number: 99,
+        category: SeatCategory.STANDARD,
+        priceModifier: '1.00',
+        isAccessible: false,
+        isActive: true,
+      }),
+    );
+
+    // Match whose kickoffAt is before the pass validFrom (2026-07-01)
+    const matchOutside = await matchRepo.save(
+      matchRepo.create({
+        homeTeam: 'Kecskeméti TE',
+        awayTeam: 'Outside Rivals',
+        competition: Competition.NB1,
+        venue: 'Széktói Stadion',
+        kickoffAt: new Date('2025-09-15T17:00:00Z'),
+        status: MatchStatus.ON_SALE,
+        capacity: 10,
+        basePrice: '5000.00',
+        isSeasonPassEligible: true,
+      }),
+    );
+
+    const fan = await registerFan('sp-validity');
+    const pass = await seedSeasonPass(ctx.dataSource, { userId: fan.userId, seatId: seatOut.id });
+
+    const resp = await request(server)
+      .get(`/api/season-passes/${pass.id}/qr/${matchOutside.id}`)
+      .set('Authorization', `Bearer ${fan.accessToken}`);
+
+    expect(resp.status).toBe(400);
+    expect(resp.body.code).toBe('match_outside_validity');
   });
 
   it('idempotent webhook — double delivery produces one ticket and one loyalty transaction', async () => {

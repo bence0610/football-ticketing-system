@@ -23,6 +23,17 @@ export interface PassLoanResponse {
   completedAt?: string;
 }
 
+export interface LoanPreview {
+  matchTitle: string;
+  matchVenue: string;
+  kickoffAt: string;
+  seatSection: string;
+  seatRow: string;
+  seatNumber: number;
+  lenderName: string;
+  expiresAt: string;
+}
+
 export interface SeasonPassResponse {
   id: string;
   status: SeasonPassStatus;

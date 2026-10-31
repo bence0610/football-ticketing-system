@@ -27,6 +27,8 @@ import { SeasonPassesService } from '../../../../core/services/season-passes.ser
 
 export interface LoanInitiationDialogData {
   pass: SeasonPassResponse;
+  /** When provided, the dialog skips step 1 and pre-selects this match. */
+  initialMatchId?: string;
 }
 
 export interface LoanInitiationDialogResult {
@@ -1018,6 +1020,15 @@ export class LoanInitiationDialogComponent implements OnInit {
 
         this.matchOptions.set(options);
         this.matchesLoading.set(false);
+
+        const pre = this.data.initialMatchId;
+        if (pre) {
+          const found = options.find((o) => o.match.id === pre && !o.occupied);
+          if (found) {
+            this.selectedMatchId.set(pre);
+            this.currentStep.set(2);
+          }
+        }
       });
   }
 

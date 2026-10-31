@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
@@ -27,11 +27,11 @@ export class AuthApiService {
     return this.http.post<AuthResponse>('/auth/login', payload, WITH_CREDENTIALS);
   }
 
-  refresh(refreshToken?: string): Observable<AuthResponse> {
+  refresh(refreshToken?: string, context?: HttpContext): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(
       '/auth/refresh',
       { refreshToken: refreshToken ?? '' },
-      WITH_CREDENTIALS,
+      context ? { ...WITH_CREDENTIALS, context } : WITH_CREDENTIALS,
     );
   }
 

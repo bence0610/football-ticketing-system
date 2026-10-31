@@ -2,12 +2,14 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
+  LoanPreview,
   PassLoanResponse,
   PurchaseSeasonPassPayload,
   PurchaseSeasonPassResponse,
   SeasonPassPrice,
   SeasonPassResponse,
 } from '../models/season-pass.models';
+import { TicketQrResponse } from '../models/ticket.models';
 
 export interface CreateLoanPayload {
   matchId: string;
@@ -55,5 +57,15 @@ export class SeasonPassesService {
       `/season-passes/loans/accept/${encodeURIComponent(invitationToken)}`,
       {},
     );
+  }
+
+  previewLoan(token: string): Observable<LoanPreview> {
+    return this.http.get<LoanPreview>(
+      `/season-passes/loans/preview/${encodeURIComponent(token)}`,
+    );
+  }
+
+  getMatchQr(passId: string, matchId: string): Observable<TicketQrResponse> {
+    return this.http.get<TicketQrResponse>(`/season-passes/${passId}/qr/${matchId}`);
   }
 }

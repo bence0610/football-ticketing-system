@@ -1,18 +1,20 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-/**
- * Surface backend errors to the user via Material snackbar and rethrow
- * so callers can still handle them. Network/server errors get a generic
- * message; backend-supplied messages take precedence when available.
- */
+/** Set to true on requests whose 401 should be swallowed silently. */
+export const SILENT_401 = new HttpContextToken<boolean>(() => false);
+
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const snackBar = inject(MatSnackBar);
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
+      if (error.status === 401 && req.context.get(SILENT_401)) {
+        return throwError(() => error);
+      }
+
       let message = 'Ismeretlen hiba történt. Próbáld újra később.';
       if (error.status === 0) {
         message = 'Nem sikerült elérni a szervert. Ellenőrizd az internetkapcsolatot.';

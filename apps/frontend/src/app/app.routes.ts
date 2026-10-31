@@ -86,6 +86,13 @@ export const APP_ROUTES: Routes = [
         title: 'Sikeres bérletvásárlás',
       },
       {
+        path: 'loans/accept/:token',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/loans/accept-loan.page').then((m) => m.AcceptLoanPageComponent),
+        title: 'Bérletkölcsön elfogadása',
+      },
+      {
         path: 'gate',
         canActivate: [gateGuard],
         loadComponent: () =>

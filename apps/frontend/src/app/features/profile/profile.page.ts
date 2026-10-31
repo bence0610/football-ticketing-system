@@ -148,7 +148,7 @@ const WAITLIST_POLL_MS = 5_000;
             } @else {
               <div class="kte-profile__passes">
                 @for (pass of passes(); track pass.id) {
-                  <kte-season-pass-card [pass]="pass" (changed)="reloadPasses()" />
+                  <kte-season-pass-card [pass]="pass" [myTickets]="tickets()" (changed)="reloadPasses()" />
                 }
               </div>
             }
