@@ -1,6 +1,7 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { SKIP_ERROR_SNACKBAR } from '../interceptors/error.interceptor';
 import {
   LoanPreview,
   PassLoanResponse,
@@ -43,7 +44,9 @@ export class SeasonPassesService {
   }
 
   createLoan(passId: string, payload: CreateLoanPayload): Observable<PassLoanResponse> {
-    return this.http.post<PassLoanResponse>(`/season-passes/${passId}/loans`, payload);
+    return this.http.post<PassLoanResponse>(`/season-passes/${passId}/loans`, payload, {
+      context: new HttpContext().set(SKIP_ERROR_SNACKBAR, true),
+    });
   }
 
   cancelLoan(passId: string, loanId: string, payload: CancelLoanPayload = {}): Observable<PassLoanResponse> {

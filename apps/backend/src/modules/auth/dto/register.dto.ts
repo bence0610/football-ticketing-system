@@ -3,37 +3,37 @@ import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'cl
 
 export class RegisterDto {
   @ApiProperty({ example: 'fan@kte.hu' })
-  @IsEmail()
-  @MaxLength(255)
+  @IsEmail({}, { message: 'Érvényes e-mail-cím szükséges (pl. nev@pelda.hu).' })
+  @MaxLength(255, { message: 'Az e-mail-cím legfeljebb 255 karakter lehet.' })
   email!: string;
 
   @ApiProperty({
     example: 'StrongPass123',
     description: 'Min. 8 karakter, legalább egy szám és egy betű.',
   })
-  @IsString()
-  @MinLength(8)
-  @MaxLength(72)
+  @IsString({ message: 'A jelszó szöveg típusú érték legyen.' })
+  @MinLength(8, { message: 'A jelszónak legalább 8 karakteresnek kell lennie.' })
+  @MaxLength(72, { message: 'A jelszó legfeljebb 72 karakter lehet.' })
   @Matches(/(?=.*[A-Za-z])(?=.*\d).+/, {
     message: 'A jelszó tartalmazzon legalább egy betűt és egy számot.',
   })
   password!: string;
 
   @ApiProperty({ example: 'Kovács' })
-  @IsString()
-  @MinLength(2)
-  @MaxLength(100)
+  @IsString({ message: 'A vezetéknév szöveg típusú érték legyen.' })
+  @MinLength(2, { message: 'A vezetéknévnek legalább 2 karakteresnek kell lennie.' })
+  @MaxLength(100, { message: 'A vezetéknév legfeljebb 100 karakter lehet.' })
   firstName!: string;
 
   @ApiProperty({ example: 'Béla' })
-  @IsString()
-  @MinLength(2)
-  @MaxLength(100)
+  @IsString({ message: 'A keresztnév szöveg típusú érték legyen.' })
+  @MinLength(2, { message: 'A keresztnévnek legalább 2 karakteresnek kell lennie.' })
+  @MaxLength(100, { message: 'A keresztnév legfeljebb 100 karakter lehet.' })
   lastName!: string;
 
   @ApiProperty({ example: '+36301234567', required: false })
   @IsOptional()
-  @IsString()
-  @MaxLength(32)
+  @IsString({ message: 'A telefonszám szöveg típusú érték legyen.' })
+  @MaxLength(32, { message: 'A telefonszám legfeljebb 32 karakter lehet.' })
   phoneNumber?: string;
 }

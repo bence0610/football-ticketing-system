@@ -15,6 +15,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { strictEmailValidator } from '../../shared/validators/email.validator';
 
 @Component({
   selector: 'kte-login-page',
@@ -166,7 +167,7 @@ export class LoginPageComponent {
     email: import('@angular/forms').FormControl<string>;
     password: import('@angular/forms').FormControl<string>;
   }> = this.fb.nonNullable.group({
-    email: this.fb.nonNullable.control('', [Validators.required, Validators.email]),
+    email: this.fb.nonNullable.control('', [Validators.required, strictEmailValidator]),
     password: this.fb.nonNullable.control('', [Validators.required, Validators.minLength(8)]),
   });
 

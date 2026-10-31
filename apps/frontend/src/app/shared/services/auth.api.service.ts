@@ -8,8 +8,11 @@ import {
   UserProfile,
   UserTicketsPage,
 } from '../models/auth.model';
+import { SKIP_ERROR_SNACKBAR } from '../../core/interceptors/error.interceptor';
 
 const WITH_CREDENTIALS = { withCredentials: true } as const;
+
+const FORM_CONTEXT = new HttpContext().set(SKIP_ERROR_SNACKBAR, true);
 
 /**
  * Thin HTTP wrapper around `/auth/*` and `/users/*`. Always sends credentials
@@ -20,11 +23,17 @@ export class AuthApiService {
   private readonly http = inject(HttpClient);
 
   register(payload: RegisterPayload): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>('/auth/register', payload, WITH_CREDENTIALS);
+    return this.http.post<AuthResponse>('/auth/register', payload, {
+      ...WITH_CREDENTIALS,
+      context: FORM_CONTEXT,
+    });
   }
 
   login(payload: LoginPayload): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>('/auth/login', payload, WITH_CREDENTIALS);
+    return this.http.post<AuthResponse>('/auth/login', payload, {
+      ...WITH_CREDENTIALS,
+      context: FORM_CONTEXT,
+    });
   }
 
   refresh(refreshToken?: string, context?: HttpContext): Observable<AuthResponse> {

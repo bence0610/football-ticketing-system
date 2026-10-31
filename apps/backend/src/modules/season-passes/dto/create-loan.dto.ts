@@ -3,19 +3,19 @@ import { IsEmail, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validat
 
 export class CreateLoanDto {
   @ApiProperty({ description: 'Match identifier the loan applies to.' })
-  @IsString()
-  @IsNotEmpty()
-  @IsUUID()
+  @IsString({ message: 'A mérkőzés-azonosítónak szöveg típusúnak kell lennie.' })
+  @IsNotEmpty({ message: 'A mérkőzés-azonosító megadása kötelező.' })
+  @IsUUID('4', { message: 'Érvénytelen mérkőzés-azonosító.' })
   matchId!: string;
 
   @ApiProperty({ description: 'Email address of the borrower.' })
-  @IsEmail()
+  @IsEmail({}, { message: 'Érvényes e-mail-cím szükséges a kölcsönzéshez (pl. nev@pelda.hu).' })
   borrowerEmail!: string;
 }
 
 export class CancelLoanDto {
   @ApiProperty({ required: false, example: 'Mégsem tudok jönni' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'A visszavonás indoka szöveg típusú érték legyen.' })
   reason?: string;
 }

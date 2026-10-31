@@ -11,6 +11,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
@@ -561,6 +562,15 @@ export class CheckoutPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private normalizeError(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      const body = error.error as { message?: unknown } | null;
+      if (body && typeof body.message === 'string') {
+        return body.message;
+      }
+      if (body && Array.isArray(body.message) && typeof body.message[0] === 'string') {
+        return (body.message as string[])[0];
+      }
+    }
     if (error instanceof Error) {
       return error.message;
     }

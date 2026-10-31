@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
@@ -7,6 +7,9 @@ import {
   MatchWeatherForecast,
   PaymentIntentResponse,
 } from '../models/payment.model';
+import { SKIP_ERROR_SNACKBAR } from '../../core/interceptors/error.interceptor';
+
+const FORM_CONTEXT = new HttpContext().set(SKIP_ERROR_SNACKBAR, true);
 
 @Injectable({ providedIn: 'root' })
 export class PaymentsApiService {
@@ -15,6 +18,7 @@ export class PaymentsApiService {
   createIntent(payload: CreatePaymentIntentRequest): Observable<PaymentIntentResponse> {
     return this.http.post<PaymentIntentResponse>('/payments/create-intent', payload, {
       withCredentials: true,
+      context: FORM_CONTEXT,
     });
   }
 
@@ -30,7 +34,7 @@ export class PaymentsApiService {
     return this.http.post<ConfirmPaymentResponse>(
       '/payments/confirm',
       { paymentIntentId },
-      { withCredentials: true },
+      { withCredentials: true, context: FORM_CONTEXT },
     );
   }
 

@@ -4,6 +4,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import {
   AbstractControl,
   FormBuilder,
+  FormControl,
   FormGroup,
   ReactiveFormsModule,
   ValidationErrors,
@@ -11,12 +12,21 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { ErrorStateMatcher } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { strictEmailValidator } from '../../shared/validators/email.validator';
+
+class PasswordMismatchMatcher implements ErrorStateMatcher {
+  isErrorState(control: FormControl | null): boolean {
+    if (!control) return false;
+    return !!(control.touched && control.parent?.errors?.['passwordMismatch']);
+  }
+}
 
 const passwordMatchValidator = (group: AbstractControl): ValidationErrors | null => {
   const password = group.get('password')?.value as string | undefined;
@@ -128,6 +138,7 @@ const passwordMatchValidator = (group: AbstractControl): ValidationErrors | null
                 [type]="showPassword() ? 'text' : 'password'"
                 formControlName="passwordConfirm"
                 autocomplete="new-password"
+                [errorStateMatcher]="passwordMismatchMatcher"
               />
               @if (form.errors?.['passwordMismatch'] && form.controls['passwordConfirm'].touched) {
                 <mat-error>A két jelszó nem egyezik.</mat-error>
@@ -217,12 +228,13 @@ export class RegisterPageComponent {
   protected readonly loading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly showPassword = signal(false);
+  protected readonly passwordMismatchMatcher = new PasswordMismatchMatcher();
 
   protected readonly form: FormGroup = this.fb.nonNullable.group(
     {
       firstName: this.fb.nonNullable.control('', [Validators.required, Validators.minLength(2)]),
       lastName: this.fb.nonNullable.control('', [Validators.required, Validators.minLength(2)]),
-      email: this.fb.nonNullable.control('', [Validators.required, Validators.email]),
+      email: this.fb.nonNullable.control('', [Validators.required, strictEmailValidator]),
       phoneNumber: this.fb.nonNullable.control(''),
       password: this.fb.nonNullable.control('', [
         Validators.required,
