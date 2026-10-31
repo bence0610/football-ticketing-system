@@ -25,7 +25,11 @@ import { CancelLoanDto, CreateLoanDto } from './dto/create-loan.dto';
 import { PurchaseSeasonPassDto } from './dto/purchase-season-pass.dto';
 import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-response.dto';
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
-import { PassLoanResponseDto, SeasonPassResponseDto } from './dto/season-pass-response.dto';
+import {
+  PassLoanResponseDto,
+  SeasonPassResponseDto,
+  LoanPreviewDto,
+} from './dto/season-pass-response.dto';
 import { PassLoan } from '../../database/entities';
 
 interface AuthenticatedRequest extends Request {
@@ -155,6 +159,13 @@ export class SeasonPassesController {
    * Blocked if an active loan exists for this (pass, match) — in that
    * case the right of entry belongs to the borrower, not the holder.
    */
+  @Get('loans/preview/:token')
+  @ApiOperation({ summary: 'Meghívó előnézete — autentikáció nélkül elérhető' })
+  @ApiOkResponse({ type: LoanPreviewDto })
+  async previewLoan(@Param('token') token: string): Promise<LoanPreviewDto> {
+    return this.seasonPassesService.previewLoan(token);
+  }
+
   @Get(':passId/qr/:matchId')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()

@@ -38,6 +38,7 @@ import { CancelLoanDto, CreateLoanDto } from './dto/create-loan.dto';
 import { PurchaseSeasonPassDto } from './dto/purchase-season-pass.dto';
 import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-response.dto';
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
+import { LoanPreviewDto } from './dto/season-pass-response.dto';
 
 const ACTIVE_SEASON_LABEL = '2026/2027';
 
@@ -540,12 +541,33 @@ export class SeasonPassesService {
         throw new NotFoundException('Invitation not found');
       }
       if (loan.status !== PassLoanStatus.PENDING) {
-        throw new BadRequestException(`Invitation is already in state ${loan.status}`);
+        const statusCodeMap: Partial<Record<PassLoanStatus, string>> = {
+          [PassLoanStatus.EXPIRED]: 'loan_expired',
+          [PassLoanStatus.CANCELLED]: 'loan_revoked',
+          [PassLoanStatus.REVOKED]: 'seat_already_used',
+        };
+        const code = statusCodeMap[loan.status] ?? 'loan_revoked';
+        if (code === 'seat_already_used') {
+          throw new ConflictException({
+            statusCode: 409,
+            message: `A meghívó már nem érvényes (állapot: ${loan.status}).`,
+            code,
+          });
+        }
+        throw new BadRequestException({
+          statusCode: 400,
+          message: `A meghívó már nem érvényes (állapot: ${loan.status}).`,
+          code,
+        });
       }
       if (loan.expiresAt.getTime() < Date.now()) {
         loan.status = PassLoanStatus.EXPIRED;
         await loanRepo.save(loan);
-        throw new BadRequestException('Invitation has expired');
+        throw new BadRequestException({
+          statusCode: 400,
+          message: 'A meghívó lejárt.',
+          code: 'loan_expired',
+        });
       }
       const borrower = await manager.getRepository(User).findOne({ where: { id: borrowerUserId } });
       if (!borrower) {
@@ -619,9 +641,12 @@ export class SeasonPassesService {
     });
 
     if (ownerAlreadyEntered) {
-      throw new ConflictException(
-        'A bérletestulajdonos már belépett erre a mérkőzésre. Az érvényesített belépőjog nem ruházható át.',
-      );
+      throw new ConflictException({
+        statusCode: 409,
+        message:
+          'A bérletestulajdonos már belépett erre a mérkőzésre. Az érvényesített belépőjog nem ruházható át.',
+        code: 'seat_already_used',
+      });
     }
 
     void this.dispatchAcceptanceEmails(loan, loanTicket!).catch((error: Error) => {
@@ -629,6 +654,68 @@ export class SeasonPassesService {
     });
 
     return loan;
+  }
+
+  /**
+   * Returns the minimum data a borrower needs to see BEFORE accepting.
+   * No auth required — the token is the only credential.
+   *
+   * Does NOT mutate the loan's status on expiry check (unlike acceptLoan).
+   */
+  async previewLoan(invitationToken: string): Promise<LoanPreviewDto> {
+    const loan = await this.passLoanRepository.findOne({
+      where: { invitationToken },
+      relations: ['match', 'seasonPass', 'seasonPass.seat', 'lender'],
+    });
+
+    if (!loan) {
+      throw new NotFoundException('A meghívó nem található.');
+    }
+
+    if (loan.status !== PassLoanStatus.PENDING) {
+      const statusCodeMap: Partial<Record<PassLoanStatus, string>> = {
+        [PassLoanStatus.EXPIRED]: 'loan_expired',
+        [PassLoanStatus.CANCELLED]: 'loan_revoked',
+        [PassLoanStatus.REVOKED]: 'seat_already_used',
+      };
+      const code = statusCodeMap[loan.status] ?? 'loan_revoked';
+      if (code === 'seat_already_used') {
+        throw new ConflictException({
+          statusCode: 409,
+          message: `A meghívó már nem érvényes (állapot: ${loan.status}).`,
+          code,
+        });
+      }
+      throw new BadRequestException({
+        statusCode: 400,
+        message: `A meghívó már nem érvényes (állapot: ${loan.status}).`,
+        code,
+      });
+    }
+
+    // Check time expiry WITHOUT writing back to the database.
+    if (loan.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: 'A meghívó lejárt.',
+        code: 'loan_expired',
+      });
+    }
+
+    const match = loan.match!;
+    const seat = loan.seasonPass?.seat;
+    const lender = loan.lender!;
+
+    return {
+      matchTitle: `${match.homeTeam} - ${match.awayTeam}`,
+      matchVenue: match.venue,
+      kickoffAt: match.kickoffAt.toISOString(),
+      seatSection: seat?.section ?? '–',
+      seatRow: seat?.row ?? '–',
+      seatNumber: seat?.number ?? 0,
+      lenderName: `${lender.firstName} ${lender.lastName}`,
+      expiresAt: loan.expiresAt.toISOString(),
+    };
   }
 
   async cancelLoan(
@@ -759,7 +846,7 @@ export class SeasonPassesService {
     pass: SeasonPass,
   ): Promise<void> {
     const matchSummary = this.renderer.matchSummary(match);
-    const acceptUrl = `${this.mailConfig.baseUrl}/loans/accept?token=${encodeURIComponent(loan.invitationToken)}`;
+    const acceptUrl = `${this.mailConfig.baseUrl}/loans/accept/${encodeURIComponent(loan.invitationToken)}`;
     await this.emailService.send({
       to: loan.borrowerEmail,
       subject: `${lender.firstName} bérletet ajánlott fel - ${matchSummary.title}`,

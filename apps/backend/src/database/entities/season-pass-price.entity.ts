@@ -1,5 +1,6 @@
 import { Column, Entity, Index } from 'typeorm';
 import { BaseEntity } from './base.entity';
+import { dateColumnTransformer } from './typeorm.transformers';
 
 /**
  * Per-section season pass price catalogue for a given season label
@@ -28,10 +29,10 @@ export class SeasonPassPrice extends BaseEntity {
   @Column({ type: 'varchar', length: 8, default: 'HUF' })
   currency!: string;
 
-  @Column({ type: 'date', name: 'valid_from' })
+  @Column({ type: 'date', name: 'valid_from', transformer: dateColumnTransformer })
   validFrom!: Date;
 
-  @Column({ type: 'date', name: 'valid_until' })
+  @Column({ type: 'date', name: 'valid_until', transformer: dateColumnTransformer })
   validUntil!: Date;
 
   @Column({ type: 'boolean', default: true, name: 'is_active' })

@@ -4,6 +4,7 @@ import { Ticket } from './ticket.entity';
 import { SeasonPass } from './season-pass.entity';
 import { LoyaltyTransaction } from './loyalty-transaction.entity';
 import { Waitlist } from './waitlist.entity';
+import { dateColumnTransformer } from './typeorm.transformers';
 
 export enum UserRole {
   FAN = 'fan',
@@ -37,7 +38,12 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 32, nullable: true, name: 'phone_number' })
   phoneNumber?: string;
 
-  @Column({ type: 'date', nullable: true, name: 'date_of_birth' })
+  @Column({
+    type: 'date',
+    nullable: true,
+    name: 'date_of_birth',
+    transformer: dateColumnTransformer,
+  })
   dateOfBirth?: Date;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.FAN })

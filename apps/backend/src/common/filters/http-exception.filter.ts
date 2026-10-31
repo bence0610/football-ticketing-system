@@ -15,6 +15,7 @@ interface ErrorResponseBody {
   method: string;
   message: string | string[];
   error?: string;
+  code?: string;
 }
 
 @Catch()
@@ -29,6 +30,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Internal server error';
     let error: string | undefined;
+    let code: string | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -39,6 +41,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
         const body = exceptionResponse as Record<string, unknown>;
         message = (body.message as string | string[]) ?? exception.message;
         error = body.error as string | undefined;
+        code = body.code as string | undefined;
       }
     } else if (exception instanceof Error) {
       message = exception.message;
@@ -50,7 +53,8 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
       path: request.url,
       method: request.method,
       message,
-      error,
+      ...(error !== undefined && { error }),
+      ...(code !== undefined && { code }),
     };
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {

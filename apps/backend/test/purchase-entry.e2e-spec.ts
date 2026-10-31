@@ -1167,6 +1167,66 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     expect(ctx.stripeStub.refundCreateMock).not.toHaveBeenCalled();
   });
 
+  /* ------------------------------------------------------------------ */
+  /* Season-pass list endpoint — date serialisation regression          */
+  /*                                                                      */
+  /* Regression guard for the DATE column bug: MySQL returns 'date'      */
+  /* columns as plain strings, so any call to .toISOString() on the raw  */
+  /* entity value crashes with "not a function". These tests ensure the   */
+  /* endpoint returns 200 with valid ISO strings regardless of whether    */
+  /* the transformer is wired or not — a 500 here means the fix regressed.*/
+  /* ------------------------------------------------------------------ */
+
+  it('season-pass list: user with no passes returns 200 and empty array', async () => {
+    const fan = await registerFan('sp-date-none');
+    const resp = await request(server)
+      .get('/api/season-passes/me')
+      .set('Authorization', `Bearer ${fan.accessToken}`);
+    expect(resp.status).toBe(200);
+    expect(resp.body).toEqual([]);
+  });
+
+  it('season-pass list: user who owns a pass returns 200 with valid ISO date strings', async () => {
+    const { seatA } = await seedMinimalFixture(ctx.dataSource);
+    const fan = await registerFan('sp-date-owner');
+    const pass = await seedSeasonPass(ctx.dataSource, { userId: fan.userId, seatId: seatA.id });
+
+    const resp = await request(server)
+      .get('/api/season-passes/me')
+      .set('Authorization', `Bearer ${fan.accessToken}`);
+
+    expect(resp.status).toBe(200);
+    expect(Array.isArray(resp.body)).toBe(true);
+    expect(resp.body).toHaveLength(1);
+
+    const dto = resp.body[0] as {
+      id: string;
+      status: string;
+      validFrom: string;
+      validUntil: string;
+    };
+    expect(dto.id).toBe(pass.id);
+    expect(dto.status).toBe('active');
+
+    // Must be non-empty strings
+    expect(typeof dto.validFrom).toBe('string');
+    expect(typeof dto.validUntil).toBe('string');
+
+    // Must be parseable ISO datetimes (not the raw MySQL '2026-07-01' date string)
+    const from = new Date(dto.validFrom);
+    const until = new Date(dto.validUntil);
+    expect(isNaN(from.getTime())).toBe(false);
+    expect(isNaN(until.getTime())).toBe(false);
+
+    // ISO format check: must start with the date portion then 'T'
+    expect(dto.validFrom).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(dto.validUntil).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    // Round-tripping: the date portion must match what was seeded
+    expect(dto.validFrom.startsWith('2026-07-01')).toBe(true);
+    expect(dto.validUntil.startsWith('2027-06-30')).toBe(true);
+  });
+
   it('idempotent webhook — double delivery produces one ticket and one loyalty transaction', async () => {
     const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
     const fan = await registerFan('idem');

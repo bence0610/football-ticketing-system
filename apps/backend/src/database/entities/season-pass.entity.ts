@@ -4,6 +4,7 @@ import { User } from './user.entity';
 import { Seat } from './seat.entity';
 import { Ticket } from './ticket.entity';
 import { PassLoan } from './pass-loan.entity';
+import { dateColumnTransformer } from './typeorm.transformers';
 
 export enum SeasonPassStatus {
   ACTIVE = 'active',
@@ -26,10 +27,10 @@ export class SeasonPass extends BaseEntity {
   @Column({ type: 'varchar', length: 32, name: 'season_label' })
   seasonLabel!: string;
 
-  @Column({ type: 'date', name: 'valid_from' })
+  @Column({ type: 'date', name: 'valid_from', transformer: dateColumnTransformer })
   validFrom!: Date;
 
-  @Column({ type: 'date', name: 'valid_until' })
+  @Column({ type: 'date', name: 'valid_until', transformer: dateColumnTransformer })
   validUntil!: Date;
 
   @Column({ type: 'enum', enum: SeasonPassStatus, default: SeasonPassStatus.PENDING_PAYMENT })

@@ -79,3 +79,29 @@ export class SeasonPassResponseDto {
   @ApiProperty({ type: () => [PassLoanResponseDto] })
   loans!: PassLoanResponseDto[];
 }
+
+export class LoanPreviewDto {
+  @ApiProperty({ description: 'Mérkőzés neve (hazai – vendég)' })
+  matchTitle!: string;
+
+  @ApiProperty({ description: 'Helyszín neve' })
+  matchVenue!: string;
+
+  @ApiProperty({ description: 'Mérkőzés kezdési időpontja ISO 8601 formában' })
+  kickoffAt!: string;
+
+  @ApiProperty({ description: 'Szektor azonosítója' })
+  seatSection!: string;
+
+  @ApiProperty({ description: 'Sor száma / jele' })
+  seatRow!: string;
+
+  @ApiProperty({ description: 'Szék száma', type: Number })
+  seatNumber!: number;
+
+  @ApiProperty({ description: 'A kölcsönadó neve (keresztnév + vezetéknév)' })
+  lenderName!: string;
+
+  @ApiProperty({ description: 'Meghívó érvényessége (ISO 8601)' })
+  expiresAt!: string;
+}
