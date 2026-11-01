@@ -126,12 +126,20 @@ export interface SeasonPassFixture {
  */
 export async function seedSeasonPass(
   dataSource: DataSource,
-  options: { userId: string; seatId: string },
+  options: {
+    userId: string;
+    seatId: string;
+    holderName?: string;
+    /** Defaults to the buyer; pass `null` for a holder without an account. */
+    holderUserId?: string | null;
+  },
 ): Promise<SeasonPass> {
   const repo = dataSource.getRepository(SeasonPass);
   return repo.save(
     repo.create({
       userId: options.userId,
+      holderName: options.holderName ?? 'Teszt Felhasználó',
+      holderUserId: options.holderUserId === undefined ? options.userId : options.holderUserId,
       seatId: options.seatId,
       seasonLabel: '2026/2027',
       validFrom: new Date('2026-07-01'),

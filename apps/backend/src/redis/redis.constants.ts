@@ -20,6 +20,12 @@ export const RedisKeys = {
   emailConfirmLock: (paymentIntentId: string, userId: string): string =>
     `email:confirm-lock:${paymentIntentId}:${userId}`,
   // Season-pass purchase — per-attempt idempotency record (TTL 300 s)
-  seasonPassAttempt: (userId: string, section: string, seasonLabel: string): string =>
-    `seasonpass-attempt:${userId}:${section}:${seasonLabel}`,
+  // `holderKey` identifies who the pass is for, so buying for several holders
+  // in one section yields separate attempts (and separate PaymentIntents).
+  seasonPassAttempt: (
+    userId: string,
+    section: string,
+    seasonLabel: string,
+    holderKey: string,
+  ): string => `seasonpass-attempt:${userId}:${section}:${seasonLabel}:${holderKey}`,
 } as const;

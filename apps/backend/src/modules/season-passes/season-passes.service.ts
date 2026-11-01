@@ -13,7 +13,8 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import Stripe from 'stripe';
-import { DataSource, In, Repository } from 'typeorm';
+import { createHash } from 'crypto';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { nanoid } from 'nanoid';
 import {
   LoyaltyTransactionSource,
@@ -61,6 +62,28 @@ function isDuplicateKeyError(err: unknown): boolean {
   if (typeof e['message'] === 'string' && e['message'].includes('ER_DUP_ENTRY')) return true;
   return false;
 }
+
+type DuplicateKind = 'seat' | 'holder' | 'other';
+
+/** Which unique index a duplicate-key error came from (MySQL names it in the message). */
+function duplicateKind(err: unknown): DuplicateKind {
+  const e = err as { message?: unknown; driverError?: { message?: unknown } } | null;
+  const text = `${String(e?.message ?? '')} ${String(e?.driverError?.message ?? '')}`;
+  if (text.includes('uq_season_passes_seat_season')) return 'seat';
+  if (text.includes('uq_season_passes_holder_season')) return 'holder';
+  return 'other';
+}
+
+interface PassHolder {
+  name: string;
+  /** Linked account, or null when the holder has no account (e.g. a child). */
+  userId: string | null;
+}
+
+const fullName = (u: { firstName: string; lastName: string }): string =>
+  `${u.firstName} ${u.lastName}`.trim();
+
+class NoFreeSeatError extends Error {}
 
 @Injectable()
 export class SeasonPassesService {
@@ -149,13 +172,27 @@ export class SeasonPassesService {
       );
     }
 
+    const holder = await this.resolveHolder(user, dto);
+    await this.assertPassCanBeIssued(priceRow, holder);
+
     // Resolve a per-attempt ID stored in Redis.
     // Two rapid calls for the same (user, section, season) within the 5-minute
     // window share the same attemptId → same Stripe idempotency key → one
     // PaymentIntent (double-click / network-retry protection).
     // A card decline deletes the key so the next attempt is genuinely fresh
     // with a new PaymentIntent — no 24-hour Stripe block.
-    const attemptKey = RedisKeys.seasonPassAttempt(userId, priceRow.section, priceRow.seasonLabel);
+    // The holder is part of the attempt identity: three passes for three
+    // holders in one section are three purchases, not one retried click.
+    const holderKey = createHash('sha256')
+      .update(`${holder.userId ?? ''}|${holder.name.toLowerCase()}`)
+      .digest('hex')
+      .slice(0, 16);
+    const attemptKey = RedisKeys.seasonPassAttempt(
+      userId,
+      priceRow.section,
+      priceRow.seasonLabel,
+      holderKey,
+    );
     let attemptId = await this.redis.get(attemptKey);
     if (!attemptId) {
       const freshId = randomUUID();
@@ -184,6 +221,8 @@ export class SeasonPassesService {
         priceRowId: priceRow.id,
         section: priceRow.section,
         seasonLabel: priceRow.seasonLabel,
+        holderName: holder.name,
+        holderUserId: holder.userId ?? '',
       },
     };
 
@@ -224,7 +263,14 @@ export class SeasonPassesService {
     }
 
     if (intent.status === 'succeeded') {
-      const pass = await this.persistSeasonPassFromIntent(intent, priceRow, userId);
+      const pass = await this.persistSeasonPassFromIntent(intent, priceRow, userId, holder);
+      if (!pass) {
+        throw new ConflictException({
+          statusCode: 409,
+          message: 'A bérletet nem sikerült kiállítani, a befizetett összeget visszatérítettük.',
+          code: 'pass_not_issued_refunded',
+        });
+      }
       await this.awardSeasonPassLoyalty(pass);
       return this.buildPurchaseResponse(intent, priceRow, pass.id);
     }
@@ -276,7 +322,12 @@ export class SeasonPassesService {
       return;
     }
 
-    const pass = await this.persistSeasonPassFromIntent(intent, priceRow, userId);
+    const holderName = intent.metadata.holderName?.trim();
+    const holder: PassHolder = holderName
+      ? { name: holderName, userId: intent.metadata.holderUserId || null }
+      : await this.defaultHolder(userId);
+    const pass = await this.persistSeasonPassFromIntent(intent, priceRow, userId, holder);
+    if (!pass) return; // refunded and logged
     await this.awardSeasonPassLoyalty(pass);
     this.logger.log(
       `[season-pass] Finalized PaymentIntent ${intent.id} → SeasonPass ${pass.id} for user ${userId}`,
@@ -284,15 +335,25 @@ export class SeasonPassesService {
   }
 
   /**
-   * Atomically persists the SeasonPass row backed by a succeeded
-   * PaymentIntent. Idempotent: a repeated call for the same
-   * `stripePaymentIntentId` returns the existing row.
+   * Persists the SeasonPass row backed by a succeeded PaymentIntent and
+   * assigns the seat. Idempotent per `stripePaymentIntentId`.
+   *
+   * Seat choice: the first free seat (by row, number) of the purchased
+   * section that is neither held by another pass this season nor occupied by
+   * a single-match ticket. Concurrent purchases may pick the same seat; the
+   * `uq_season_passes_seat_season` index rejects the loser, which retries with
+   * the next free seat.
+   *
+   * Returns `null` when the pass could not be issued (section full, or the
+   * holder account already holds a pass this season). In that case the
+   * payment has already been refunded in full.
    */
   private async persistSeasonPassFromIntent(
     intent: Stripe.PaymentIntent,
     priceRow: SeasonPassPrice,
     userId: string,
-  ): Promise<SeasonPass> {
+    holder: PassHolder,
+  ): Promise<SeasonPass | null> {
     const existing = await this.seasonPassRepository.findOne({
       where: { stripePaymentIntentId: intent.id },
     });
@@ -300,23 +361,154 @@ export class SeasonPassesService {
       return existing;
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const repo = manager.getRepository(SeasonPass);
-      const pass = repo.create({
-        id: randomUUID(),
-        userId,
-        seasonLabel: priceRow.seasonLabel,
-        validFrom: priceRow.validFrom,
-        validUntil: priceRow.validUntil,
-        status: SeasonPassStatus.ACTIVE,
-        pricePaid: priceRow.price.toFixed(2),
-        currency: priceRow.currency,
-        qrCode: `KTE-SP-${randomUUID()}`,
-        autoRenew: false,
-        stripePaymentIntentId: intent.id,
+    const maxSeatAttempts = 8;
+    let failure = 'no free seat in section';
+    for (let attempt = 0; attempt < maxSeatAttempts; attempt++) {
+      try {
+        return await this.dataSource.transaction(async (manager) => {
+          const seatId = await this.findFreeSeatId(manager, priceRow.section, priceRow.seasonLabel);
+          if (!seatId) {
+            throw new NoFreeSeatError();
+          }
+          const repo = manager.getRepository(SeasonPass);
+          return repo.save(
+            repo.create({
+              id: randomUUID(),
+              userId,
+              holderName: holder.name,
+              holderUserId: holder.userId,
+              seatId,
+              seasonLabel: priceRow.seasonLabel,
+              validFrom: priceRow.validFrom,
+              validUntil: priceRow.validUntil,
+              status: SeasonPassStatus.ACTIVE,
+              pricePaid: priceRow.price.toFixed(2),
+              currency: priceRow.currency,
+              qrCode: `KTE-SP-${randomUUID()}`,
+              autoRenew: false,
+              stripePaymentIntentId: intent.id,
+            }),
+          );
+        });
+      } catch (err: unknown) {
+        if (err instanceof NoFreeSeatError) {
+          break;
+        }
+        if (isDuplicateKeyError(err)) {
+          const kind = duplicateKind(err);
+          if (kind === 'seat') continue; // lost a race for the seat — pick the next one
+          if (kind === 'holder') {
+            failure = 'holder already holds a pass this season';
+            break;
+          }
+          // Same intent inserted concurrently (webhook + confirm): return the winner's row.
+          const winner = await this.seasonPassRepository.findOne({
+            where: { stripePaymentIntentId: intent.id },
+          });
+          if (winner) return winner;
+        }
+        throw err;
+      }
+    }
+
+    await this.refundUnissuedPass(intent, failure);
+    return null;
+  }
+
+  private async refundUnissuedPass(intent: Stripe.PaymentIntent, reason: string): Promise<void> {
+    this.logger.error(
+      `[season-pass] PaymentIntent ${intent.id}: pass not issued (${reason}); refunding.`,
+    );
+    try {
+      await this.stripe.refunds.create(
+        { payment_intent: intent.id },
+        { idempotencyKey: `refund_seasonpass_${intent.id}` },
+      );
+    } catch (error) {
+      this.logger.error(
+        `[season-pass] PaymentIntent ${intent.id}: refund FAILED, manual action required: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async findFreeSeatId(
+    manager: EntityManager,
+    section: string,
+    seasonLabel: string,
+  ): Promise<string | null> {
+    const rows: Array<{ id: string }> = await manager.query(
+      'SELECT s.id FROM seats s ' +
+        'WHERE s.section = ? AND s.is_active = 1 ' +
+        'AND NOT EXISTS (SELECT 1 FROM season_passes sp WHERE sp.seat_id = s.id AND sp.season_label = ?) ' +
+        "AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.seat_id = s.id AND t.status IN ('pending_payment', 'paid', 'used')) " +
+        'ORDER BY s.`row`, s.`number` LIMIT 1',
+      [section, seasonLabel],
+    );
+    return rows[0]?.id ?? null;
+  }
+
+  private async defaultHolder(buyerId: string): Promise<PassHolder> {
+    const buyer = await this.userRepository.findOne({ where: { id: buyerId } });
+    return { name: buyer ? fullName(buyer) : 'Ismeretlen', userId: buyer ? buyer.id : null };
+  }
+
+  /**
+   * Who will occupy the seat. Nothing given → the buyer. A name only → a
+   * holder without an account (the buyer shows that QR). An email → the
+   * registered account with that email (name defaults to the account's).
+   */
+  private async resolveHolder(buyer: User, dto: PurchaseSeasonPassDto): Promise<PassHolder> {
+    const name = dto.holderName?.trim();
+    const email = dto.holderEmail?.trim().toLowerCase();
+    if (!name && !email) {
+      return { name: fullName(buyer), userId: buyer.id };
+    }
+    if (email) {
+      const account = await this.userRepository.findOne({ where: { email } });
+      if (!account) {
+        throw new NotFoundException({
+          statusCode: 404,
+          message:
+            'Ehhez az e-mail-címhez nem tartozik fiók. Hagyd üresen az e-mail mezőt, ha a birtokosnak nincs fiókja.',
+          code: 'holder_account_not_found',
+        });
+      }
+      return { name: name || fullName(account), userId: account.id };
+    }
+    return { name: name!, userId: null };
+  }
+
+  /** Fail fast, before any money moves. The DB constraints remain the final word. */
+  private async assertPassCanBeIssued(
+    priceRow: SeasonPassPrice,
+    holder: PassHolder,
+  ): Promise<void> {
+    if (holder.userId) {
+      const already = await this.seasonPassRepository.findOne({
+        where: { holderUserId: holder.userId, seasonLabel: priceRow.seasonLabel },
       });
-      return repo.save(pass);
-    });
+      if (already) {
+        throw new ConflictException({
+          statusCode: 409,
+          message: 'Ennek a felhasználónak már van bérlete erre a szezonra.',
+          code: 'holder_already_has_pass',
+        });
+      }
+    }
+    const seatId = await this.findFreeSeatId(
+      this.dataSource.manager,
+      priceRow.section,
+      priceRow.seasonLabel,
+    );
+    if (!seatId) {
+      throw new ConflictException({
+        statusCode: 409,
+        message: 'Ebben a szektorban nincs több szabad bérletes hely.',
+        code: 'section_sold_out',
+      });
+    }
   }
 
   private async awardSeasonPassLoyalty(pass: SeasonPass): Promise<void> {
@@ -364,10 +556,11 @@ export class SeasonPassesService {
   async listForUser(
     userId: string,
   ): Promise<Array<{ pass: SeasonPass; loans: PassLoan[]; seat: string | undefined }>> {
+    // Passes the user manages: bought by them, or held by them (account link).
     const passes = await this.seasonPassRepository.find({
-      where: { userId },
-      relations: ['seat'],
-      order: { validFrom: 'DESC' },
+      where: [{ userId }, { holderUserId: userId }],
+      relations: ['seat', 'user'],
+      order: { validFrom: 'DESC', createdAt: 'ASC' },
     });
     if (passes.length === 0) {
       return [];
@@ -384,7 +577,12 @@ export class SeasonPassesService {
     }));
   }
 
-  async getOwnedPass(passId: string, userId: string): Promise<SeasonPass> {
+  /**
+   * Who may act on a pass (show its QR, lend it, withdraw a loan): the BUYER
+   * (manages it, and is the only one who can act for a holder without an
+   * account) and the HOLDER's account if linked. Both have equal rights.
+   */
+  async getManagedPass(passId: string, userId: string): Promise<SeasonPass> {
     const pass = await this.seasonPassRepository.findOne({
       where: { id: passId },
       relations: ['seat'],
@@ -392,8 +590,8 @@ export class SeasonPassesService {
     if (!pass) {
       throw new NotFoundException(`Season pass ${passId} not found`);
     }
-    if (pass.userId !== userId) {
-      throw new ForbiddenException('Not the owner of this season pass');
+    if (pass.userId !== userId && pass.holderUserId !== userId) {
+      throw new ForbiddenException('Not the buyer or holder of this season pass');
     }
     return pass;
   }
@@ -416,8 +614,8 @@ export class SeasonPassesService {
     passId: string,
     matchId: string,
     userId: string,
-  ): Promise<{ ticketId: string; dataUrl: string; token: string }> {
-    const pass = await this.getOwnedPass(passId, userId);
+  ): Promise<{ ticketId: string; dataUrl: string; token: string; holderName: string }> {
+    const pass = await this.getManagedPass(passId, userId);
     if (pass.status !== SeasonPassStatus.ACTIVE) {
       throw new BadRequestException('Season pass is not active');
     }
@@ -441,7 +639,12 @@ export class SeasonPassesService {
 
     const ticket = await this.materializeSeasonPassTicket(pass, matchId);
     const result = await this.qrService.generateForTicket(ticket.id, ticket.qrJti);
-    return { ticketId: ticket.id, dataUrl: result.dataUrl, token: result.token };
+    return {
+      ticketId: ticket.id,
+      dataUrl: result.dataUrl,
+      token: result.token,
+      holderName: pass.holderName,
+    };
   }
 
   /**
@@ -523,7 +726,7 @@ export class SeasonPassesService {
   }
 
   async createLoan(passId: string, lenderUserId: string, dto: CreateLoanDto): Promise<PassLoan> {
-    const pass = await this.getOwnedPass(passId, lenderUserId);
+    const pass = await this.getManagedPass(passId, lenderUserId);
     if (pass.status !== SeasonPassStatus.ACTIVE) {
       throw new BadRequestException('Season pass is not active');
     }
@@ -534,6 +737,15 @@ export class SeasonPassesService {
     }
     if (lender.email.toLowerCase() === dto.borrowerEmail.toLowerCase()) {
       throw new BadRequestException('Cannot loan to yourself');
+    }
+    const borrowerAccount = await this.userRepository.findOne({
+      where: { email: dto.borrowerEmail.toLowerCase() },
+    });
+    if (
+      borrowerAccount &&
+      (borrowerAccount.id === pass.userId || borrowerAccount.id === pass.holderUserId)
+    ) {
+      throw new BadRequestException('Cannot loan a pass to its own buyer or holder');
     }
 
     const match = await this.matchRepository.findOne({ where: { id: dto.matchId } });
@@ -810,8 +1022,16 @@ export class SeasonPassesService {
       if (!loan) {
         throw new NotFoundException('Loan not found');
       }
-      if (loan.lenderUserId !== userId) {
-        throw new ForbiddenException('Only the lender can cancel a loan');
+      // Buyer and holder share management rights, so either may withdraw a
+      // loan (the lender may be the other one, or a holder without an account
+      // acting through the buyer).
+      const seasonPass = loan.seasonPass;
+      const mayManage =
+        loan.lenderUserId === userId ||
+        seasonPass?.userId === userId ||
+        seasonPass?.holderUserId === userId;
+      if (!mayManage) {
+        throw new ForbiddenException('Only the buyer or holder of the pass can cancel a loan');
       }
       if (loan.status !== PassLoanStatus.PENDING && loan.status !== PassLoanStatus.ACCEPTED) {
         throw new BadRequestException(`Loan in state ${loan.status} cannot be cancelled`);

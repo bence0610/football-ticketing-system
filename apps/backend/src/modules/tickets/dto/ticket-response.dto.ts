@@ -76,4 +76,10 @@ export class TicketQrResponseDto {
 
   @ApiProperty({ description: 'The signed JWT token encoded inside the QR image' })
   token!: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'A belépő személy neve (bérletnél a birtokos), a QR mellett megjelenítéshez.',
+  })
+  holderName?: string;
 }

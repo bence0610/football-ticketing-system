@@ -75,13 +75,16 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   /* Shared helpers                                                      */
   /* ------------------------------------------------------------------ */
 
-  async function registerFan(emailSuffix = 'fan'): Promise<RegisteredFan> {
+  async function registerFan(
+    emailSuffix = 'fan',
+    name: { firstName: string; lastName: string } = { firstName: 'Teszt', lastName: 'Felhasználó' },
+  ): Promise<RegisteredFan> {
     const email = `${emailSuffix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@kte.hu`;
     const response = await request(server).post('/api/auth/register').send({
       email,
       password: PASSWORD,
-      firstName: 'Teszt',
-      lastName: 'Felhasználó',
+      firstName: name.firstName,
+      lastName: name.lastName,
     });
     expect(response.status).toBe(201);
     return {
@@ -1312,7 +1315,22 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   /* Season-pass purchase webhook scenarios                              */
   /* ------------------------------------------------------------------ */
 
-  async function seedSeasonPassPrice(section = 'A'): Promise<SeasonPassPrice> {
+  async function seedSeasonPassPrice(section = 'A', seatCount = 3): Promise<SeasonPassPrice> {
+    // Passes get a seat at purchase, so the section needs free seats.
+    const seatRepo = ctx.dataSource.getRepository(Seat);
+    for (let n = 1; n <= seatCount; n++) {
+      await seatRepo.save(
+        seatRepo.create({
+          section,
+          row: 'SP',
+          number: n,
+          category: SeatCategory.STANDARD,
+          priceModifier: '1.00',
+          isAccessible: false,
+          isActive: true,
+        }),
+      );
+    }
     const repo = ctx.dataSource.getRepository(SeasonPassPrice);
     return repo.save(
       repo.create({
@@ -1526,8 +1544,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     expect(resp1.body.paymentIntentId).toBe(declinedId);
 
     // After the decline the service must have deleted the Redis attempt key.
-    const attemptKey = RedisKeys.seasonPassAttempt(fan.userId, priceRow.section, '2026/2027');
-    expect(await ctx.redis.get(attemptKey)).toBeNull();
+    expect(await ctx.redis.keys('seasonpass-attempt:*')).toHaveLength(0);
 
     // Second attempt: must succeed immediately — no 24-hour block, new intent.
     const { paymentIntentId: newId } = await purchaseSeasonPassIntent(
@@ -1612,5 +1629,402 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       .find({ where: { userId: fan.userId } });
     expect(tickets).toHaveLength(1);
     expect(tickets[0].stripePaymentIntentId).toBe(id2);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Buyer ≠ holder: family season passes                                */
+  /* ------------------------------------------------------------------ */
+
+  /** Purchases one pass through the API and finalises it via the Stripe webhook. */
+  async function buyPassFor(
+    buyer: RegisteredFan,
+    sectionId: string,
+    holder: { holderName?: string; holderEmail?: string } = {},
+  ): Promise<{ intent: StubbedPaymentIntent; pass: SeasonPass | null }> {
+    const resp = await request(server)
+      .post('/api/season-passes/purchase')
+      .set('Authorization', `Bearer ${buyer.accessToken}`)
+      .send({ sectionId, ...holder });
+    expect(resp.status).toBe(201);
+    const intent = ctx.stripeStub.getStoredIntent(resp.body.paymentIntentId as string)!;
+    const hook = await deliverWebhook(intent);
+    expect(hook.status).toBe(200);
+    await flushAsync();
+    const pass = await ctx.dataSource
+      .getRepository(SeasonPass)
+      .findOne({ where: { stripePaymentIntentId: intent.id } });
+    return { intent, pass };
+  }
+
+  async function scanAt(gateToken: string, ticketId: string, token: string) {
+    return request(server)
+      .patch(`/api/tickets/${ticketId}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token });
+  }
+
+  interface Family {
+    buyer: RegisteredFan;
+    partner: RegisteredFan;
+    passes: { self: SeasonPass; partner: SeasonPass; child: SeasonPass };
+  }
+
+  /** Buyer buys three passes in one section: for themself, their partner (account), a child (no account). */
+  async function buyFamilyPasses(section: string): Promise<Family> {
+    const buyer = await registerFan('fam-buyer', { firstName: 'Péter', lastName: 'Kovács' });
+    const partner = await registerFan('fam-partner', { firstName: 'Anna', lastName: 'Kovácsné' });
+    const self = await buyPassFor(buyer, section);
+    const part = await buyPassFor(buyer, section, { holderEmail: partner.email });
+    const child = await buyPassFor(buyer, section, { holderName: 'Kovács Bence' });
+    return {
+      buyer,
+      partner,
+      passes: { self: self.pass!, partner: part.pass!, child: child.pass! },
+    };
+  }
+
+  it('family a — one buyer, three holders in one section: three passes, three different seats, three charges', async () => {
+    await seedSeasonPassPrice('A');
+    const { buyer, partner, passes } = await buyFamilyPasses('A');
+
+    expect(ctx.stripeStub.paymentIntentsCreateMock).toHaveBeenCalledTimes(3);
+    const created = await Promise.all(
+      ctx.stripeStub.paymentIntentsCreateMock.mock.results.map(
+        (r) => r.value as Promise<{ id: string; amount: number }>,
+      ),
+    );
+    expect(new Set(created.map((i) => i.id)).size).toBe(3);
+    created.forEach((i) => expect(i.amount).toBe(3000000));
+
+    const all = [passes.self, passes.partner, passes.child];
+    all.forEach((p) => {
+      expect(p.userId).toBe(buyer.userId);
+      expect(p.status).toBe(SeasonPassStatus.ACTIVE);
+      expect(p.seatId).toBeTruthy();
+    });
+    expect(new Set(all.map((p) => p.seatId)).size).toBe(3);
+
+    expect(passes.self.holderName).toBe('Péter Kovács');
+    expect(passes.self.holderUserId).toBe(buyer.userId);
+    expect(passes.partner.holderName).toBe('Anna Kovácsné');
+    expect(passes.partner.holderUserId).toBe(partner.userId);
+    expect(passes.child.holderName).toBe('Kovács Bence');
+    expect(passes.child.holderUserId).toBeNull();
+  });
+
+  it('family a2 — three webhooks delivered concurrently still get three different seats', async () => {
+    await seedSeasonPassPrice('A');
+    const buyer = await registerFan('fam-conc');
+    const intents: StubbedPaymentIntent[] = [];
+    for (const holderName of ['Gyerek Egy', 'Gyerek Kettő', 'Gyerek Három']) {
+      const resp = await request(server)
+        .post('/api/season-passes/purchase')
+        .set('Authorization', `Bearer ${buyer.accessToken}`)
+        .send({ sectionId: 'A', holderName });
+      expect(resp.status).toBe(201);
+      intents.push(ctx.stripeStub.getStoredIntent(resp.body.paymentIntentId as string)!);
+    }
+    const results = await Promise.all(intents.map((i) => deliverWebhook(i)));
+    results.forEach((r) => expect(r.status).toBe(200));
+    await flushAsync();
+
+    const passes = await ctx.dataSource.getRepository(SeasonPass).find({
+      where: { userId: buyer.userId },
+    });
+    expect(passes).toHaveLength(3);
+    expect(new Set(passes.map((p) => p.seatId)).size).toBe(3);
+    expect(ctx.stripeStub.refundCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("family b — each holder's per-match entry works at the gate and the scan names the holder", async () => {
+    await seedSeasonPassPrice('A');
+    const { match } = await seedMinimalFixture(ctx.dataSource);
+    const { buyer, partner, passes } = await buyFamilyPasses('A');
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-fam-b@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    // The buyer shows the QR for themself and the child (no account);
+    // the partner shows their own, from their own profile.
+    const cases: Array<{ token: string; pass: SeasonPass; holderName: string }> = [
+      { token: buyer.accessToken, pass: passes.self, holderName: 'Péter Kovács' },
+      { token: buyer.accessToken, pass: passes.child, holderName: 'Kovács Bence' },
+      { token: partner.accessToken, pass: passes.partner, holderName: 'Anna Kovácsné' },
+    ];
+    for (const c of cases) {
+      const qr = await request(server)
+        .get(`/api/season-passes/${c.pass.id}/qr/${match.id}`)
+        .set('Authorization', `Bearer ${c.token}`);
+      expect(qr.status).toBe(200);
+      expect(qr.body.holderName).toBe(c.holderName);
+
+      const scan = await scanAt(gateToken, qr.body.ticketId as string, qr.body.token as string);
+      expect(scan.status).toBe(200);
+      expect(scan.body.success).toBe(true);
+      expect(scan.body.source).toBe(TicketSource.SEASON_PASS);
+      expect(scan.body.holderName).toBe(c.holderName);
+      expect(scan.body.seat.id).toBe(c.pass.seatId);
+    }
+
+    // Profiles: the buyer manages all three, the partner sees only their own.
+    const mine = await request(server)
+      .get('/api/season-passes/me')
+      .set('Authorization', `Bearer ${buyer.accessToken}`);
+    expect(mine.body).toHaveLength(3);
+    expect((mine.body as Array<{ holderName: string }>).map((p) => p.holderName).sort()).toEqual([
+      'Anna Kovácsné',
+      'Kovács Bence',
+      'Péter Kovács',
+    ]);
+    const theirs = await request(server)
+      .get('/api/season-passes/me')
+      .set('Authorization', `Bearer ${partner.accessToken}`);
+    expect(theirs.body).toHaveLength(1);
+    expect(theirs.body[0].holderName).toBe('Anna Kovácsné');
+    expect(theirs.body[0].isHolder).toBe(true);
+    expect(theirs.body[0].isBuyer).toBe(false);
+    expect(theirs.body[0].buyerName).toBe('Péter Kovács');
+
+    // A stranger can neither see nor use somebody else's pass.
+    const stranger = await registerFan('fam-stranger');
+    const denied = await request(server)
+      .get(`/api/season-passes/${passes.child.id}/qr/${match.id}`)
+      .set('Authorization', `Bearer ${stranger.accessToken}`);
+    expect(denied.status).toBe(403);
+  });
+
+  it('family c — the same seat cannot be sold as a season pass twice for one season (DB constraint)', async () => {
+    const { seatA } = await seedMinimalFixture(ctx.dataSource);
+    const first = await registerFan('seat-dup-1');
+    const second = await registerFan('seat-dup-2');
+    await seedSeasonPass(ctx.dataSource, { userId: first.userId, seatId: seatA.id });
+
+    await expect(
+      seedSeasonPass(ctx.dataSource, { userId: second.userId, seatId: seatA.id }),
+    ).rejects.toThrow(/uq_season_passes_seat_season/);
+
+    expect(await ctx.dataSource.getRepository(SeasonPass).count()).toBe(1);
+
+    // A different season may reuse the seat.
+    const repo = ctx.dataSource.getRepository(SeasonPass);
+    await repo.save(
+      repo.create({
+        userId: second.userId,
+        holderName: 'Következő Szezon',
+        holderUserId: second.userId,
+        seatId: seatA.id,
+        seasonLabel: '2027/2028',
+        validFrom: new Date('2027-07-01'),
+        validUntil: new Date('2028-06-30'),
+        status: SeasonPassStatus.ACTIVE,
+        pricePaid: '30000.00',
+        currency: 'HUF',
+        qrCode: `KTE-SP-${Date.now()}`,
+      }),
+    );
+    expect(await repo.count()).toBe(2);
+  });
+
+  it('family c2 — a full section refuses a further purchase before any charge', async () => {
+    await seedSeasonPassPrice('A', 2);
+    const buyer = await registerFan('full-section');
+    await buyPassFor(buyer, 'A', { holderName: 'Egy' });
+    await buyPassFor(buyer, 'A', { holderName: 'Kettő' });
+    ctx.stripeStub.paymentIntentsCreateMock.mockClear();
+
+    const resp = await request(server)
+      .post('/api/season-passes/purchase')
+      .set('Authorization', `Bearer ${buyer.accessToken}`)
+      .send({ sectionId: 'A', holderName: 'Három' });
+    expect(resp.status).toBe(409);
+    expect(resp.body.code).toBe('section_sold_out');
+    expect(ctx.stripeStub.paymentIntentsCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('family d — an account holds at most one pass per season (API pre-check, DB constraint, refund on race)', async () => {
+    await seedSeasonPassPrice('A');
+    const buyer = await registerFan('hold-buyer');
+    const partner = await registerFan('hold-partner');
+
+    // 1) First pass for the partner succeeds, a second purchase is refused before charging.
+    const first = await buyPassFor(buyer, 'A', { holderEmail: partner.email });
+    expect(first.pass?.holderUserId).toBe(partner.userId);
+    ctx.stripeStub.paymentIntentsCreateMock.mockClear();
+    const again = await request(server)
+      .post('/api/season-passes/purchase')
+      .set('Authorization', `Bearer ${buyer.accessToken}`)
+      .send({ sectionId: 'A', holderEmail: partner.email });
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe('holder_already_has_pass');
+    expect(ctx.stripeStub.paymentIntentsCreateMock).not.toHaveBeenCalled();
+
+    // The partner buying a pass for themself is the same rule.
+    const own = await request(server)
+      .post('/api/season-passes/purchase')
+      .set('Authorization', `Bearer ${partner.accessToken}`)
+      .send({ sectionId: 'A' });
+    expect(own.status).toBe(409);
+    expect(own.body.code).toBe('holder_already_has_pass');
+
+    // 2) The database itself rejects a second pass for the same account + season.
+    const { seatA } = await seedMinimalFixture(ctx.dataSource);
+    await expect(
+      seedSeasonPass(ctx.dataSource, {
+        userId: buyer.userId,
+        seatId: seatA.id,
+        holderUserId: partner.userId,
+      }),
+    ).rejects.toThrow(/uq_season_passes_holder_season/);
+
+    // 3) Race: two purchases for a fresh account both pass the pre-check
+    //    (nothing issued yet); the second webhook must be refunded, not issued.
+    const racer = await registerFan('hold-racer');
+    const respA = await request(server)
+      .post('/api/season-passes/purchase')
+      .set('Authorization', `Bearer ${buyer.accessToken}`)
+      .send({ sectionId: 'A', holderEmail: racer.email, holderName: 'Racer A' });
+    const respB = await request(server)
+      .post('/api/season-passes/purchase')
+      .set('Authorization', `Bearer ${buyer.accessToken}`)
+      .send({ sectionId: 'A', holderEmail: racer.email, holderName: 'Racer B' });
+    expect(respA.status).toBe(201);
+    expect(respB.status).toBe(201);
+    ctx.stripeStub.refundCreateMock.mockClear();
+    for (const r of [respA, respB]) {
+      await deliverWebhook(ctx.stripeStub.getStoredIntent(r.body.paymentIntentId as string)!);
+      await flushAsync();
+    }
+    const racerPasses = await ctx.dataSource
+      .getRepository(SeasonPass)
+      .find({ where: { holderUserId: racer.userId } });
+    expect(racerPasses).toHaveLength(1);
+    expect(ctx.stripeStub.refundCreateMock).toHaveBeenCalledTimes(1);
+    const refundArgs = ctx.stripeStub.refundCreateMock.mock.calls[0][0] as {
+      payment_intent: string;
+    };
+    expect(refundArgs.payment_intent).toBe(respB.body.paymentIntentId);
+  });
+
+  it('family e — unknown holder email is rejected before charging', async () => {
+    await seedSeasonPassPrice('A');
+    const buyer = await registerFan('unknown-holder');
+    const resp = await request(server)
+      .post('/api/season-passes/purchase')
+      .set('Authorization', `Bearer ${buyer.accessToken}`)
+      .send({ sectionId: 'A', holderEmail: 'nobody-here@kte.hu' });
+    expect(resp.status).toBe(404);
+    expect(resp.body.code).toBe('holder_account_not_found');
+    expect(ctx.stripeStub.paymentIntentsCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('family f — lending: buyer and holder may both lend; a borrower displaces only one match of one pass', async () => {
+    await seedSeasonPassPrice('A');
+    const { match: match1 } = await seedMinimalFixture(ctx.dataSource);
+    const matchRepo = ctx.dataSource.getRepository(Match);
+    const match2 = await matchRepo.save(
+      matchRepo.create({
+        homeTeam: 'Kecskeméti TE',
+        awayTeam: 'Második Ellenfél',
+        competition: Competition.NB1,
+        venue: 'Széktói Stadion',
+        kickoffAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        status: MatchStatus.ON_SALE,
+        capacity: 2,
+        basePrice: '5000.00',
+        isSeasonPassEligible: false,
+      }),
+    );
+    const { buyer, partner, passes } = await buyFamilyPasses('A');
+    const borrower = await registerFan('fam-borrower', { firstName: 'Kölcsön', lastName: 'Vevő' });
+    const stranger = await registerFan('fam-stranger-2');
+    const gate = await createGateUser(ctx.dataSource, { email: 'gate-fam-f@kte.hu' });
+    const gateToken = await loginAs(gate.user.email, gate.plainPassword);
+
+    const lend = (token: string, passId: string, matchId: string, email: string) =>
+      request(server)
+        .post(`/api/season-passes/${passId}/loans`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ matchId, borrowerEmail: email });
+    const qr = (token: string, passId: string, matchId: string) =>
+      request(server)
+        .get(`/api/season-passes/${passId}/qr/${matchId}`)
+        .set('Authorization', `Bearer ${token}`);
+
+    // Neither buyer nor holder → refused. Lending to the pass's own holder → refused.
+    const byStranger = await lend(stranger.accessToken, passes.child.id, match1.id, borrower.email);
+    expect(byStranger.status).toBe(403);
+    const toOwnHolder = await lend(buyer.accessToken, passes.partner.id, match1.id, partner.email);
+    expect(toOwnHolder.status).toBe(400);
+
+    // The BUYER lends the child's pass (holder has no account) for match 1.
+    await createAndAcceptLoan(
+      buyer.accessToken,
+      passes.child.id,
+      match1.id,
+      borrower.email,
+      borrower.accessToken,
+    );
+
+    // Child's pass: match 1 is gone (409), match 2 still works.
+    const blocked = await qr(buyer.accessToken, passes.child.id, match1.id);
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.code).toBe('entry_transferred');
+    const child2 = await qr(buyer.accessToken, passes.child.id, match2.id);
+    expect(child2.status).toBe(200);
+
+    // The other two passes are untouched for match 1.
+    const partnerQr = await qr(partner.accessToken, passes.partner.id, match1.id);
+    expect(partnerQr.status).toBe(200);
+    const selfQr = await qr(buyer.accessToken, passes.self.id, match1.id);
+    expect(selfQr.status).toBe(200);
+
+    // The borrower enters with the LOAN ticket — gate shows the borrower, not the child.
+    const loanTicket = await getLoanTicketForBorrower(borrower.accessToken);
+    const loanQr = await request(server)
+      .get(`/api/tickets/${loanTicket.id}/qr`)
+      .set('Authorization', `Bearer ${borrower.accessToken}`);
+    const loanScan = await scanAt(gateToken, loanTicket.id, loanQr.body.token as string);
+    expect(loanScan.body.result).toBe('ok');
+    expect(loanScan.body.source).toBe(TicketSource.LOAN);
+    expect(loanScan.body.holderName).toBe('Kölcsön Vevő');
+    expect(loanScan.body.seat.id).toBe(passes.child.seatId);
+
+    // The other holders still enter match 1, and the child's pass enters match 2.
+    for (const q of [partnerQr, selfQr]) {
+      const s = await scanAt(gateToken, q.body.ticketId as string, q.body.token as string);
+      expect(s.body.result).toBe('ok');
+    }
+    const child2Scan = await scanAt(
+      gateToken,
+      child2.body.ticketId as string,
+      child2.body.token as string,
+    );
+    expect(child2Scan.body.result).toBe('ok');
+    expect(child2Scan.body.holderName).toBe('Kovács Bence');
+
+    // Exactly one LOAN ticket exists: nothing else was displaced.
+    expect(
+      await ctx.dataSource.getRepository(Ticket).count({ where: { source: TicketSource.LOAN } }),
+    ).toBe(1);
+
+    // The HOLDER (with account) lends their own pass for match 2 ...
+    const holderLoan = await lend(
+      partner.accessToken,
+      passes.partner.id,
+      match2.id,
+      borrower.email,
+    );
+    expect(holderLoan.status).toBe(201);
+    // ... a stranger may not withdraw it, but the BUYER, who shares management, may.
+    const strangerCancel = await request(server)
+      .delete(`/api/season-passes/${passes.partner.id}/loans/${holderLoan.body.id}`)
+      .set('Authorization', `Bearer ${stranger.accessToken}`)
+      .send({});
+    expect(strangerCancel.status).toBe(403);
+    const cancel = await request(server)
+      .delete(`/api/season-passes/${passes.partner.id}/loans/${holderLoan.body.id}`)
+      .set('Authorization', `Bearer ${buyer.accessToken}`)
+      .send({ reason: 'Mégsem' });
+    expect(cancel.status).toBe(200);
+    expect(cancel.body.status).toBe('cancelled');
   });
 });

@@ -8,8 +8,8 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
-import { Ticket, TicketStatus } from '../../database/entities';
+import { DataSource, EntityManager, Repository } from 'typeorm';
+import { SeasonPass, Ticket, TicketSource, TicketStatus, User } from '../../database/entities';
 import { QrService } from '../qr/qr.service';
 import { TicketScanResponseDto } from './dto/scan-ticket.dto';
 import { WaitlistNotificationService } from '../waitlist/waitlist-notification.service';
@@ -132,12 +132,14 @@ export class TicketsService {
       if (ticket.qrJti) {
         await this.qrService.revoke(ticket.qrJti);
       }
+      const holderName = await this.resolveEnteringName(manager, ticket);
       return {
         success: true,
         result: 'ok',
         ticketId: ticket.id,
         scannedAt: now.toISOString(),
         source: ticket.source,
+        holderName,
         match: ticket.match
           ? {
               id: ticket.match.id,
@@ -158,6 +160,30 @@ export class TicketsService {
           : undefined,
       };
     });
+  }
+
+  /**
+   * Name of the person who is physically entering — what the steward checks.
+   *  - SEASON_PASS: the pass HOLDER (not the buyer, who may be a parent).
+   *  - LOAN: the borrower (the ticket's owner), never the pass holder.
+   *  - SINGLE: the ticket's owner.
+   */
+  private async resolveEnteringName(
+    manager: EntityManager,
+    ticket: Ticket,
+  ): Promise<string | undefined> {
+    if (ticket.source === TicketSource.SEASON_PASS && ticket.seasonPassId) {
+      const pass = await manager.getRepository(SeasonPass).findOne({
+        where: { id: ticket.seasonPassId },
+        select: ['id', 'holderName'],
+      });
+      if (pass) return pass.holderName;
+    }
+    const user = await manager.getRepository(User).findOne({
+      where: { id: ticket.userId },
+      select: ['id', 'firstName', 'lastName'],
+    });
+    return user ? `${user.firstName} ${user.lastName}`.trim() : undefined;
   }
 
   /**

@@ -55,6 +55,21 @@ export class SeasonPassResponseDto {
   @ApiProperty({ type: String })
   validUntil!: string;
 
+  @ApiProperty({ description: 'A birtokos (a széken ülő személy) neve.' })
+  holderName!: string;
+
+  @ApiProperty({ description: 'Igaz, ha a bejelentkezett felhasználó a vásárló.' })
+  isBuyer!: boolean;
+
+  @ApiProperty({ description: 'Igaz, ha a bejelentkezett felhasználó a birtokos (fiókkal).' })
+  isHolder!: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: 'A vásárló neve, ha nem a bejelentkezett felhasználó.',
+  })
+  buyerName?: string;
+
   @ApiProperty({ required: false })
   seatLabel?: string;
 

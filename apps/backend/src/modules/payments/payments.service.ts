@@ -111,7 +111,12 @@ export class PaymentsService {
     // Double-clicks with the same lock tokens hash to the same value and
     // collapse to one PaymentIntent via Stripe's idempotency.
     const ownerTokenDigest = createHash('sha256')
-      .update(dto.seats.map((s) => s.ownerToken).sort().join(','))
+      .update(
+        dto.seats
+          .map((s) => s.ownerToken)
+          .sort()
+          .join(','),
+      )
       .digest('hex')
       .slice(0, 16);
     const idempotencyKey = `intent_${userId}_${dto.matchId}_${ownerTokenDigest}`;

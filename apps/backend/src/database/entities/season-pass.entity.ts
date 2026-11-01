@@ -17,9 +17,21 @@ export enum SeasonPassStatus {
 @Index('IDX_season_passes_qr', ['qrCode'], { unique: true })
 @Index('idx_season_passes_user', ['userId'])
 @Index('idx_season_passes_status', ['status'])
+// Physical rule: one pass per seat per season.
+@Index('uq_season_passes_seat_season', ['seatId', 'seasonLabel'], { unique: true })
+// An account holds at most one pass per season (NULL holders — children — are unconstrained).
+@Index('uq_season_passes_holder_season', ['holderUserId', 'seasonLabel'], { unique: true })
 export class SeasonPass extends BaseEntity {
   @Column({ type: 'varchar', length: 36, name: 'user_id' })
   userId!: string;
+
+  /** Name of the person who occupies the seat (shown at the gate). Always set. */
+  @Column({ type: 'varchar', length: 120, name: 'holder_name' })
+  holderName!: string;
+
+  /** Optional account of the holder. NULL when the holder has no account. */
+  @Column({ type: 'varchar', length: 36, nullable: true, name: 'holder_user_id' })
+  holderUserId?: string | null;
 
   @Column({ type: 'varchar', length: 36, nullable: true, name: 'seat_id' })
   seatId?: string;
@@ -54,6 +66,10 @@ export class SeasonPass extends BaseEntity {
   @ManyToOne(() => User, (user) => user.seasonPasses, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'user_id' })
   user?: User;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'holder_user_id' })
+  holder?: User | null;
 
   @ManyToOne(() => Seat, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'seat_id' })

@@ -61,6 +61,13 @@ export class TicketScanResponseDto {
   @ApiProperty({ required: false, description: 'Ticket source: single | season_pass | loan' })
   source?: string;
 
+  @ApiProperty({
+    required: false,
+    description:
+      'A belépő személy neve: bérletnél a birtokos, kölcsönzésnél a kölcsönvevő, egyébként a jegy tulajdonosa.',
+  })
+  holderName?: string;
+
   @ApiProperty({ required: false, type: ScanMatchInfoDto })
   match?: ScanMatchInfoDto;
 

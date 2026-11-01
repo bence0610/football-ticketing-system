@@ -7,8 +7,7 @@
     "^.+\\.(t|j)s$": [
       "ts-jest",
       {
-        "tsconfig": "./tsconfig.json",
-        "isolatedModules": true
+        "tsconfig": "<rootDir>/../tsconfig.jest.json"
       }
     ]
   },

@@ -102,6 +102,13 @@ export class SeasonPassesController {
     const items = await this.seasonPassesService.listForUser(userId);
     return items.map(({ pass, loans, seat }) => ({
       id: pass.id,
+      holderName: pass.holderName,
+      isBuyer: pass.userId === userId,
+      isHolder: pass.holderUserId === userId,
+      buyerName:
+        pass.userId !== userId && pass.user
+          ? `${pass.user.firstName} ${pass.user.lastName}`.trim()
+          : undefined,
       status: pass.status,
       seasonLabel: pass.seasonLabel,
       validFrom: pass.validFrom.toISOString(),
@@ -177,12 +184,12 @@ export class SeasonPassesController {
     @Req() req: AuthenticatedRequest,
   ): Promise<TicketQrResponseDto> {
     const userId = extractUserId(req);
-    const { ticketId, dataUrl, token } = await this.seasonPassesService.getMatchQr(
+    const { ticketId, dataUrl, token, holderName } = await this.seasonPassesService.getMatchQr(
       passId,
       matchId,
       userId,
     );
-    return { ticketId, dataUrl, token };
+    return { ticketId, dataUrl, token, holderName };
   }
 
   @Delete(':id/loans/:loanId')

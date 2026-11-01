@@ -56,15 +56,14 @@ const mockTicketsService: Partial<TicketsService> = {
 
 describe('TicketsController – scan endpoint', () => {
   let app: INestApplication;
+  // The guard stub reads this per request, so one compiled app serves every test.
+  let currentUser: { id: string; email: string; role: UserRole } | null = null;
 
   /**
-   * Bootstraps the test app with a synthetic authenticated user.
-   * JwtAuthGuard is replaced so no real JWT secret is needed.
-   * RolesGuard is left real — this is what enforces the gate-role requirement.
+   * The module is compiled ONCE. JwtAuthGuard is replaced so no real JWT secret
+   * is needed; RolesGuard stays real — it enforces the gate-role requirement.
    */
-  async function buildApp(
-    user: { id: string; email: string; role: UserRole } | null,
-  ): Promise<void> {
+  beforeAll(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [TicketsController],
       providers: [{ provide: TicketsService, useValue: mockTicketsService }, RolesGuard, Reflector],
@@ -72,9 +71,9 @@ describe('TicketsController – scan endpoint', () => {
       .overrideGuard(JwtAuthGuard)
       .useValue({
         canActivate: (ctx: ExecutionContext) => {
-          if (!user) return false;
-          const req = ctx.switchToHttp().getRequest<{ user: typeof user }>();
-          req.user = user;
+          if (!currentUser) return false;
+          const req = ctx.switchToHttp().getRequest<{ user: typeof currentUser }>();
+          req.user = currentUser;
           return true;
         },
       })
@@ -83,11 +82,18 @@ describe('TicketsController – scan endpoint', () => {
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
     await app.init();
-  }
+  });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await app?.close();
-    jest.clearAllMocks();
+  });
+
+  beforeEach(() => {
+    // Reset call history AND any mockResolvedValue left by a previous test.
+    jest.resetAllMocks();
+    (mockTicketsService.count as jest.Mock).mockResolvedValue(0);
+    (mockTicketsService.findForUser as jest.Mock).mockResolvedValue([]);
+    currentUser = null;
   });
 
   // -------------------------------------------------------------------------
@@ -95,7 +101,7 @@ describe('TicketsController – scan endpoint', () => {
   // -------------------------------------------------------------------------
 
   it('should return 403 when a fan tries to scan a ticket', async () => {
-    await buildApp(FAN_USER);
+    currentUser = FAN_USER;
 
     await request(app.getHttpServer())
       .patch(`/tickets/${TICKET_ID}/scan`)
@@ -110,7 +116,7 @@ describe('TicketsController – scan endpoint', () => {
   // -------------------------------------------------------------------------
 
   it('should return 400 when a gate operator sends no token', async () => {
-    await buildApp(GATE_USER);
+    currentUser = GATE_USER;
 
     await request(app.getHttpServer()).patch(`/tickets/${TICKET_ID}/scan`).send({}).expect(400);
 
@@ -122,7 +128,7 @@ describe('TicketsController – scan endpoint', () => {
   // -------------------------------------------------------------------------
 
   it('should return 200 with ok result when scan succeeds', async () => {
-    await buildApp(GATE_USER);
+    currentUser = GATE_USER;
 
     const successResponse: TicketScanResponseDto = {
       success: true,
@@ -161,7 +167,7 @@ describe('TicketsController – scan endpoint', () => {
   // -------------------------------------------------------------------------
 
   it('should return already_used and not grant entry when ticket was already scanned', async () => {
-    await buildApp(GATE_USER);
+    currentUser = GATE_USER;
 
     const alreadyUsedResponse: TicketScanResponseDto = {
       success: false,
@@ -187,7 +193,7 @@ describe('TicketsController – scan endpoint', () => {
   // -------------------------------------------------------------------------
 
   it('should return invalid when the token belongs to a different ticket', async () => {
-    await buildApp(GATE_USER);
+    currentUser = GATE_USER;
 
     const invalidResponse: TicketScanResponseDto = {
       success: false,
