@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import Stripe from 'stripe';
 import { DataSource, In, Repository } from 'typeorm';
@@ -105,10 +105,16 @@ export class PaymentsService {
       throw new BadRequestException('Érvénytelen összeg.');
     }
 
-    const idempotencyKey = `intent_${userId}_${dto.matchId}_${dto.seats
-      .map((s) => s.seatId)
-      .sort()
-      .join('_')}`;
+    // Hash the ownerTokens (not the seatIds) so the key identifies this
+    // specific lock hold. Re-acquiring locks after a failure yields new tokens
+    // → a different hash → a fresh PaymentIntent, no 24-hour Stripe block.
+    // Double-clicks with the same lock tokens hash to the same value and
+    // collapse to one PaymentIntent via Stripe's idempotency.
+    const ownerTokenDigest = createHash('sha256')
+      .update(dto.seats.map((s) => s.ownerToken).sort().join(','))
+      .digest('hex')
+      .slice(0, 16);
+    const idempotencyKey = `intent_${userId}_${dto.matchId}_${ownerTokenDigest}`;
 
     const stripeAmount = this.toStripeAmount(totalAmount);
     this.logger.debug(

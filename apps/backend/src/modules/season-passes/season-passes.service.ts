@@ -11,6 +11,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import Redis from 'ioredis';
 import Stripe from 'stripe';
 import { DataSource, In, Repository } from 'typeorm';
 import { nanoid } from 'nanoid';
@@ -29,6 +30,7 @@ import {
   User,
 } from '../../database/entities';
 import { CronConfig, LoyaltyConfig, MailConfig, StripeConfig } from '../../config';
+import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { EmailService } from '../email/email.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { QrService } from '../qr/qr.service';
@@ -41,6 +43,12 @@ import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
 import { LoanPreviewDto } from './dto/season-pass-response.dto';
 
 const ACTIVE_SEASON_LABEL = '2026/2027';
+
+// TTL for the per-attempt Redis record. Two requests within this window for
+// the same (user, section, season) share one Stripe idempotency key so
+// double-clicks and network retries collapse to a single PaymentIntent.
+// A card decline clears the record immediately so the next attempt is fresh.
+const SEASON_PASS_ATTEMPT_TTL_SEC = 300;
 
 function isDuplicateKeyError(err: unknown): boolean {
   if (err == null || typeof err !== 'object') return false;
@@ -71,6 +79,7 @@ export class SeasonPassesService {
     private readonly seasonPassPriceRepository: Repository<SeasonPassPrice>,
     @InjectDataSource() private readonly dataSource: DataSource,
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
     private readonly qrService: QrService,
@@ -140,13 +149,28 @@ export class SeasonPassesService {
       );
     }
 
-    // Idempotency: same user buying the same section for the same season
-    // within Stripe's idempotency window must collapse to a single intent.
-    const idempotencyKey =
-      `seasonpass_${userId}_${priceRow.section}_${priceRow.seasonLabel}`.replace(
-        /[^a-zA-Z0-9_-]/g,
-        '_',
+    // Resolve a per-attempt ID stored in Redis.
+    // Two rapid calls for the same (user, section, season) within the 5-minute
+    // window share the same attemptId → same Stripe idempotency key → one
+    // PaymentIntent (double-click / network-retry protection).
+    // A card decline deletes the key so the next attempt is genuinely fresh
+    // with a new PaymentIntent — no 24-hour Stripe block.
+    const attemptKey = RedisKeys.seasonPassAttempt(userId, priceRow.section, priceRow.seasonLabel);
+    let attemptId = await this.redis.get(attemptKey);
+    if (!attemptId) {
+      const freshId = randomUUID();
+      const stored = await this.redis.set(
+        attemptKey,
+        freshId,
+        'EX',
+        SEASON_PASS_ATTEMPT_TTL_SEC,
+        'NX',
       );
+      // If SET NX lost a concurrent race, re-fetch whichever value won.
+      attemptId = stored === 'OK' ? freshId : ((await this.redis.get(attemptKey)) ?? freshId);
+    }
+
+    const idempotencyKey = `seasonpass_${attemptId}`;
 
     const stripeAmount = this.toStripeAmount(priceRow.price);
 
@@ -181,6 +205,9 @@ export class SeasonPassesService {
       intent = await this.stripe.paymentIntents.create(intentParams, { idempotencyKey });
     } catch (error) {
       const stripeError = error as Stripe.errors.StripeError;
+      // Clear the attempt key so the user can retry immediately without
+      // being blocked by the old Stripe idempotency key.
+      await this.redis.del(attemptKey).catch(() => undefined);
       // Card declined / requires action errors come back inside the error
       // payload with a `payment_intent` we can still surface to the client.
       if (stripeError?.payment_intent) {

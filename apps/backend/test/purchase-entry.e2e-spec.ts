@@ -1451,4 +1451,166 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     });
     expect(loyalty).toHaveLength(0);
   });
+
+  /* ------------------------------------------------------------------ */
+  /* Idempotency key fix — scenarios                                     */
+  /* ------------------------------------------------------------------ */
+
+  it('season-pass idempotency — two purchase requests for the same attempt collapse to exactly one PaymentIntent, one pass, one loyalty tx', async () => {
+    const priceRow = await seedSeasonPassPrice('E');
+    const fan = await registerFan('sp-idem-a');
+
+    // Two successive calls while the Redis attempt key is still alive.
+    const { paymentIntentId: id1 } = await purchaseSeasonPassIntent(
+      fan.accessToken,
+      priceRow.section,
+    );
+    const { paymentIntentId: id2 } = await purchaseSeasonPassIntent(
+      fan.accessToken,
+      priceRow.section,
+    );
+
+    // Both calls must resolve to the same PaymentIntent.
+    expect(id1).toBe(id2);
+
+    // Stripe's create was invoked twice but only created one intent (second
+    // call returned the cached entry via the shared idempotency key).
+    expect(ctx.stripeStub.paymentIntentsCreateMock).toHaveBeenCalledTimes(2);
+    const allResults = await Promise.all(
+      ctx.stripeStub.paymentIntentsCreateMock.mock.results.map(
+        (r) => r.value as Promise<{ id: string }>,
+      ),
+    );
+    const uniqueIds = new Set(allResults.map((i) => i.id));
+    expect(uniqueIds.size).toBe(1);
+
+    // Delivering the webhook once must produce exactly one pass and one loyalty tx.
+    const intent = ctx.stripeStub.getStoredIntent(id1)!;
+    const webhookResp = await deliverWebhook(intent);
+    expect(webhookResp.status).toBe(200);
+    await flushAsync();
+
+    const passes = await ctx.dataSource
+      .getRepository(SeasonPass)
+      .find({ where: { stripePaymentIntentId: intent.id } });
+    expect(passes).toHaveLength(1);
+
+    const loyalty = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
+      where: { userId: fan.userId, source: LoyaltyTransactionSource.SEASON_PASS_PURCHASE },
+    });
+    expect(loyalty).toHaveLength(1);
+  });
+
+  it('season-pass idempotency — retry after card decline creates a fresh PaymentIntent without a 24-hour block', async () => {
+    const priceRow = await seedSeasonPassPrice('F');
+    const fan = await registerFan('sp-idem-b');
+
+    // First attempt: simulate a card decline (Stripe throws with payment_intent).
+    const declinedId = `pi_declined_${Date.now()}`;
+    ctx.stripeStub.paymentIntentsCreateMock.mockRejectedValueOnce(
+      Object.assign(new Error('Your card was declined'), {
+        payment_intent: {
+          id: declinedId,
+          object: 'payment_intent',
+          status: 'payment_failed',
+          client_secret: null,
+          metadata: {},
+        },
+      }),
+    );
+    const resp1 = await request(server)
+      .post('/api/season-passes/purchase')
+      .set('Authorization', `Bearer ${fan.accessToken}`)
+      .send({ sectionId: priceRow.section });
+    expect(resp1.status).toBe(201);
+    expect(resp1.body.paymentIntentId).toBe(declinedId);
+
+    // After the decline the service must have deleted the Redis attempt key.
+    const attemptKey = RedisKeys.seasonPassAttempt(fan.userId, priceRow.section, '2026/2027');
+    expect(await ctx.redis.get(attemptKey)).toBeNull();
+
+    // Second attempt: must succeed immediately — no 24-hour block, new intent.
+    const { paymentIntentId: newId } = await purchaseSeasonPassIntent(
+      fan.accessToken,
+      priceRow.section,
+    );
+    expect(newId).not.toBe(declinedId);
+
+    // Webhook for the new intent → exactly one pass, zero passes for the declined id.
+    const intent = ctx.stripeStub.getStoredIntent(newId)!;
+    expect(intent).toBeDefined();
+    await deliverWebhook(intent);
+    await flushAsync();
+
+    const passes = await ctx.dataSource.getRepository(SeasonPass).find({
+      where: { userId: fan.userId },
+    });
+    expect(passes).toHaveLength(1);
+    expect(passes[0].stripePaymentIntentId).toBe(newId);
+  });
+
+  it('ticket idempotency — two createIntent calls with the same seat locks collapse to one PaymentIntent', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const fan = await registerFan('tkt-idem-a');
+
+    const ownerToken = await lockSeat(fan.accessToken, match.id, seatA.id);
+
+    const { paymentIntentId: id1 } = await createIntent(fan.accessToken, match.id, [
+      { seatId: seatA.id, ownerToken },
+    ]);
+    const { paymentIntentId: id2 } = await createIntent(fan.accessToken, match.id, [
+      { seatId: seatA.id, ownerToken },
+    ]);
+
+    // Same ownerToken → same hash → same Stripe idempotency key → same intent.
+    expect(id1).toBe(id2);
+
+    // Delivering the webhook once must yield exactly one ticket.
+    const intent = ctx.stripeStub.getStoredIntent(id1)!;
+    await deliverWebhook(intent);
+    await flushAsync();
+
+    const tickets = await ctx.dataSource
+      .getRepository(Ticket)
+      .find({ where: { userId: fan.userId } });
+    expect(tickets).toHaveLength(1);
+    expect(tickets[0].status).toBe(TicketStatus.PAID);
+  });
+
+  it('ticket idempotency — createIntent after re-acquiring seat lock creates a fresh PaymentIntent', async () => {
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const fan = await registerFan('tkt-idem-b');
+
+    // First attempt.
+    const ownerToken1 = await lockSeat(fan.accessToken, match.id, seatA.id);
+    const { paymentIntentId: id1 } = await createIntent(fan.accessToken, match.id, [
+      { seatId: seatA.id, ownerToken: ownerToken1 },
+    ]);
+
+    // Simulate the first attempt being abandoned: release the seat lock so
+    // the user can re-acquire it for a fresh attempt.
+    await ctx.redis.del(RedisKeys.seatLock(match.id, seatA.id));
+
+    // Second attempt with a fresh lock → new ownerToken → different hash.
+    const ownerToken2 = await lockSeat(fan.accessToken, match.id, seatA.id);
+    expect(ownerToken2).not.toBe(ownerToken1);
+
+    const { paymentIntentId: id2 } = await createIntent(fan.accessToken, match.id, [
+      { seatId: seatA.id, ownerToken: ownerToken2 },
+    ]);
+
+    // Different hash → different idempotency key → different PaymentIntent.
+    expect(id2).not.toBe(id1);
+
+    // Only the second intent is fulfilled; zero tickets for the first.
+    const intent2 = ctx.stripeStub.getStoredIntent(id2)!;
+    await deliverWebhook(intent2);
+    await flushAsync();
+
+    const tickets = await ctx.dataSource
+      .getRepository(Ticket)
+      .find({ where: { userId: fan.userId } });
+    expect(tickets).toHaveLength(1);
+    expect(tickets[0].stripePaymentIntentId).toBe(id2);
+  });
 });

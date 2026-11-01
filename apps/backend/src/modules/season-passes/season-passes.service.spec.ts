@@ -5,6 +5,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { SeasonPassesService } from './season-passes.service';
 import { STRIPE_CLIENT } from '../payments/stripe.provider';
+import { REDIS_CLIENT } from '../../redis/redis.constants';
 import { EmailService } from '../email/email.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { QrService } from '../qr/qr.service';
@@ -64,6 +65,10 @@ describe('SeasonPassesService – previewLoan', () => {
         {
           provide: STRIPE_CLIENT,
           useValue: { paymentIntents: { create: jest.fn() }, refunds: { create: jest.fn() } },
+        },
+        {
+          provide: REDIS_CLIENT,
+          useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
         },
         { provide: EmailService, useValue: { send: jest.fn() } },
         {

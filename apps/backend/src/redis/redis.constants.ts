@@ -19,4 +19,7 @@ export const RedisKeys = {
   // Payments — confirmation email idempotency lock
   emailConfirmLock: (paymentIntentId: string, userId: string): string =>
     `email:confirm-lock:${paymentIntentId}:${userId}`,
+  // Season-pass purchase — per-attempt idempotency record (TTL 300 s)
+  seasonPassAttempt: (userId: string, section: string, seasonLabel: string): string =>
+    `seasonpass-attempt:${userId}:${section}:${seasonLabel}`,
 } as const;

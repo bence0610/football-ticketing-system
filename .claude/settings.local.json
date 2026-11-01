@@ -142,7 +142,9 @@
       "Bash(netstat -ano)",
       "Bash(findstr \":3306 \\\\|:3307 \")",
       "Bash(cmd *)",
-      "Bash(powershell *)"
+      "Bash(powershell *)",
+      "Bash(npx nx *)",
+      "Bash(python -c \"import sys,json; containers=json.load\\(sys.stdin\\) if isinstance\\(json.load\\(open\\('/dev/stdin','r'\\)\\), list\\) else [json.loads\\(l\\) for l in open\\('/dev/stdin','r'\\)]; [print\\(c.get\\('Name',''\\),c.get\\('Health',''\\)\\) for c in containers]\")"
     ]
   }
 }

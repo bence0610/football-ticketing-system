@@ -38,13 +38,21 @@ const DATA_TABLES: readonly string[] = [
 ];
 
 export async function truncateAll(dataSource: DataSource): Promise<void> {
-  await dataSource.query('SET FOREIGN_KEY_CHECKS = 0');
+  // All commands must run on the SAME connection so that the session-level
+  // FOREIGN_KEY_CHECKS=0 actually applies to the subsequent DELETEs.
+  // Using the shared pool would route each query to an arbitrary connection
+  // where FK checks are still enabled, causing DELETE to fail on tables
+  // that are referenced by others (e.g. seats ← tickets).
+  const qr = dataSource.createQueryRunner();
+  await qr.connect();
   try {
+    await qr.query('SET FOREIGN_KEY_CHECKS = 0');
     for (const table of DATA_TABLES) {
-      await dataSource.query(`DELETE FROM \`${table}\``);
+      await qr.query(`DELETE FROM \`${table}\``);
     }
   } finally {
-    await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
+    await qr.query('SET FOREIGN_KEY_CHECKS = 1');
+    await qr.release();
   }
 }
 
