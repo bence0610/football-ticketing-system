@@ -81,6 +81,16 @@ interface MatchRow {
         </mat-card-header>
 
         <mat-card-content>
+          <div class="row">
+            <span class="label">Birtokos</span>
+            <span data-testid="pass-holder">{{ pass.holderName }}</span>
+          </div>
+          @if (!pass.isBuyer && pass.buyerName) {
+            <div class="row">
+              <span class="label">Vásárló</span>
+              <span>{{ pass.buyerName }}</span>
+            </div>
+          }
           @if (pass.section) {
             <div class="row">
               <span class="label">Szektor</span>
@@ -418,6 +428,7 @@ export class SeasonPassCardComponent implements OnInit, OnChanges {
         data: {
           matchTitle: row.matchTitle,
           seatLabel: this.pass.seatLabel ?? '',
+          holderName: this.pass.holderName,
           qrLoader$: this.seasonPassesService.getMatchQr(this.pass.id, row.matchId),
         },
       },

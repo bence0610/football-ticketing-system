@@ -107,6 +107,11 @@ function extractTicketId(token: string): string | null {
 
               @if (result.result === 'ok' && result.match && result.seat) {
                 <div class="kte-gate-result__details">
+                  @if (result.holderName) {
+                    <p class="kte-gate-result__holder" data-testid="gate-holder">
+                      <strong>{{ result.holderName }}</strong>
+                    </p>
+                  }
                   <p>
                     <strong>{{ result.match.homeTeam }} – {{ result.match.awayTeam }}</strong>
                   </p>
@@ -244,6 +249,9 @@ function extractTicketId(token: string): string | null {
         margin: 0;
       }
 
+      .kte-gate-result__holder {
+        font-size: 1.4em;
+      }
       .kte-gate-result__time {
         font-size: 0.8rem;
         opacity: 0.7;

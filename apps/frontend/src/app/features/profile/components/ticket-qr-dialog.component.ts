@@ -17,6 +17,8 @@ export interface TicketQrDialogData {
   ticketId?: string;
   matchTitle: string;
   seatLabel: string;
+  /** The person entering with this QR (pass holder), shown above the code. */
+  holderName?: string;
   /** When provided, the dialog uses this observable instead of fetching via ticketId. */
   qrLoader$?: Observable<TicketQrResponse>;
 }
@@ -37,6 +39,9 @@ export interface TicketQrDialogData {
     <div class="qr-dialog">
       <h2 mat-dialog-title>{{ data.matchTitle }}</h2>
       <mat-dialog-content>
+        @if (data.holderName) {
+          <p class="holder" data-testid="qr-holder">{{ data.holderName }}</p>
+        }
         <p class="seat">{{ data.seatLabel }}</p>
         @if (loading()) {
           <div class="loader">
@@ -83,6 +88,11 @@ export interface TicketQrDialogData {
         border: 1px solid var(--kte-border);
         border-radius: var(--kte-radius);
         padding: 12px;
+      }
+      .holder {
+        font-size: 1.2em;
+        font-weight: 600;
+        margin: 0 0 4px;
       }
       .seat {
         color: var(--kte-muted);

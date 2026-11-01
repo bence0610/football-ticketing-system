@@ -117,9 +117,66 @@ const MAX_RETRY_ATTEMPTS = 3;
                 } @else if (!selectedPrice()) {
                   <p class="kte-season-pass__note">Válassz szektort a kártya megjelenítéséhez.</p>
                 } @else {
+                  <fieldset class="kte-season-pass__holder" [disabled]="processing()">
+                    <legend>Kinek szól a bérlet?</legend>
+                    <label>
+                      <input
+                        type="radio"
+                        name="holder"
+                        data-testid="holder-self"
+                        [checked]="!forSomeoneElse()"
+                        (change)="setHolderSelf()"
+                      />
+                      Nekem
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="holder"
+                        data-testid="holder-other"
+                        [checked]="forSomeoneElse()"
+                        (change)="setHolderOther()"
+                      />
+                      Másnak (családtag, gyerek)
+                    </label>
+                    @if (forSomeoneElse()) {
+                      <label class="kte-season-pass__field">
+                        Név
+                        <input
+                          type="text"
+                          maxlength="120"
+                          autocomplete="off"
+                          data-testid="holder-name"
+                          [value]="holderName()"
+                          (input)="onHolderName($any($event.target).value)"
+                        />
+                      </label>
+                      <label class="kte-season-pass__field">
+                        E-mail (csak ha van fiókja)
+                        <input
+                          type="email"
+                          maxlength="255"
+                          autocomplete="off"
+                          data-testid="holder-email"
+                          [value]="holderEmail()"
+                          (input)="onHolderEmail($any($event.target).value)"
+                        />
+                      </label>
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        data-testid="holder-apply"
+                        [disabled]="!holderValid() || intentLoading()"
+                        (click)="applyHolder()"
+                      >
+                        Tovább a fizetéshez
+                      </button>
+                    }
+                  </fieldset>
+
                   @if (initializationError(); as initErr) {
                     <p class="kte-season-pass__error" role="alert">{{ initErr }}</p>
-                  } @else if (!clientSecret()) {
+                  } @else if (!clientSecret() && intentLoading()) {
                     <div class="kte-season-pass__loader-row">
                       <mat-spinner diameter="32" />
                       <span>Fizetési felület előkészítése…</span>
@@ -304,6 +361,24 @@ const MAX_RETRY_ATTEMPTS = 3;
         margin: var(--kte-spacing-2) 0;
         color: var(--kte-muted);
       }
+      .kte-season-pass__holder {
+        border: 1px solid var(--kte-border, rgba(0, 0, 0, 0.2));
+        border-radius: var(--kte-radius);
+        margin: 0 0 var(--kte-spacing-3);
+        padding: var(--kte-spacing-3);
+        display: flex;
+        flex-direction: column;
+        gap: var(--kte-spacing-2);
+      }
+      .kte-season-pass__field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .kte-season-pass__field input {
+        padding: 8px;
+        font: inherit;
+      }
       .kte-season-pass__error {
         background: var(--kte-danger-bg);
         color: var(--kte-danger);
@@ -362,6 +437,11 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
   protected readonly paymentError = signal<string | null>(null);
   protected readonly failureCount = signal(0);
   protected readonly paymentElementMounted = signal(false);
+  protected readonly forSomeoneElse = signal(false);
+  protected readonly holderName = signal('');
+  protected readonly holderEmail = signal('');
+  /** The holder details were confirmed and the intent was (or is being) created with them. */
+  protected readonly holderApplied = signal(false);
   protected readonly MAX_RETRY_ATTEMPTS = MAX_RETRY_ATTEMPTS;
   protected readonly supportEmail = 'jegy@kte.hu';
 
@@ -411,9 +491,89 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
     this.disposePaymentElement();
     this.clientSecret.set(null);
     this.paymentIntentId.set(null);
-    if (this.auth.isAuthenticated()) {
+    if (this.auth.isAuthenticated() && (!this.forSomeoneElse() || this.holderApplied())) {
       void this.initializeIntent(price);
     }
+  }
+
+  protected holderValid(): boolean {
+    const email = this.holderEmail().trim();
+    return this.holderName().trim().length >= 2 || (email.length > 0 && email.includes('@'));
+  }
+
+  protected setHolderSelf(): void {
+    if (!this.forSomeoneElse()) {
+      return;
+    }
+    this.forSomeoneElse.set(false);
+    this.holderApplied.set(false);
+    this.restartIntent();
+  }
+
+  protected setHolderOther(): void {
+    if (this.forSomeoneElse()) {
+      return;
+    }
+    this.forSomeoneElse.set(true);
+    this.holderApplied.set(false);
+    // The intent prepared for "myself" must not be paid for someone else.
+    this.resetPayment();
+  }
+
+  protected onHolderName(value: string): void {
+    this.holderName.set(value);
+    this.invalidateHolder();
+  }
+
+  protected onHolderEmail(value: string): void {
+    this.holderEmail.set(value);
+    this.invalidateHolder();
+  }
+
+  protected applyHolder(): void {
+    if (!this.holderValid()) {
+      return;
+    }
+    this.holderApplied.set(true);
+    this.restartIntent();
+  }
+
+  /** Editing the holder invalidates a prepared payment: the charge is bound to the holder. */
+  private invalidateHolder(): void {
+    if (this.holderApplied() || this.clientSecret()) {
+      this.holderApplied.set(false);
+      this.resetPayment();
+    }
+  }
+
+  private resetPayment(): void {
+    this.paymentError.set(null);
+    this.initializationError.set(null);
+    this.failureCount.set(0);
+    this.disposePaymentElement();
+    this.clientSecret.set(null);
+    this.paymentIntentId.set(null);
+  }
+
+  private restartIntent(): void {
+    this.resetPayment();
+    const price = this.selectedPrice();
+    if (price && this.auth.isAuthenticated()) {
+      void this.initializeIntent(price);
+    }
+  }
+
+  /** Holder part of the purchase payload; empty = the buyer themself. */
+  private holderPayload(): { holderName?: string; holderEmail?: string } {
+    if (!this.forSomeoneElse()) {
+      return {};
+    }
+    const holderName = this.holderName().trim();
+    const holderEmail = this.holderEmail().trim();
+    return {
+      ...(holderName ? { holderName } : {}),
+      ...(holderEmail ? { holderEmail } : {}),
+    };
   }
 
   /**
@@ -425,7 +585,7 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
     this.intentLoading.set(true);
     try {
       const response = await firstValueFrom(
-        this.seasonPassApi.purchase({ sectionId: price.sectionId }),
+        this.seasonPassApi.purchase({ sectionId: price.sectionId, ...this.holderPayload() }),
       );
       if (!response.clientSecret) {
         this.initializationError.set('A fizetési felület előkészítése sikertelen.');
@@ -511,7 +671,7 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
         let response: PurchaseSeasonPassResponse | null = null;
         try {
           response = await firstValueFrom(
-            this.seasonPassApi.purchase({ sectionId: price.sectionId }),
+            this.seasonPassApi.purchase({ sectionId: price.sectionId, ...this.holderPayload() }),
           );
         } catch (err) {
           // Best-effort: don't block the user from seeing the confirmation

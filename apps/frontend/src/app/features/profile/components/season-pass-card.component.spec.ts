@@ -33,6 +33,9 @@ const baseMatch: MatchResource = {
 };
 
 const basePass: SeasonPassResponse = {
+  holderName: 'Teszt Elek',
+  isBuyer: true,
+  isHolder: true,
   id: 'pass-1',
   status: 'active',
   seasonLabel: '2026/2027',

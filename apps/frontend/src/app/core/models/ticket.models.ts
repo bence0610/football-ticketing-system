@@ -34,6 +34,8 @@ export interface TicketQrResponse {
   ticketId: string;
   dataUrl: string;
   token: string;
+  /** Name of the person entering (the pass holder, for season passes). */
+  holderName?: string;
 }
 
 export type ScanResult = 'ok' | 'already_used' | 'invalid' | 'expired' | 'wrong_match';
@@ -60,6 +62,8 @@ export interface TicketScanResponse {
   ticketId?: string;
   scannedAt?: string;
   message?: string;
+  /** Who is entering: pass holder / borrower / ticket owner. */
+  holderName?: string;
   match?: ScanMatchInfo;
   seat?: ScanSeatInfo;
 }

@@ -36,6 +36,14 @@ export interface LoanPreview {
 
 export interface SeasonPassResponse {
   id: string;
+  /** The person who occupies the seat (shown at the gate). */
+  holderName: string;
+  /** The current user bought this pass. */
+  isBuyer: boolean;
+  /** The current user is the holder (linked account). */
+  isHolder: boolean;
+  /** Set when someone else bought the pass for the current user. */
+  buyerName?: string;
   status: SeasonPassStatus;
   seasonLabel: string;
   validFrom: string;
@@ -68,6 +76,10 @@ export interface SeasonPassPrice {
 
 export interface PurchaseSeasonPassPayload {
   sectionId: string;
+  /** Who the pass is for; omit both for the buyer. A name alone = holder without account. */
+  holderName?: string;
+  /** Email of the holder's registered account (links the pass to their profile). */
+  holderEmail?: string;
   paymentMethodId?: string;
 }
 
