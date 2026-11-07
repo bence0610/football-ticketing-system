@@ -1,0 +1,2775 @@
+[
+  {
+    "name": "home",
+    "role": "guest",
+    "route": "/",
+    "width": 393,
+    "shot": "screenshots/home__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 73,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "kte-match-list-item.ng-star-inserted > mat-card.mat-mdc-card.mdc-card > footer.kte-match-card__footer > a.mdc-button.mdc-button--unelevated",
+        "text": "shopping_cart Jegyvásárlás",
+        "w": 152,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 12,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart login Bejelentke",
+        "content": 396,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "stadium-seat-map",
+    "role": "guest",
+    "route": "/stadium?matchId=b51eb715-0b29-427b-b266-441c637b725c",
+    "width": 393,
+    "shot": "screenshots/stadium-seat-map__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 73,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-1 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-1 > mat-select#mat-select-0",
+        "text": "Kecskeméti TE – Újpest FC 2026. nov. 9. 20:00 · Sz",
+        "w": 313,
+        "h": 24,
+        "tag": "mat-select",
+        "count": 1
+      },
+      {
+        "path": "label.kte-a11y-toggle > mat-slide-toggle#kte-a11y-toggle > div.mdc-form-field.mat-internal-form-field > button#kte-a11y-toggle-button",
+        "text": "Csak akadálymentes ülések szűrése",
+        "w": 36,
+        "h": 14,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 19,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart login Bejelentke",
+        "content": 396,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "stadium-seat-map (sector-opened)",
+    "role": "guest",
+    "route": "/stadium?matchId=b51eb715-0b29-427b-b266-441c637b725c",
+    "width": 393,
+    "shot": "screenshots/stadium-seat-map-sector-opened__393.png",
+    "note": "stadium SVG map rendered at 329x273; clicked sector A",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 73,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-1 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-1 > mat-select#mat-select-0",
+        "text": "Kecskeméti TE – Újpest FC 2026. nov. 9. 20:00 · Sz",
+        "w": 313,
+        "h": 24,
+        "tag": "mat-select",
+        "count": 1
+      },
+      {
+        "path": "label.kte-a11y-toggle > mat-slide-toggle#kte-a11y-toggle > div.mdc-form-field.mat-internal-form-field > button#kte-a11y-toggle-button",
+        "text": "Csak akadálymentes ülések szűrése",
+        "w": 36,
+        "h": 14,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "div.kte-seat-grid__rows > div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat",
+        "text": "accessible 1",
+        "w": 28,
+        "h": 28,
+        "tag": "button",
+        "count": 40
+      }
+    ],
+    "seatLike": 119,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart login Bejelentke",
+        "content": 396,
+        "shown": 393
+      }
+    ],
+    "seatMetrics": {
+      "count": 100,
+      "enabled": 98,
+      "minW": 28,
+      "minH": 28,
+      "rowW": 192,
+      "rowShown": 189
+    }
+  },
+  {
+    "name": "stadium-seat-map (seat-selected)",
+    "role": "guest",
+    "route": "/stadium?matchId=b51eb715-0b29-427b-b266-441c637b725c",
+    "width": 393,
+    "shot": "screenshots/stadium-seat-map-seat-selected__393.png",
+    "note": "clicked the first enabled seat (bottom sheet expected)",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "19"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > header.kte-seat-detail__header > h3",
+          "text": "1. sor / 3. szék"
+        },
+        "overlapPx": "11x6"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "20"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > header.kte-seat-detail__header > h3",
+          "text": "1. sor / 3. szék"
+        },
+        "overlapPx": "11x6"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "11"
+        },
+        "b": {
+          "path": "aside.kte-seat-detail.ng-star-inserted > dl.kte-seat-detail__list > div > dd.kte-seat-detail__price",
+          "text": "5250 Ft"
+        },
+        "overlapPx": "11x8"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "12"
+        },
+        "b": {
+          "path": "aside.kte-seat-detail.ng-star-inserted > dl.kte-seat-detail__list > div > dd.kte-seat-detail__price",
+          "text": "5250 Ft"
+        },
+        "overlapPx": "11x8"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "6"
+        },
+        "b": {
+          "path": "aside.kte-seat-detail.ng-star-inserted > dl.kte-seat-detail__list > div > dd",
+          "text": "Szabad"
+        },
+        "overlapPx": "6x6"
+      }
+    ],
+    "small": [
+      {
+        "path": "kte-seat-detail-bottom-sheet.ng-star-inserted > kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > button.kte-seat-detail__close.mdc-button",
+        "text": "close Bezárás",
+        "w": 102,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 123,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart login Bejelentke",
+        "content": 396,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "cart",
+    "role": "guest",
+    "route": "/cart",
+    "width": 393,
+    "shot": "screenshots/cart__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-card.mat-mdc-card.mdc-card > mat-card-content.mat-mdc-card-content > p.kte-cart__warning > mat-icon.mat-icon.notranslate",
+        "text": "info",
+        "kind": "cut-off",
+        "hidden": 6
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 73,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 11,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 396,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "login",
+    "role": "guest",
+    "route": "/login",
+    "width": 393,
+    "shot": "screenshots/login__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 73,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-1 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-1 > input#mat-input-0",
+        "text": "",
+        "w": 211,
+        "h": 24,
+        "tag": "input",
+        "count": 2
+      },
+      {
+        "path": "section.kte-auth-page > mat-card.mat-mdc-card.mdc-card > mat-card-actions.mat-mdc-card-actions.mdc-card__actions > a.mdc-button.mat-mdc-button",
+        "text": "Regisztráció",
+        "w": 109,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 12,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 396,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "register",
+    "role": "guest",
+    "route": "/register",
+    "width": 393,
+    "shot": "screenshots/register__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 73,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-1 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-1 > input#mat-input-0",
+        "text": "",
+        "w": 247,
+        "h": 24,
+        "tag": "input",
+        "count": 4
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-3 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-3 > input#mat-input-2",
+        "text": "",
+        "w": 211,
+        "h": 24,
+        "tag": "input",
+        "count": 2
+      },
+      {
+        "path": "section.kte-auth-page > mat-card.mat-mdc-card.mdc-card > mat-card-actions.mat-mdc-card-actions.mdc-card__actions > a.mdc-button.mat-mdc-button",
+        "text": "Bejelentkezés",
+        "w": 122,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 16,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 396,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "season-pass",
+    "role": "guest",
+    "route": "/season-pass",
+    "width": 393,
+    "shot": "screenshots/season-pass__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-card-content.mat-mdc-card-content > ul > li > mat-icon.mat-icon.notranslate",
+        "text": "event_seat",
+        "kind": "cut-off",
+        "hidden": 4
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 73,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "aside.kte-season-pass__checkout > mat-card.mat-mdc-card.mdc-card > mat-card-content.mat-mdc-card-content > a.mdc-button.mdc-button--unelevated",
+        "text": "login Bejelentkezés",
+        "w": 160,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 12,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 396,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "not-found",
+    "role": "guest",
+    "route": "/nincs-ilyen-oldal",
+    "width": 393,
+    "shot": "screenshots/not-found__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 73,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "main.kte-shell__main > kte-not-found-page.ng-star-inserted > section.kte-404 > a.mdc-button.mdc-button--unelevated",
+        "text": "home Vissza a kezdőlapra",
+        "w": 203,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 8,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 396,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "profile",
+    "role": "fan",
+    "route": "/profile",
+    "width": 393,
+    "shot": "screenshots/profile__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user > mat-icon.mat-icon.notranslate",
+        "text": "arrow_drop_down",
+        "kind": "cut-off",
+        "hidden": 9
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down SD",
+        "w": 73,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-profile-page.ng-star-inserted > section.kte-profile > div.kte-profile__actions.ng-star-inserted > button.mdc-button.mdc-button--outlined",
+        "text": "logout Kijelentkezés",
+        "w": 156,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 14,
+    "hRegions": []
+  },
+  {
+    "name": "loyalty",
+    "role": "fan",
+    "route": "/loyalty",
+    "width": 393,
+    "shot": "screenshots/loyalty__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user > mat-icon.mat-icon.notranslate",
+        "text": "arrow_drop_down",
+        "kind": "cut-off",
+        "hidden": 9
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down SD",
+        "w": 73,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 7,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 553,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "season-pass-signed-in",
+    "role": "fan",
+    "route": "/season-pass",
+    "width": 393,
+    "shot": "screenshots/season-pass-signed-in__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user > mat-icon.mat-icon.notranslate",
+        "text": "arrow_drop_down",
+        "kind": "cut-off",
+        "hidden": 9
+      },
+      {
+        "path": "mat-card-content.mat-mdc-card-content > ul > li > mat-icon.mat-icon.notranslate",
+        "text": "event_seat",
+        "kind": "cut-off",
+        "hidden": 4
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down SD",
+        "w": 73,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 11,
+    "hRegions": []
+  },
+  {
+    "name": "checkout",
+    "role": "fan",
+    "route": "/checkout",
+    "width": 393,
+    "shot": "screenshots/checkout__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user > mat-icon.mat-icon.notranslate",
+        "text": "arrow_drop_down",
+        "kind": "cut-off",
+        "hidden": 9
+      },
+      {
+        "path": "div.breakdown.with-discount > div.row.discount > span.label > mat-icon.mat-icon.notranslate",
+        "text": "star",
+        "kind": "cut-off",
+        "hidden": 2
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down SD",
+        "w": 73,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-checkout-page.ng-star-inserted > section.kte-checkout > header.kte-checkout__header > a.mdc-button.mat-mdc-button",
+        "text": "arrow_back Vissza a kosárhoz",
+        "w": 176,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 8,
+    "hRegions": []
+  },
+  {
+    "name": "gate",
+    "role": "gate",
+    "route": "/gate",
+    "width": 393,
+    "shot": "screenshots/gate__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user > mat-icon.mat-icon.notranslate",
+        "text": "arrow_drop_down",
+        "kind": "cut-off",
+        "hidden": 9
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down OK",
+        "w": 73,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "section.kte-gate-page > mat-card.mat-mdc-card.mdc-card > mat-card-actions.mat-mdc-card-actions.mdc-card__actions > button.mdc-button.mdc-button--unelevated",
+        "text": "qr_code_scanner Ellenőrzés",
+        "w": 133,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 9,
+    "hRegions": []
+  },
+  {
+    "name": "admin",
+    "role": "admin",
+    "route": "/admin",
+    "width": 393,
+    "shot": "screenshots/admin__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user > mat-icon.mat-icon.notranslate",
+        "text": "arrow_drop_down",
+        "kind": "cut-off",
+        "hidden": 9
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down KA",
+        "w": 73,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "monetization_on Bevételi statisztikák",
+        "w": 218,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "map Foglaltsági heatmap",
+        "w": 214,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 9,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 420,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "admin-revenue",
+    "role": "admin",
+    "route": "/admin/revenue",
+    "width": 393,
+    "shot": "screenshots/admin-revenue__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user > mat-icon.mat-icon.notranslate",
+        "text": "arrow_drop_down",
+        "kind": "cut-off",
+        "hidden": 9
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down KA",
+        "w": 73,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "monetization_on Bevételi statisztikák",
+        "w": 218,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "map Foglaltsági heatmap",
+        "w": 214,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 9,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 420,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "admin-heatmap",
+    "role": "admin",
+    "route": "/admin/heatmap",
+    "width": 393,
+    "shot": "screenshots/admin-heatmap__393.png",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user > mat-icon.mat-icon.notranslate",
+        "text": "arrow_drop_down",
+        "kind": "cut-off",
+        "hidden": 9
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down KA",
+        "w": 73,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "monetization_on Bevételi statisztikák",
+        "w": 216,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "map Foglaltsági heatmap",
+        "w": 215,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-2 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-2 > mat-select#mat-select-0",
+        "text": "Kecskeméti TE – Ferencvárosi TC (2026. máj. 10. 19",
+        "w": 217,
+        "h": 24,
+        "tag": "mat-select",
+        "count": 1
+      }
+    ],
+    "seatLike": 11,
+    "hRegions": []
+  },
+  {
+    "name": "app-shell navigation (guest)",
+    "role": "guest",
+    "route": "/",
+    "width": 393,
+    "shot": "screenshots/app-shell-nav-guest__393.png",
+    "note": "menu toggle found and clicked",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [
+      {
+        "a": {
+          "path": "div.mat-drawer-inner-container.ng-tns-c2033655494-0 > mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > mat-icon.mat-icon.notranslate",
+          "text": "home"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.kte-shell__menu-btn.mdc-icon-button > mat-icon.mat-icon.notranslate",
+          "text": "menu"
+        },
+        "overlapPx": "12x12"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Kezdőlap"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand > span.kte-shell__brand-mark",
+          "text": "KTE"
+        },
+        "overlapPx": "27x7"
+      }
+    ],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 73,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "kte-match-list-item.ng-star-inserted > mat-card.mat-mdc-card.mdc-card > footer.kte-match-card__footer > a.mdc-button.mdc-button--unelevated",
+        "text": "shopping_cart Jegyvásárlás",
+        "w": 152,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 17,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 396,
+        "shown": 393
+      }
+    ]
+  },
+  {
+    "name": "app-shell navigation (fan)",
+    "role": "fan",
+    "route": "/",
+    "width": 393,
+    "shot": "screenshots/app-shell-nav-fan__393.png",
+    "note": "menu toggle found and clicked",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user > mat-icon.mat-icon.notranslate",
+        "text": "arrow_drop_down",
+        "kind": "cut-off",
+        "hidden": 9
+      }
+    ],
+    "overlaps": [
+      {
+        "a": {
+          "path": "div.mat-drawer-inner-container.ng-tns-c2033655494-0 > mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > mat-icon.mat-icon.notranslate",
+          "text": "home"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.kte-shell__menu-btn.mdc-icon-button > mat-icon.mat-icon.notranslate",
+          "text": "menu"
+        },
+        "overlapPx": "12x12"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Kezdőlap"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand > span.kte-shell__brand-mark",
+          "text": "KTE"
+        },
+        "overlapPx": "27x7"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Admin"
+        },
+        "b": {
+          "path": "kte-hero-section > section.kte-hero > div.kte-hero__content > span.kte-hero__eyebrow",
+          "text": "KECSKEMÉTI TE — HIVATALOS JEGYPORTÁL"
+        },
+        "overlapPx": "35x8"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Profil"
+        },
+        "b": {
+          "path": "kte-hero-section > section.kte-hero > div.kte-hero__content > h1#kte-hero-title",
+          "text": "Élj át minden gólt a Széktóiban."
+        },
+        "overlapPx": "41x20"
+      }
+    ],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down SD",
+        "w": 73,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-match-list-item.ng-star-inserted > mat-card.mat-mdc-card.mdc-card > footer.kte-match-card__footer > a.mdc-button.mdc-button--unelevated",
+        "text": "shopping_cart Jegyvásárlás",
+        "w": 152,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 19,
+    "hRegions": []
+  },
+  {
+    "name": "app-shell navigation (admin)",
+    "role": "admin",
+    "route": "/",
+    "width": 393,
+    "shot": "screenshots/app-shell-nav-admin__393.png",
+    "note": "menu toggle found and clicked",
+    "vw": 393,
+    "hScroll": {
+      "scrollWidth": 393,
+      "bodyScrollWidth": 393,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user > mat-icon.mat-icon.notranslate",
+        "text": "arrow_drop_down",
+        "kind": "cut-off",
+        "hidden": 9
+      }
+    ],
+    "overlaps": [
+      {
+        "a": {
+          "path": "div.mat-drawer-inner-container.ng-tns-c2033655494-0 > mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > mat-icon.mat-icon.notranslate",
+          "text": "home"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.kte-shell__menu-btn.mdc-icon-button > mat-icon.mat-icon.notranslate",
+          "text": "menu"
+        },
+        "overlapPx": "12x12"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Kezdőlap"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand > span.kte-shell__brand-mark",
+          "text": "KTE"
+        },
+        "overlapPx": "27x7"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Admin"
+        },
+        "b": {
+          "path": "kte-hero-section > section.kte-hero > div.kte-hero__content > span.kte-hero__eyebrow",
+          "text": "KECSKEMÉTI TE — HIVATALOS JEGYPORTÁL"
+        },
+        "overlapPx": "35x8"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Profil"
+        },
+        "b": {
+          "path": "kte-hero-section > section.kte-hero > div.kte-hero__content > h1#kte-hero-title",
+          "text": "Élj át minden gólt a Széktóiban."
+        },
+        "overlapPx": "41x20"
+      }
+    ],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down KA",
+        "w": 73,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-match-list-item.ng-star-inserted > mat-card.mat-mdc-card.mdc-card > footer.kte-match-card__footer > a.mdc-button.mdc-button--unelevated",
+        "text": "shopping_cart Jegyvásárlás",
+        "w": 152,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 19,
+    "hRegions": []
+  },
+  {
+    "name": "home",
+    "role": "guest",
+    "route": "/",
+    "width": 360,
+    "shot": "screenshots/home__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-card.mat-mdc-card.mdc-card > header.kte-countdown__header > p.kte-countdown__meta > mat-icon.mat-icon.notranslate",
+        "text": "calendar_today",
+        "kind": "cut-off",
+        "hidden": 2
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 64,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "kte-match-list-item.ng-star-inserted > mat-card.mat-mdc-card.mdc-card > footer.kte-match-card__footer > a.mdc-button.mdc-button--unelevated",
+        "text": "shopping_cart Jegyvásárlás",
+        "w": 152,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 12,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart login Bejelentke",
+        "content": 391,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "stadium-seat-map",
+    "role": "guest",
+    "route": "/stadium?matchId=b51eb715-0b29-427b-b266-441c637b725c",
+    "width": 360,
+    "shot": "screenshots/stadium-seat-map__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [
+      {
+        "a": {
+          "path": "div.kte-sector-summary__grid > mat-card.mat-mdc-card.mdc-card > header.kte-sector-card__header > span.kte-sector-card__compass",
+          "text": "NYUGAT"
+        },
+        "b": {
+          "path": "kte-app-shell.ng-star-inserted > kte-chatbot-widget.ng-star-inserted > button.kte-chatbot-fab > mat-icon.mat-icon.notranslate",
+          "text": "chat_bubble"
+        },
+        "overlapPx": "14x14"
+      }
+    ],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 64,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-1 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-1 > mat-select#mat-select-0",
+        "text": "Kecskeméti TE – Újpest FC 2026. nov. 9. 20:00 · Sz",
+        "w": 280,
+        "h": 24,
+        "tag": "mat-select",
+        "count": 1
+      },
+      {
+        "path": "label.kte-a11y-toggle > mat-slide-toggle#kte-a11y-toggle > div.mdc-form-field.mat-internal-form-field > button#kte-a11y-toggle-button",
+        "text": "Csak akadálymentes ülések szűrése",
+        "w": 36,
+        "h": 14,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 19,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart login Bejelentke",
+        "content": 391,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "stadium-seat-map (sector-opened)",
+    "role": "guest",
+    "route": "/stadium?matchId=b51eb715-0b29-427b-b266-441c637b725c",
+    "width": 360,
+    "shot": "screenshots/stadium-seat-map-sector-opened__360.png",
+    "note": "stadium SVG map rendered at 296x247; clicked sector A",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [
+      {
+        "a": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.kte-shell__menu-btn.mdc-icon-button > mat-icon.mat-icon.notranslate",
+          "text": "menu"
+        },
+        "b": {
+          "path": "div.kte-sector-summary__grid > mat-card.mat-mdc-card.mdc-card > header.kte-sector-card__header > span.kte-sector-card__section",
+          "text": "C"
+        },
+        "overlapPx": "10x19"
+      },
+      {
+        "a": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined > span.mdc-button__label",
+          "text": "Bejelentkezés"
+        },
+        "b": {
+          "path": "div.kte-sector-summary__grid > mat-card.mat-mdc-card.mdc-card > header.kte-sector-card__header > span.kte-sector-card__compass",
+          "text": "KELET"
+        },
+        "overlapPx": "33x14"
+      }
+    ],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 64,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-1 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-1 > mat-select#mat-select-0",
+        "text": "Kecskeméti TE – Újpest FC 2026. nov. 9. 20:00 · Sz",
+        "w": 280,
+        "h": 24,
+        "tag": "mat-select",
+        "count": 1
+      },
+      {
+        "path": "label.kte-a11y-toggle > mat-slide-toggle#kte-a11y-toggle > div.mdc-form-field.mat-internal-form-field > button#kte-a11y-toggle-button",
+        "text": "Csak akadálymentes ülések szűrése",
+        "w": 36,
+        "h": 14,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "div.kte-seat-grid__rows > div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat",
+        "text": "accessible 1",
+        "w": 28,
+        "h": 28,
+        "tag": "button",
+        "count": 40
+      }
+    ],
+    "seatLike": 119,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart login Bejelentke",
+        "content": 391,
+        "shown": 360
+      }
+    ],
+    "seatMetrics": {
+      "count": 100,
+      "enabled": 98,
+      "minW": 28,
+      "minH": 28,
+      "rowW": 159,
+      "rowShown": 156
+    }
+  },
+  {
+    "name": "stadium-seat-map (seat-selected)",
+    "role": "guest",
+    "route": "/stadium?matchId=b51eb715-0b29-427b-b266-441c637b725c",
+    "width": 360,
+    "shot": "screenshots/stadium-seat-map-seat-selected__360.png",
+    "note": "clicked the first enabled seat (bottom sheet expected)",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [
+      {
+        "a": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand > span.kte-shell__brand-text",
+          "text": "Jegyportál"
+        },
+        "b": {
+          "path": "svg > g > g > text",
+          "text": ""
+        },
+        "overlapPx": "6x9"
+      },
+      {
+        "a": {
+          "path": "section.kte-seat-grid.ng-star-inserted > div.kte-seat-grid__rows > div.kte-seat-grid__row.ng-star-inserted > span.kte-seat-grid__row-label",
+          "text": "1. sor"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > header.kte-seat-detail__header > span.kte-seat-detail__chip",
+          "text": "A SZEKTOR"
+        },
+        "overlapPx": "27x5"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > mat-icon.mat-icon.notranslate",
+          "text": "accessible"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > header.kte-seat-detail__header > h3",
+          "text": "1. sor / 3. szék"
+        },
+        "overlapPx": "12x12"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "16"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > header.kte-seat-detail__header > h3",
+          "text": "1. sor / 3. szék"
+        },
+        "overlapPx": "11x11"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > mat-icon.mat-icon.notranslate",
+          "text": "accessible"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > header.kte-seat-detail__header > h3",
+          "text": "1. sor / 3. szék"
+        },
+        "overlapPx": "12x12"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "17"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > header.kte-seat-detail__header > h3",
+          "text": "1. sor / 3. szék"
+        },
+        "overlapPx": "11x11"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > mat-icon.mat-icon.notranslate",
+          "text": "accessible"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > header.kte-seat-detail__header > h3",
+          "text": "1. sor / 3. szék"
+        },
+        "overlapPx": "7x12"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "18"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > header.kte-seat-detail__header > h3",
+          "text": "1. sor / 3. szék"
+        },
+        "overlapPx": "11x11"
+      },
+      {
+        "a": {
+          "path": "section.kte-seat-grid.ng-star-inserted > div.kte-seat-grid__rows > div.kte-seat-grid__row.ng-star-inserted > span.kte-seat-grid__row-label",
+          "text": "2. sor"
+        },
+        "b": {
+          "path": "aside.kte-seat-detail.ng-star-inserted > dl.kte-seat-detail__list > div > dt",
+          "text": "AKADÁLYMENTES"
+        },
+        "overlapPx": "31x7"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "20"
+        },
+        "b": {
+          "path": "aside.kte-seat-detail.ng-star-inserted > dl.kte-seat-detail__list > div > dd",
+          "text": "Szabad"
+        },
+        "overlapPx": "11x11"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "7"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > button.kte-seat-detail__cta.mdc-button > span.mdc-button__label",
+          "text": "Kosárba"
+        },
+        "overlapPx": "6x10"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "8"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > button.kte-seat-detail__cta.mdc-button > span.mdc-button__label",
+          "text": "Kosárba"
+        },
+        "overlapPx": "6x10"
+      },
+      {
+        "a": {
+          "path": "div.kte-seat-grid__row.ng-star-inserted > div.kte-seat-grid__row-seats > button.mat-mdc-tooltip-trigger.kte-seat > span.kte-seat__number",
+          "text": "20"
+        },
+        "b": {
+          "path": "kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > button.kte-seat-detail__close.mdc-button > span.mdc-button__label",
+          "text": "Bezárás"
+        },
+        "overlapPx": "11x6"
+      }
+    ],
+    "small": [
+      {
+        "path": "kte-seat-detail-bottom-sheet.ng-star-inserted > kte-seat-detail-panel > aside.kte-seat-detail.ng-star-inserted > button.kte-seat-detail__close.mdc-button",
+        "text": "close Bezárás",
+        "w": 102,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 123,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart login Bejelentke",
+        "content": 391,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "cart",
+    "role": "guest",
+    "route": "/cart",
+    "width": 360,
+    "shot": "screenshots/cart__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-card.mat-mdc-card.mdc-card > mat-card-content.mat-mdc-card-content > p.kte-cart__warning > mat-icon.mat-icon.notranslate",
+        "text": "info",
+        "kind": "cut-off",
+        "hidden": 7
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 64,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 11,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 391,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "login",
+    "role": "guest",
+    "route": "/login",
+    "width": 360,
+    "shot": "screenshots/login__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 64,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-1 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-1 > input#mat-input-0",
+        "text": "",
+        "w": 178,
+        "h": 24,
+        "tag": "input",
+        "count": 2
+      },
+      {
+        "path": "section.kte-auth-page > mat-card.mat-mdc-card.mdc-card > mat-card-actions.mat-mdc-card-actions.mdc-card__actions > a.mdc-button.mat-mdc-button",
+        "text": "Regisztráció",
+        "w": 109,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 12,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 391,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "register",
+    "role": "guest",
+    "route": "/register",
+    "width": 360,
+    "shot": "screenshots/register__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 64,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-1 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-1 > input#mat-input-0",
+        "text": "",
+        "w": 214,
+        "h": 24,
+        "tag": "input",
+        "count": 4
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-3 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-3 > input#mat-input-2",
+        "text": "",
+        "w": 178,
+        "h": 24,
+        "tag": "input",
+        "count": 2
+      },
+      {
+        "path": "section.kte-auth-page > mat-card.mat-mdc-card.mdc-card > mat-card-actions.mat-mdc-card-actions.mdc-card__actions > a.mdc-button.mat-mdc-button",
+        "text": "Bejelentkezés",
+        "w": 122,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 16,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 391,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "season-pass",
+    "role": "guest",
+    "route": "/season-pass",
+    "width": 360,
+    "shot": "screenshots/season-pass__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-card-content.mat-mdc-card-content > ul > li > mat-icon.mat-icon.notranslate",
+        "text": "event_seat",
+        "kind": "cut-off",
+        "hidden": 6
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 64,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "aside.kte-season-pass__checkout > mat-card.mat-mdc-card.mdc-card > mat-card-content.mat-mdc-card-content > a.mdc-button.mdc-button--unelevated",
+        "text": "login Bejelentkezés",
+        "w": 160,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 12,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 391,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "not-found",
+    "role": "guest",
+    "route": "/nincs-ilyen-oldal",
+    "width": 360,
+    "shot": "screenshots/not-found__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 64,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "main.kte-shell__main > kte-not-found-page.ng-star-inserted > section.kte-404 > a.mdc-button.mdc-button--unelevated",
+        "text": "home Vissza a kezdőlapra",
+        "w": 203,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 8,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 391,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "profile",
+    "role": "fan",
+    "route": "/profile",
+    "width": 360,
+    "shot": "screenshots/profile__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down SD",
+        "w": 64,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-profile-page.ng-star-inserted > section.kte-profile > div.kte-profile__actions.ng-star-inserted > button.mdc-button.mdc-button--outlined",
+        "text": "logout Kijelentkezés",
+        "w": 156,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 14,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 368,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "loyalty",
+    "role": "fan",
+    "route": "/loyalty",
+    "width": 360,
+    "shot": "screenshots/loyalty__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down SD",
+        "w": 64,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 7,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 553,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "season-pass-signed-in",
+    "role": "fan",
+    "route": "/season-pass",
+    "width": 360,
+    "shot": "screenshots/season-pass-signed-in__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-card-content.mat-mdc-card-content > ul > li > mat-icon.mat-icon.notranslate",
+        "text": "event_seat",
+        "kind": "cut-off",
+        "hidden": 6
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down SD",
+        "w": 64,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 11,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 368,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "checkout",
+    "role": "fan",
+    "route": "/checkout",
+    "width": 360,
+    "shot": "screenshots/checkout__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "div.breakdown.with-discount > div.row.discount > span.label > mat-icon.mat-icon.notranslate",
+        "text": "star",
+        "kind": "cut-off",
+        "hidden": 4
+      }
+    ],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down SD",
+        "w": 64,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-checkout-page.ng-star-inserted > section.kte-checkout > header.kte-checkout__header > a.mdc-button.mat-mdc-button",
+        "text": "arrow_back Vissza a kosárhoz",
+        "w": 174,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 8,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 arrow_drop_dow",
+        "content": 368,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "gate",
+    "role": "gate",
+    "route": "/gate",
+    "width": 360,
+    "shot": "screenshots/gate__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [
+      {
+        "a": {
+          "path": "mat-form-field.mat-mdc-form-field.kte-gate-token-field > div.mat-mdc-form-field-subscript-wrapper.mat-mdc-form-field-bottom-align > div.mat-mdc-form-field-hint-wrapper.ng-tns-c3736059725-2 > mat-hint#mat-mdc-hint-0",
+          "text": "Nyisd meg a jegyet a profilon → QR ikon → Másolás "
+        },
+        "b": {
+          "path": "mat-card.mat-mdc-card.mdc-card > mat-card-actions.mat-mdc-card-actions.mdc-card__actions > button.mdc-button.mdc-button--unelevated > mat-icon.mat-icon.notranslate",
+          "text": "qr_code_scanner"
+        },
+        "overlapPx": "18x18"
+      },
+      {
+        "a": {
+          "path": "mat-form-field.mat-mdc-form-field.kte-gate-token-field > div.mat-mdc-form-field-subscript-wrapper.mat-mdc-form-field-bottom-align > div.mat-mdc-form-field-hint-wrapper.ng-tns-c3736059725-2 > mat-hint#mat-mdc-hint-0",
+          "text": "Nyisd meg a jegyet a profilon → QR ikon → Másolás "
+        },
+        "b": {
+          "path": "mat-card.mat-mdc-card.mdc-card > mat-card-actions.mat-mdc-card-actions.mdc-card__actions > button.mdc-button.mdc-button--unelevated > span.mdc-button__label",
+          "text": "Ellenőrzés"
+        },
+        "overlapPx": "66x18"
+      }
+    ],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down OK",
+        "w": 64,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "section.kte-gate-page > mat-card.mat-mdc-card.mdc-card > mat-card-actions.mat-mdc-card-actions.mdc-card__actions > button.mdc-button.mdc-button--unelevated",
+        "text": "qr_code_scanner Ellenőrzés",
+        "w": 133,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      }
+    ],
+    "seatLike": 9,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 368,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "admin",
+    "role": "admin",
+    "route": "/admin",
+    "width": 360,
+    "shot": "screenshots/admin__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down KA",
+        "w": 64,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "monetization_on Bevételi statisztikák",
+        "w": 218,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "map Foglaltsági heatmap",
+        "w": 214,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 9,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 420,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "admin-revenue",
+    "role": "admin",
+    "route": "/admin/revenue",
+    "width": 360,
+    "shot": "screenshots/admin-revenue__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down KA",
+        "w": 64,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "monetization_on Bevételi statisztikák",
+        "w": 218,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "map Foglaltsági heatmap",
+        "w": 214,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 9,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 420,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "admin-heatmap",
+    "role": "admin",
+    "route": "/admin/heatmap",
+    "width": 360,
+    "shot": "screenshots/admin-heatmap__360.png",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [],
+    "overlaps": [],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down KA",
+        "w": 64,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "monetization_on Bevételi statisztikák",
+        "w": 216,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "kte-admin-page.ng-star-inserted > section.kte-admin > nav.kte-admin__nav > a.mdc-button.mdc-button--outlined",
+        "text": "map Foglaltsági heatmap",
+        "w": 215,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "div.mat-mdc-text-field-wrapper.mdc-text-field > div.mat-mdc-form-field-flex.ng-tns-c3736059725-2 > div.mat-mdc-form-field-infix.ng-tns-c3736059725-2 > mat-select#mat-select-0",
+        "text": "Kecskeméti TE – Ferencvárosi TC (2026. máj. 10. 19",
+        "w": 184,
+        "h": 24,
+        "tag": "mat-select",
+        "count": 1
+      }
+    ],
+    "seatLike": 11,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 368,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "app-shell navigation (guest)",
+    "role": "guest",
+    "route": "/",
+    "width": 360,
+    "shot": "screenshots/app-shell-nav-guest__360.png",
+    "note": "menu toggle found and clicked",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-card.mat-mdc-card.mdc-card > header.kte-countdown__header > p.kte-countdown__meta > mat-icon.mat-icon.notranslate",
+        "text": "calendar_today",
+        "kind": "cut-off",
+        "hidden": 2
+      }
+    ],
+    "overlaps": [
+      {
+        "a": {
+          "path": "div.mat-drawer-inner-container.ng-tns-c2033655494-0 > mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > mat-icon.mat-icon.notranslate",
+          "text": "home"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.kte-shell__menu-btn.mdc-icon-button > mat-icon.mat-icon.notranslate",
+          "text": "menu"
+        },
+        "overlapPx": "12x12"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Kezdőlap"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand > span.kte-shell__brand-mark",
+          "text": "KTE"
+        },
+        "overlapPx": "27x7"
+      }
+    ],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.mdc-button.mdc-button--outlined",
+        "text": "login Bejelentkezés",
+        "w": 64,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "kte-match-list-item.ng-star-inserted > mat-card.mat-mdc-card.mdc-card > footer.kte-match-card__footer > a.mdc-button.mdc-button--unelevated",
+        "text": "shopping_cart Jegyvásárlás",
+        "w": 152,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 17,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 login Bejelent",
+        "content": 391,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "app-shell navigation (fan)",
+    "role": "fan",
+    "route": "/",
+    "width": 360,
+    "shot": "screenshots/app-shell-nav-fan__360.png",
+    "note": "menu toggle found and clicked",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-card.mat-mdc-card.mdc-card > header.kte-countdown__header > p.kte-countdown__meta > mat-icon.mat-icon.notranslate",
+        "text": "calendar_today",
+        "kind": "cut-off",
+        "hidden": 2
+      }
+    ],
+    "overlaps": [
+      {
+        "a": {
+          "path": "div.mat-drawer-inner-container.ng-tns-c2033655494-0 > mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > mat-icon.mat-icon.notranslate",
+          "text": "home"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.kte-shell__menu-btn.mdc-icon-button > mat-icon.mat-icon.notranslate",
+          "text": "menu"
+        },
+        "overlapPx": "12x12"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Kezdőlap"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand > span.kte-shell__brand-mark",
+          "text": "KTE"
+        },
+        "overlapPx": "27x7"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Admin"
+        },
+        "b": {
+          "path": "kte-hero-section > section.kte-hero > div.kte-hero__content > span.kte-hero__eyebrow",
+          "text": "KECSKEMÉTI TE — HIVATALOS JEGYPORTÁL"
+        },
+        "overlapPx": "35x8"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Profil"
+        },
+        "b": {
+          "path": "kte-hero-section > section.kte-hero > div.kte-hero__content > h1#kte-hero-title",
+          "text": "Élj át minden gólt a Széktóiban."
+        },
+        "overlapPx": "41x20"
+      }
+    ],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down SD",
+        "w": 64,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-match-list-item.ng-star-inserted > mat-card.mat-mdc-card.mdc-card > footer.kte-match-card__footer > a.mdc-button.mdc-button--unelevated",
+        "text": "shopping_cart Jegyvásárlás",
+        "w": 152,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 19,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart 3 arrow_drop_dow",
+        "content": 368,
+        "shown": 360
+      }
+    ]
+  },
+  {
+    "name": "app-shell navigation (admin)",
+    "role": "admin",
+    "route": "/",
+    "width": 360,
+    "shot": "screenshots/app-shell-nav-admin__360.png",
+    "note": "menu toggle found and clicked",
+    "vw": 360,
+    "hScroll": {
+      "scrollWidth": 360,
+      "bodyScrollWidth": 360,
+      "overflowPx": 0,
+      "canScroll": false
+    },
+    "wide": [],
+    "clipped": [
+      {
+        "path": "mat-card.mat-mdc-card.mdc-card > header.kte-countdown__header > p.kte-countdown__meta > mat-icon.mat-icon.notranslate",
+        "text": "calendar_today",
+        "kind": "cut-off",
+        "hidden": 2
+      }
+    ],
+    "overlaps": [
+      {
+        "a": {
+          "path": "div.mat-drawer-inner-container.ng-tns-c2033655494-0 > mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > mat-icon.mat-icon.notranslate",
+          "text": "home"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.kte-shell__menu-btn.mdc-icon-button > mat-icon.mat-icon.notranslate",
+          "text": "menu"
+        },
+        "overlapPx": "12x12"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Kezdőlap"
+        },
+        "b": {
+          "path": "mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand > span.kte-shell__brand-mark",
+          "text": "KTE"
+        },
+        "overlapPx": "27x7"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Admin"
+        },
+        "b": {
+          "path": "kte-hero-section > section.kte-hero > div.kte-hero__content > span.kte-hero__eyebrow",
+          "text": "KECSKEMÉTI TE — HIVATALOS JEGYPORTÁL"
+        },
+        "overlapPx": "35x8"
+      },
+      {
+        "a": {
+          "path": "mat-nav-list.mat-mdc-nav-list.mat-mdc-list-base > a.mat-mdc-list-item.mdc-list-item > span.mdc-list-item__content > span.mat-mdc-list-item-title.mdc-list-item__primary-text",
+          "text": "Profil"
+        },
+        "b": {
+          "path": "kte-hero-section > section.kte-hero > div.kte-hero__content > h1#kte-hero-title",
+          "text": "Élj át minden gólt a Széktóiban."
+        },
+        "overlapPx": "41x20"
+      }
+    ],
+    "small": [
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > a.kte-shell__brand",
+        "text": "KTE Jegyportál",
+        "w": 144,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      },
+      {
+        "path": "mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content > mat-toolbar.mat-toolbar.kte-shell__toolbar > button.mat-mdc-menu-trigger.kte-shell__user",
+        "text": "arrow_drop_down KA",
+        "w": 64,
+        "h": 36,
+        "tag": "button",
+        "count": 1
+      },
+      {
+        "path": "kte-match-list-item.ng-star-inserted > mat-card.mat-mdc-card.mdc-card > footer.kte-match-card__footer > a.mdc-button.mdc-button--unelevated",
+        "text": "shopping_cart Jegyvásárlás",
+        "w": 152,
+        "h": 36,
+        "tag": "a",
+        "count": 1
+      }
+    ],
+    "seatLike": 19,
+    "hRegions": [
+      {
+        "path": "kte-root > kte-app-shell.ng-star-inserted > mat-sidenav-container.mat-drawer-container.mat-sidenav-container > mat-sidenav-content.mat-drawer-content.mat-sidenav-content",
+        "text": "menu KTE Jegyportál shopping_cart arrow_drop_down ",
+        "content": 368,
+        "shown": 360
+      }
+    ]
+  }
+]
