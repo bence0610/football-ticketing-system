@@ -19,6 +19,7 @@ import { MatchesApiService } from '../../../shared/services/matches.api.service'
 import { HeatmapLegendComponent } from './components/heatmap-legend.component';
 import { MatchPickerComponent } from './components/match-picker.component';
 import { StadiumHeatmapComponent } from './components/stadium-heatmap.component';
+import { extractApiErrorMessage } from '../../../shared/utils/api-error';
 
 const REFRESH_MS = 60_000;
 
@@ -225,15 +226,6 @@ export class SeatHeatmapPageComponent implements OnInit, OnDestroy {
   }
 
   private normalizeError(error: unknown): string {
-    if (typeof error === 'object' && error !== null) {
-      const err = error as { error?: { message?: string }; message?: string };
-      if (err.error?.message) {
-        return err.error.message;
-      }
-      if (err.message) {
-        return err.message;
-      }
-    }
-    return 'A foglaltsági adatok betöltése sikertelen.';
+    return extractApiErrorMessage(error, 'A foglaltsági adatok betöltése sikertelen.');
   }
 }

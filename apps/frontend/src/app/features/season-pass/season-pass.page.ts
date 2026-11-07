@@ -27,6 +27,7 @@ import {
 import { SeasonPassesService } from '../../core/services/season-passes.service';
 import { StripeService } from '../../core/stripe/stripe.service';
 import { HufCurrencyPipe } from '../../shared/pipes/huf-currency.pipe';
+import { extractApiErrorMessage } from '../../shared/utils/api-error';
 
 const MAX_RETRY_ATTEMPTS = 3;
 
@@ -724,18 +725,6 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
   }
 
   private normalizeError(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-    if (typeof error === 'string') {
-      return error;
-    }
-    if (error && typeof error === 'object' && 'message' in error) {
-      const message = (error as { message: unknown }).message;
-      if (typeof message === 'string') {
-        return message;
-      }
-    }
-    return 'Ismeretlen hiba történt a bérletvásárlás során.';
+    return extractApiErrorMessage(error, 'Ismeretlen hiba történt a bérletvásárlás során.');
   }
 }

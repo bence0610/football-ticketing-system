@@ -17,6 +17,7 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { WaitlistEntry } from '../../../../shared/models/waitlist.model';
 import { WaitlistApiService } from '../../../../shared/services/waitlist.api.service';
+import { extractApiErrorMessage } from '../../../../shared/utils/api-error';
 
 /**
  * Floating "Join waitlist" button shown on a sold-out match panel. The
@@ -115,15 +116,6 @@ export class WaitlistJoinButtonComponent {
   }
 
   private normalizeError(error: unknown): string {
-    if (typeof error === 'object' && error !== null) {
-      const err = error as { error?: { message?: string }; message?: string };
-      if (err.error?.message) {
-        return err.error.message;
-      }
-      if (err.message) {
-        return err.message;
-      }
-    }
-    return 'A várólistára történő feliratkozás sikertelen.';
+    return extractApiErrorMessage(error, 'A várólistára történő feliratkozás sikertelen.');
   }
 }

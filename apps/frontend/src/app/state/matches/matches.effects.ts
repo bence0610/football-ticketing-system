@@ -3,6 +3,7 @@ import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { catchError, map, of, switchMap } from 'rxjs';
 import { MatchesApiService } from '../../shared/services/matches.api.service';
 import { MatchesActions } from './matches.actions';
+import { extractApiErrorMessage } from '../../shared/utils/api-error';
 
 @Injectable()
 export class MatchesEffects {
@@ -46,12 +47,6 @@ export class MatchesEffects {
   );
 
   private toMessage(error: unknown, fallback: string): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-    if (typeof error === 'string') {
-      return error;
-    }
-    return fallback;
+    return extractApiErrorMessage(error, fallback);
   }
 }

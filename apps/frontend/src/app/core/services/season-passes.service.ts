@@ -38,8 +38,11 @@ export class SeasonPassesService {
   }
 
   purchase(payload: PurchaseSeasonPassPayload): Observable<PurchaseSeasonPassResponse> {
+    // The purchase page shows the failure in its own inline block (role="alert"),
+    // like every other form submission — so no global snackbar on top of it.
     return this.http.post<PurchaseSeasonPassResponse>('/season-passes/purchase', payload, {
       withCredentials: true,
+      context: new HttpContext().set(SKIP_ERROR_SNACKBAR, true),
     });
   }
 

@@ -15,6 +15,7 @@ import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
 import { RevenueByMatchTableComponent } from '../components/revenue-by-match-table.component';
 import { RevenueLineChartComponent } from '../components/revenue-line-chart.component';
 import { RevenueSummaryCardComponent } from '../components/revenue-summary-card.component';
+import { extractApiErrorMessage } from '../../../shared/utils/api-error';
 
 @Component({
   selector: 'kte-admin-revenue-page',
@@ -164,15 +165,6 @@ export class RevenueStatsPageComponent implements OnInit {
   }
 
   private normalizeError(error: unknown): string {
-    if (typeof error === 'object' && error !== null) {
-      const err = error as { error?: { message?: string }; message?: string };
-      if (err.error?.message) {
-        return err.error.message;
-      }
-      if (err.message) {
-        return err.message;
-      }
-    }
-    return 'A statisztikák betöltése sikertelen.';
+    return extractApiErrorMessage(error, 'A statisztikák betöltése sikertelen.');
   }
 }

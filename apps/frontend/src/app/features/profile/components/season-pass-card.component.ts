@@ -32,6 +32,7 @@ import {
   LoanInitiationDialogData,
   LoanInitiationDialogResult,
 } from './loan-initiation-dialog/loan-initiation-dialog.component';
+import { extractApiErrorMessage } from '../../../shared/utils/api-error';
 
 type MatchRowState =
   | 'mine_upcoming'
@@ -473,7 +474,7 @@ export class SeasonPassCardComponent implements OnInit, OnChanges {
       },
       error: (err) => {
         this.snack.open(
-          `Sikertelen visszavonás: ${err?.error?.message ?? 'ismeretlen hiba'}`,
+          `Sikertelen visszavonás: ${extractApiErrorMessage(err, 'ismeretlen hiba')}`,
           'Bezár',
           { duration: 4000 },
         );

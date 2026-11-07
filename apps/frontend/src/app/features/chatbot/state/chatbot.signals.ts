@@ -1,7 +1,9 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ChatbotMessage } from '../../../shared/models/chatbot.model';
 import { ChatbotApiService } from '../../../shared/services/chatbot.api.service';
+import { extractApiErrorMessage } from '../../../shared/utils/api-error';
 
 const SUGGESTIONS_HU: readonly string[] = [
   'Mikor van a következő meccs?',
@@ -86,18 +88,9 @@ export class ChatbotStore {
   }
 
   private normalizeError(error: unknown): string {
-    if (typeof error === 'object' && error !== null) {
-      const err = error as { error?: { message?: string }; message?: string; status?: number };
-      if (err.status === 429) {
-        return 'Túl sok kérés a chatbothoz, próbáld újra később.';
-      }
-      if (err.error?.message) {
-        return err.error.message;
-      }
-      if (err.message) {
-        return err.message;
-      }
+    if (error instanceof HttpErrorResponse && error.status === 429) {
+      return 'Túl sok kérés a chatbothoz, próbáld újra később.';
     }
-    return 'A chatbot nem érhető el, próbáld újra később.';
+    return extractApiErrorMessage(error, 'A chatbot nem érhető el, próbáld újra később.');
   }
 }

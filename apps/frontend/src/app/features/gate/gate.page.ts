@@ -10,6 +10,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { TicketsService } from '../../core/services/tickets.service';
 import { ScanResult, TicketScanResponse } from '../../core/models/ticket.models';
+import { extractApiErrorMessage } from '../../shared/utils/api-error';
 
 const RESULT_LABELS: Record<ScanResult, string> = {
   ok: 'Belépés engedélyezve',
@@ -305,7 +306,7 @@ export class GatePageComponent {
         const message =
           err.status === 403
             ? 'Nincs jogosultságod a beléptetéshez.'
-            : err.error?.message ?? 'Hiba történt a kiszolgálóval való kommunikáció során.';
+            : extractApiErrorMessage(err, 'Hiba történt a kiszolgálóval való kommunikáció során.');
         this.scanResult.set({ success: false, result: 'invalid', message });
       },
     });

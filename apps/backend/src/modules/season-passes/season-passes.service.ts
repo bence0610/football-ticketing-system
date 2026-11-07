@@ -173,7 +173,7 @@ export class SeasonPassesService {
     }
 
     const holder = await this.resolveHolder(user, dto);
-    await this.assertPassCanBeIssued(priceRow, holder);
+    await this.assertPassCanBeIssued(priceRow, holder, userId);
 
     // Resolve a per-attempt ID stored in Redis.
     // Two rapid calls for the same (user, section, season) within the 5-minute
@@ -484,6 +484,7 @@ export class SeasonPassesService {
   private async assertPassCanBeIssued(
     priceRow: SeasonPassPrice,
     holder: PassHolder,
+    buyerId: string,
   ): Promise<void> {
     if (holder.userId) {
       const already = await this.seasonPassRepository.findOne({
@@ -492,7 +493,11 @@ export class SeasonPassesService {
       if (already) {
         throw new ConflictException({
           statusCode: 409,
-          message: 'Ennek a felhasználónak már van bérlete erre a szezonra.',
+          // Second person when the buyer is the holder, the holder's name otherwise.
+          message:
+            holder.userId === buyerId
+              ? 'Erre a szezonra már van bérleted.'
+              : `${holder.name} nevére már van bérlet erre a szezonra.`,
           code: 'holder_already_has_pass',
         });
       }

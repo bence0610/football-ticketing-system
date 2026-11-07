@@ -23,6 +23,7 @@ import { Router } from '@angular/router';
 import { firstValueFrom, interval } from 'rxjs';
 import { WaitlistEntry } from '../../../../shared/models/waitlist.model';
 import { WaitlistApiService } from '../../../../shared/services/waitlist.api.service';
+import { extractApiErrorMessage } from '../../../../shared/utils/api-error';
 
 const STATUS_LABEL: Readonly<Record<WaitlistEntry['status'], string>> = {
   active: 'Várólistán',
@@ -256,9 +257,7 @@ export class WaitlistCardComponent implements OnInit {
       });
       this.changed.emit();
     } catch (error) {
-      const message =
-        (error as { error?: { message?: string } })?.error?.message ??
-        'A megerősítés sikertelen.';
+      const message = extractApiErrorMessage(error, 'A megerősítés sikertelen.');
       this.snackBar.open(message, 'Bezárás', { duration: 6000 });
       this.changed.emit();
     } finally {

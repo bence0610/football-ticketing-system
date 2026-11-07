@@ -11,7 +11,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
@@ -40,6 +39,7 @@ import {
   DiscountBreakdownComponent,
 } from './components/discount-breakdown.component';
 import { WeatherBannerComponent } from './components/weather-banner.component';
+import { extractApiErrorMessage } from '../../shared/utils/api-error';
 
 const MAX_RETRY_ATTEMPTS = 3;
 
@@ -562,21 +562,6 @@ export class CheckoutPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private normalizeError(error: unknown): string {
-    if (error instanceof HttpErrorResponse) {
-      const body = error.error as { message?: unknown } | null;
-      if (body && typeof body.message === 'string') {
-        return body.message;
-      }
-      if (body && Array.isArray(body.message) && typeof body.message[0] === 'string') {
-        return (body.message as string[])[0];
-      }
-    }
-    if (error instanceof Error) {
-      return error.message;
-    }
-    if (typeof error === 'string') {
-      return error;
-    }
-    return 'Ismeretlen hiba történt a fizetés során.';
+    return extractApiErrorMessage(error, 'Ismeretlen hiba történt a fizetés során.');
   }
 }

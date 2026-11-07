@@ -24,6 +24,7 @@ import {
 } from '../../../../core/models/season-pass.models';
 import { MatchResource, MatchesService } from '../../../../core/services/matches.service';
 import { SeasonPassesService } from '../../../../core/services/season-passes.service';
+import { extractApiErrorMessage } from '../../../../shared/utils/api-error';
 
 export interface LoanInitiationDialogData {
   pass: SeasonPassResponse;
@@ -1033,16 +1034,6 @@ export class LoanInitiationDialogComponent implements OnInit {
   }
 
   private extractErrorMessage(err: HttpErrorResponse, fallback?: string): string {
-    const apiMessage = err?.error?.message;
-    if (typeof apiMessage === 'string' && apiMessage.length > 0) {
-      return apiMessage;
-    }
-    if (Array.isArray(apiMessage) && apiMessage.length > 0) {
-      return apiMessage.join(', ');
-    }
-    if (typeof err?.message === 'string' && err.message.length > 0 && !fallback) {
-      return err.message;
-    }
-    return fallback ?? 'Ismeretlen hiba történt.';
+    return extractApiErrorMessage(err, fallback ?? 'Ismeretlen hiba történt.');
   }
 }

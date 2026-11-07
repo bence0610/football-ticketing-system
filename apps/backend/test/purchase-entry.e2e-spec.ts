@@ -1855,6 +1855,11 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       .send({ sectionId: 'A', holderEmail: partner.email });
     expect(again.status).toBe(409);
     expect(again.body.code).toBe('holder_already_has_pass');
+    // Buying FOR someone else: the message names them (not "ennek a felhasználónak").
+    expect(first.pass?.holderName).toBeTruthy();
+    expect(again.body.message).toBe(
+      `${first.pass?.holderName} nevére már van bérlet erre a szezonra.`,
+    );
     expect(ctx.stripeStub.paymentIntentsCreateMock).not.toHaveBeenCalled();
 
     // The partner buying a pass for themself is the same rule.
@@ -1864,6 +1869,8 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       .send({ sectionId: 'A' });
     expect(own.status).toBe(409);
     expect(own.body.code).toBe('holder_already_has_pass');
+    // Buying for MYSELF: second person.
+    expect(own.body.message).toBe('Erre a szezonra már van bérleted.');
 
     // 2) The database itself rejects a second pass for the same account + season.
     const { seatA } = await seedMinimalFixture(ctx.dataSource);

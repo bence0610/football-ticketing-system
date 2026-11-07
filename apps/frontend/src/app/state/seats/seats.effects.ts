@@ -4,6 +4,7 @@ import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { catchError, map, of, switchMap } from 'rxjs';
 import { SeatsApiService } from '../../shared/services/seats.api.service';
 import { SeatsActions } from './seats.actions';
+import { extractApiErrorMessage } from '../../shared/utils/api-error';
 
 @Injectable()
 export class SeatsEffects {
@@ -67,22 +68,6 @@ export class SeatsEffects {
   );
 
   private toMessage(error: unknown, fallback: string): string {
-    if (error instanceof HttpErrorResponse) {
-      const body = error.error;
-      if (body && typeof body === 'object' && 'message' in body) {
-        const value = (body as { message: unknown }).message;
-        if (typeof value === 'string') {
-          return value;
-        }
-        if (Array.isArray(value) && typeof value[0] === 'string') {
-          return value[0];
-        }
-      }
-      return error.message || fallback;
-    }
-    if (error instanceof Error) {
-      return error.message;
-    }
-    return fallback;
+    return extractApiErrorMessage(error, fallback);
   }
 }
