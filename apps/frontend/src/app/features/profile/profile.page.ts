@@ -23,6 +23,7 @@ import { TicketResponse } from '../../core/models/ticket.models';
 import { SeasonPassResponse } from '../../core/models/season-pass.models';
 import { SeasonPassesService } from '../../core/services/season-passes.service';
 import { TicketsService } from '../../core/services/tickets.service';
+import { TIER_LABELS } from '../../core/models/loyalty.models';
 import { LoyaltyTier, UserProfile } from '../../shared/models/auth.model';
 import { WaitlistEntry } from '../../shared/models/waitlist.model';
 import { AuthApiService } from '../../shared/services/auth.api.service';
@@ -30,13 +31,6 @@ import { WaitlistApiService } from '../../shared/services/waitlist.api.service';
 import { SeasonPassCardComponent } from './components/season-pass-card.component';
 import { TicketCardComponent } from './components/ticket-card.component';
 import { WaitlistCardComponent } from './components/waitlist-card/waitlist-card.component';
-
-const TIER_LABEL: Readonly<Record<LoyaltyTier, string>> = {
-  bronze: 'Bronz',
-  silver: 'Ezüst',
-  gold: 'Arany',
-  platinum: 'Platina',
-};
 
 /**
  * Loyalty tier chip background colors on the profile page. Values mirror
@@ -313,7 +307,7 @@ export class ProfilePageComponent implements OnInit {
 
   protected readonly tierLabel = computed(() => {
     const user = this.profile();
-    return user ? TIER_LABEL[user.loyaltyTier] : '';
+    return user ? TIER_LABELS[user.loyaltyTier] : '';
   });
 
   protected readonly tierColor = computed(() => {

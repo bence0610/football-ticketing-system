@@ -22,15 +22,18 @@ export class PaymentIntentSeatDto {
   ownerToken!: string;
 }
 
+/** Most seats one purchase may contain; also quoted to visitors by the chatbot. */
+export const MAX_SEATS_PER_ORDER = 6;
+
 export class CreatePaymentIntentDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
   matchId!: string;
 
-  @ApiProperty({ type: [PaymentIntentSeatDto], minItems: 1, maxItems: 6 })
+  @ApiProperty({ type: [PaymentIntentSeatDto], minItems: 1, maxItems: MAX_SEATS_PER_ORDER })
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(6)
+  @ArrayMaxSize(MAX_SEATS_PER_ORDER)
   @ValidateNested({ each: true })
   @Type(() => PaymentIntentSeatDto)
   seats!: PaymentIntentSeatDto[];

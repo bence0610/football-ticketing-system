@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { CheckoutPage } from './pages/checkout.page';
 import { CartPage } from './pages/cart.page';
 import {
@@ -49,8 +49,8 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function mockRefreshSuccess(page: import('@playwright/test').Page): Promise<void> {
-  return page.route('**/auth/refresh', (route) =>
+async function mockRefreshSuccess(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/auth/refresh', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -59,14 +59,14 @@ function mockRefreshSuccess(page: import('@playwright/test').Page): Promise<void
   );
 }
 
-function mockRefreshFail(page: import('@playwright/test').Page): Promise<void> {
-  return page.route('**/auth/refresh', (route) =>
+async function mockRefreshFail(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/auth/refresh', (route) =>
     route.fulfill({ status: 401, body: 'Unauthorized' }),
   );
 }
 
-function mockPaymentIntent(page: import('@playwright/test').Page): Promise<void> {
-  return page.route('**/api/payments/intent', (route) =>
+async function mockPaymentIntent(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/payments/create-intent', (route) =>
     route.fulfill({
       status: 201,
       contentType: 'application/json',
@@ -75,8 +75,8 @@ function mockPaymentIntent(page: import('@playwright/test').Page): Promise<void>
   );
 }
 
-function mockPaymentIntentFail(page: import('@playwright/test').Page): Promise<void> {
-  return page.route('**/api/payments/intent', (route) =>
+async function mockPaymentIntentFail(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/payments/create-intent', (route) =>
     route.fulfill({
       status: 500,
       contentType: 'application/json',
@@ -85,11 +85,11 @@ function mockPaymentIntentFail(page: import('@playwright/test').Page): Promise<v
   );
 }
 
-function mockWeather(
+async function mockWeather(
   page: import('@playwright/test').Page,
   body: unknown,
 ): Promise<void> {
-  return page.route('**/api/matches/**/weather', (route) =>
+  await page.route('**/weather/match/**', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -98,8 +98,8 @@ function mockWeather(
   );
 }
 
-function mockWeatherFail(page: import('@playwright/test').Page): Promise<void> {
-  return page.route('**/api/matches/**/weather', (route) =>
+async function mockWeatherFail(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/weather/match/**', (route) =>
     route.fulfill({ status: 404 }),
   );
 }
@@ -244,7 +244,7 @@ test.describe('Checkout Page – /checkout', () => {
     await injectStripeMock(page);
 
     // Delay the payment intent response so we can observe the loading state
-    await page.route('**/api/payments/intent', async (route) => {
+    await page.route('**/payments/create-intent', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 600));
       await route.fulfill({
         status: 201,
@@ -318,7 +318,7 @@ test.describe('Checkout Page – /checkout', () => {
     await injectStripeMock(page);
 
     // Return the intent only after a short delay
-    await page.route('**/api/payments/intent', async (route) => {
+    await page.route('**/payments/create-intent', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 800));
       await route.fulfill({
         status: 201,
@@ -367,65 +367,49 @@ test.describe('Confirmation Page – /checkout/confirmation', () => {
     await expect(checkout.guardCard).toContainText('Nincs megerősíthető fizetés');
   });
 
+  /**
+   * Opens /checkout/confirmation the way the app does after a successful
+   * payment: a client-side navigation carrying router state. (A page reload
+   * cannot do this — the router replaces history.state on the initial
+   * navigation — so the state is pushed and delivered through popstate.)
+   * Asserts the SUCCESS card is showing, so the tests below cannot pass on
+   * the "no payment to confirm" guard card, which has similar links.
+   */
+  async function openConfirmationWithState(page: Page): Promise<CheckoutPage> {
+    const state = {
+      paymentIntentId: PAYMENT_INTENT_ID,
+      seats: [{ section: 'A', row: '1', seatNumber: 5, price: 3500 }],
+      totalPaid: 3500,
+    };
+    await mockRefreshSuccess(page);
+    await page.goto('/');
+    await expect(page.locator('kte-app-shell, main').first()).toBeVisible();
+    await page.evaluate((navState) => {
+      window.history.pushState(navState, '', '/checkout/confirmation');
+      window.dispatchEvent(new PopStateEvent('popstate', { state: navState }));
+    }, state);
+    const checkout = new CheckoutPage(page);
+    await expect(checkout.successHeading).toContainText('Sikeres fizetés');
+    await expect(checkout.guardCard).toHaveCount(0);
+    return checkout;
+  }
+
   test('should render the success card with order data when navigation state is set', async ({
     page,
   }) => {
-    const state = {
-      paymentIntentId: PAYMENT_INTENT_ID,
-      seats: [
-        { section: 'A', row: '1', seatNumber: 5, price: 3500 },
-      ],
-      totalPaid: 3500,
-    };
+    const checkout = await openConfirmationWithState(page);
 
-    // Use page.evaluate to push history state before the Angular router reads it
-    await mockRefreshSuccess(page);
-    await page.goto('/checkout/confirmation');
-
-    // Inject the navigation state into window.history.state the way Angular's
-    // router does, then trigger a reload so ConfirmationPage.ngOnInit sees it.
-    await page.evaluate((navState) => {
-      window.history.replaceState(navState, '');
-    }, state);
-    await page.reload();
-
-    const checkout = new CheckoutPage(page);
-    await expect(checkout.successHeading).toContainText('Sikeres fizetés');
     await expect(checkout.orderIdBlock).toContainText(PAYMENT_INTENT_ID);
     await expect(checkout.seatList).toHaveCount(1);
   });
 
   test('should have a "Profil megnyitása" link that points to /profile', async ({ page }) => {
-    const state = {
-      paymentIntentId: PAYMENT_INTENT_ID,
-      seats: [{ section: 'A', row: '1', seatNumber: 5, price: 3500 }],
-      totalPaid: 3500,
-    };
-
-    await page.goto('/checkout/confirmation');
-    await page.evaluate((navState) => {
-      window.history.replaceState(navState, '');
-    }, state);
-    await page.reload();
-
-    const checkout = new CheckoutPage(page);
+    const checkout = await openConfirmationWithState(page);
     await expect(checkout.profileLink).toHaveAttribute('href', /\/profile/);
   });
 
   test('should have a "Vissza a kezdőlapra" link that points to /', async ({ page }) => {
-    const state = {
-      paymentIntentId: PAYMENT_INTENT_ID,
-      seats: [{ section: 'A', row: '1', seatNumber: 5, price: 3500 }],
-      totalPaid: 3500,
-    };
-
-    await page.goto('/checkout/confirmation');
-    await page.evaluate((navState) => {
-      window.history.replaceState(navState, '');
-    }, state);
-    await page.reload();
-
-    const checkout = new CheckoutPage(page);
+    const checkout = await openConfirmationWithState(page);
     await expect(checkout.homeLink).toHaveAttribute('href', '/');
   });
 });

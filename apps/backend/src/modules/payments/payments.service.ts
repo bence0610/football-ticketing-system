@@ -23,6 +23,7 @@ import {
   TicketStatus,
   User,
 } from '../../database/entities';
+import { seatUnitPrice } from '../seats/seat-pricing';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { SeatLockService } from '../../redis/seat-lock.service';
@@ -373,7 +374,7 @@ export class PaymentsService {
               this.logger.error(`Seat ${seatId} missing while finalizing payment ${intent.id}`);
               continue;
             }
-            const price = Math.round(basePrice * Number(seat.priceModifier));
+            const price = seatUnitPrice(basePrice, seat.priceModifier);
             const ticket = em.create(Ticket, {
               matchId,
               seatId,
@@ -411,7 +412,7 @@ export class PaymentsService {
         const refundHuf = takenSeatIds.reduce((acc, seatId) => {
           const seat = seatById.get(seatId);
           if (!seat) return acc;
-          return acc + Math.round(basePrice * Number(seat.priceModifier));
+          return acc + seatUnitPrice(basePrice, seat.priceModifier);
         }, 0);
 
         if (refundHuf > 0) {
@@ -772,7 +773,7 @@ export class PaymentsService {
       }
 
       const modifier = Number(seat.priceModifier);
-      const price = Math.round(basePrice * modifier);
+      const price = seatUnitPrice(basePrice, modifier);
       this.logger.debug(
         `Seat ${seat.id} base=${basePrice} modifier=${modifier} unitPrice=${price}`,
       );

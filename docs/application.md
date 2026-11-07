@@ -46,7 +46,7 @@ A hűségprogram célja, hogy jutalmazzon minden interakciót, és erősítse a 
 Pontszerzési lehetőségek
 EseményPontJegyvásárlás+50 pont / jegyBérletvásárlás+500 pontBérlet kölcsönadása+25 pontRegisztráció+100 pont (egyszeri)Profil kitöltése+50 pont (egyszeri)Meccsre bejelentkezés (QR scan)+10 pont
 Szintek és jutalmak
-SzintPonthatárJutalom🔵 Kék Szurkoló0–499 pontAlap hozzáférés⚪ Ezüst Szurkoló500–1999 pont5% kedvezmény jegyekre🟡 Arany Szurkoló2000–4999 pont10% kedvezmény, korai jegyelővétel🔴 KTE Legenda5000+ pont15% kedvezmény, VIP előtérhozzáférés, dedikált support
+SzintPonthatárJutalom🔵 Kék Szurkoló0–499 pontAlap hozzáférés⚪ Ezüst Szurkoló500–1499 pont5% kedvezmény jegyekre🟡 Arany Szurkoló1500–2999 pont10% kedvezmény, korai jegyelővétel🔴 KTE Legenda3000+ pont15% kedvezmény, VIP előtérhozzáférés, dedikált support
 A pontok és szintek a felhasználó profiljában valós időben frissülnek, és az előfizetési évad végén részlegesen (50%) átvihetők a következő szezonba.
 
 5. AI Chatbot Asszisztens

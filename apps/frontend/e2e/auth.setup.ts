@@ -7,9 +7,8 @@ import { AUTH_RESPONSE } from './fixtures/api-mocks';
  *
  * This file is matched only by the `auth-setup` playwright project. It:
  *  1. Intercepts POST /auth/login to return a mocked AuthResponse.
- *  2. Intercepts POST /auth/refresh (called by AuthInitializer on boot) with
- *     the same response so any page load inside authenticated tests starts
- *     with a valid in-memory access token.
+ *  2. Intercepts POST /auth/refresh (called by AuthInitializer on boot) with a
+ *     401, so the app boots as a guest and the login form is reachable.
  *  3. Navigates to /login, submits the form, and waits for the redirect.
  *  4. Saves the resulting browser storage state to .auth/user.json.
  *
@@ -21,13 +20,14 @@ import { AUTH_RESPONSE } from './fixtures/api-mocks';
 export const AUTH_STATE_PATH = path.join(__dirname, '.auth', 'user.json');
 
 setup('authenticate and save storage state', async ({ page }) => {
-  // Stub the refresh endpoint — Angular's APP_INITIALIZER calls this on boot
-  // to restore the session. Return the same mock auth response.
+  // Boot as a guest: the refresh endpoint answers 401, so the app stays on
+  // /login. (If refresh succeeded, the app would restore a session and redirect
+  // away from /login before the form could be used.)
   await page.route('**/auth/refresh', (route) => {
     route.fulfill({
-      status: 200,
+      status: 401,
       contentType: 'application/json',
-      body: JSON.stringify(AUTH_RESPONSE),
+      body: JSON.stringify({ statusCode: 401, message: 'Unauthorized' }),
     });
   });
 

@@ -38,14 +38,14 @@ import { AUTH_RESPONSE, AUTH_USER } from './fixtures/api-mocks';
 // Shared setup helpers
 // ---------------------------------------------------------------------------
 
-function mockRefreshFail(page: import('@playwright/test').Page): Promise<void> {
-  return page.route('**/auth/refresh', (route) =>
+async function mockRefreshFail(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/auth/refresh', (route) =>
     route.fulfill({ status: 401, body: 'Unauthorized' }),
   );
 }
 
-function mockRefreshSuccess(page: import('@playwright/test').Page): Promise<void> {
-  return page.route('**/auth/refresh', (route) =>
+async function mockRefreshSuccess(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/auth/refresh', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -54,8 +54,8 @@ function mockRefreshSuccess(page: import('@playwright/test').Page): Promise<void
   );
 }
 
-function mockLoginSuccess(page: import('@playwright/test').Page): Promise<void> {
-  return page.route('**/auth/login', (route) =>
+async function mockLoginSuccess(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/auth/login', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -64,8 +64,8 @@ function mockLoginSuccess(page: import('@playwright/test').Page): Promise<void> 
   );
 }
 
-function mockLoginFailure(page: import('@playwright/test').Page, status = 401): Promise<void> {
-  return page.route('**/auth/login', (route) =>
+async function mockLoginFailure(page: import('@playwright/test').Page, status = 401): Promise<void> {
+  await page.route('**/auth/login', (route) =>
     route.fulfill({
       status,
       contentType: 'application/json',
@@ -74,8 +74,8 @@ function mockLoginFailure(page: import('@playwright/test').Page, status = 401): 
   );
 }
 
-function mockRegisterSuccess(page: import('@playwright/test').Page): Promise<void> {
-  return page.route('**/auth/register', (route) =>
+async function mockRegisterSuccess(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/auth/register', (route) =>
     route.fulfill({
       status: 201,
       contentType: 'application/json',
@@ -84,8 +84,8 @@ function mockRegisterSuccess(page: import('@playwright/test').Page): Promise<voi
   );
 }
 
-function mockRegisterConflict(page: import('@playwright/test').Page): Promise<void> {
-  return page.route('**/auth/register', (route) =>
+async function mockRegisterConflict(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/auth/register', (route) =>
     route.fulfill({
       status: 409,
       contentType: 'application/json',
@@ -262,8 +262,9 @@ test.describe('Registration Page – /register', () => {
     await auth.passwordField.fill('Valami12');
     await auth.passwordConfirmField.fill('Masvalami99');
 
-    // Trigger form validation by submitting
-    await auth.registerSubmitButton.click();
+    // The submit button is disabled while the form is invalid, so it cannot be
+    // clicked to trigger validation; leaving the field marks it touched.
+    await auth.passwordConfirmField.blur();
 
     await expect(page.locator('mat-error', { hasText: /két jelszó nem egyezik/i })).toBeVisible();
   });

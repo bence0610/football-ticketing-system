@@ -38,7 +38,7 @@ The existing `profile.spec.ts` Test 6 assertion `await expect(card).toContainTex
 - `ticketStatusBadge(card): Locator` — card.locator('[data-testid="ticket-status-badge"]')
 
 ## Key tier boundary values (for unit tests)
-Kék: 0–499, Ezüst: 500–1999, Arany: 2000–4999, KTE Legenda: 5000+
+Kék: 0–499, Ezüst: 500–1499, Arany: 1500–2999, KTE Legenda: 3000+ (source of truth: apps/backend/src/modules/loyalty/loyalty.constants.ts)
 Discounts: Kék 0%, Ezüst 5%, Arany 10%, KTE Legenda 15%
 
 ## Idempotency decisions to clarify before implementing

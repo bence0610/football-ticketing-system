@@ -210,4 +210,34 @@ describe('TicketsController – scan endpoint', () => {
     expect(res.body.success).toBe(false);
     expect(res.body.result).toBe('invalid');
   });
+
+  // -------------------------------------------------------------------------
+  // GET /tickets/count — was open to anonymous callers (disclosed sales volume)
+  // -------------------------------------------------------------------------
+
+  describe('GET /tickets/count', () => {
+    const ADMIN_USER = { id: 'admin-id', email: 'admin@kte.hu', role: UserRole.ADMIN };
+
+    it('rejects an anonymous caller without touching the service', async () => {
+      currentUser = null;
+      await request(app.getHttpServer()).get('/tickets/count').expect(403);
+      expect(mockTicketsService.count).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['fan', FAN_USER],
+      ['gate operator', GATE_USER],
+    ])('rejects a %s with 403', async (_label, user) => {
+      currentUser = user;
+      await request(app.getHttpServer()).get('/tickets/count').expect(403);
+      expect(mockTicketsService.count).not.toHaveBeenCalled();
+    });
+
+    it('returns the total to an admin', async () => {
+      currentUser = ADMIN_USER;
+      (mockTicketsService.count as jest.Mock).mockResolvedValue(42);
+      const res = await request(app.getHttpServer()).get('/tickets/count').expect(200);
+      expect(res.body).toEqual({ total: 42 });
+    });
+  });
 });

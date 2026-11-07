@@ -2,6 +2,10 @@ import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
+import { UserRole } from '../../database/entities';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { LoyaltyService } from './loyalty.service';
 import {
   LoyaltySnapshotResponseDto,
@@ -19,7 +23,10 @@ export class LoyaltyController {
   constructor(private readonly loyaltyService: LoyaltyService) {}
 
   @Get('transactions/count')
-  @ApiOkResponse({ description: 'Total loyalty transactions count' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: 'Total loyalty transactions count (admin only)' })
   async count(): Promise<{ total: number }> {
     const total = await this.loyaltyService.count();
     return { total };

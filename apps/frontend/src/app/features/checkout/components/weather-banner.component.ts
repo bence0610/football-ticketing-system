@@ -33,10 +33,28 @@ const COVERED_SECTORS = new Set<string>(['VIP']);
           Másik szektor választása
         </a>
       </div>
+    } @else if (noForecastMessage()) {
+      <p class="kte-weather-note" role="status" data-testid="weather-no-forecast">
+        <mat-icon>cloud_off</mat-icon>
+        <span>{{ noForecastMessage() }}</span>
+      </p>
     }
   `,
   styles: [
     `
+      .kte-weather-note {
+        display: flex;
+        align-items: center;
+        gap: var(--kte-spacing-2);
+        margin: 0 0 var(--kte-spacing-4);
+        color: var(--kte-muted);
+        font-size: 13px;
+      }
+      .kte-weather-note mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
       .kte-weather {
         display: grid;
         grid-template-columns: auto 1fr auto;
@@ -84,12 +102,28 @@ export class WeatherBannerComponent {
     return this.uncoveredSections().length > 0;
   }
 
+  /** Text for the "no forecast" state; null when there is nothing to say. */
+  protected noForecastMessage(): string | null {
+    if (!this.forecast?.fallback) {
+      return null;
+    }
+    switch (this.forecast.unavailableReason) {
+      case 'too_far':
+        return 'Az időjárás-előrejelzés még nem elérhető: a mérkőzés kezdése még túl messze van.';
+      case 'no_data':
+        return 'Az időjárás-előrejelzés jelenleg nem elérhető.';
+      default:
+        // `past` or an older backend without a reason: nothing useful to show.
+        return null;
+    }
+  }
+
   protected get uncoveredSectorsLabel(): string {
     return this.uncoveredSections().join(', ');
   }
 
   protected percentProbability(): number {
-    if (!this.forecast) {
+    if (!this.forecast || this.forecast.precipitationProbability === null) {
       return 0;
     }
     return Math.round(this.forecast.precipitationProbability * 100);

@@ -1,4 +1,5 @@
 import * as Joi from 'joi';
+import { DEFAULT_ANTHROPIC_MODEL } from './anthropic.config';
 
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
@@ -46,7 +47,7 @@ export const envValidationSchema = Joi.object({
 
   // Anthropic
   ANTHROPIC_API_KEY: Joi.string().required(),
-  ANTHROPIC_MODEL: Joi.string().default('claude-sonnet-4-20250514'),
+  ANTHROPIC_MODEL: Joi.string().default(DEFAULT_ANTHROPIC_MODEL),
   ANTHROPIC_MAX_TOKENS: Joi.number().integer().min(64).default(1024),
 
   // OpenWeatherMap

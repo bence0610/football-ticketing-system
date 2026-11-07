@@ -100,9 +100,15 @@ export class CartPage {
       ...item,
     }));
 
-    await page.evaluate(
+    // addInitScript runs in every new document BEFORE the app boots, so it also
+    // works ahead of the first page.goto() (page.evaluate would throw a
+    // SecurityError on about:blank). It only seeds when the key is absent, so a
+    // later reload keeps whatever the app has written since.
+    await page.addInitScript(
       ([key, payload]: [string, unknown]) => {
-        window.sessionStorage.setItem(key, JSON.stringify(payload));
+        if (window.sessionStorage.getItem(key) === null) {
+          window.sessionStorage.setItem(key, JSON.stringify(payload));
+        }
       },
       [STORAGE_KEY, { version: 1, matchId, items: fullItems }] as [string, unknown],
     );

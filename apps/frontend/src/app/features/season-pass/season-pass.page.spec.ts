@@ -32,7 +32,7 @@ describe("SeasonPassPageComponent — purchase failure presentation", () => {
   let snackBar: jasmine.SpyObj<MatSnackBar>;
 
   beforeEach(() => {
-    snackBar = jasmine.createSpyObj<MatSnackBar>("MatSnackBar", ["open"]);
+    snackBar = jasmine.createSpyObj("MatSnackBar", ["open"]) as jasmine.SpyObj<MatSnackBar>;
     TestBed.configureTestingModule({
       imports: [SeasonPassPageComponent],
       providers: [

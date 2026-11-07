@@ -7,9 +7,23 @@ import { Repository } from 'typeorm';
 import { WeatherConfig } from '../../config';
 import { Match } from '../../database/entities';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
-import { MatchWeatherForecastDto } from './dto';
+import { MatchWeatherForecastDto, WeatherUnavailableReason } from './dto';
 
 const RAIN_WARNING_THRESHOLD_MM = 0.5;
+
+/**
+ * OpenWeatherMap's free forecast covers 5 days. A match kicking off later than
+ * this has no forecast yet — the service says so instead of returning the last
+ * available slot as if it were that match's weather.
+ */
+export const FORECAST_HORIZON_HOURS = 120;
+
+/** The forecast is in 3-hour slots; a slot further from kickoff than this is not "its" weather. */
+const MAX_SLOT_DISTANCE_MS = 3 * 60 * 60 * 1000;
+
+/** Failures (missing key, API down) are cached only briefly so recovery is quick. */
+const UNAVAILABLE_CACHE_TTL_SECONDS = 60;
+
 const OPENWEATHER_FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast';
 
 interface OwmListEntry {
@@ -23,8 +37,25 @@ interface OwmListEntry {
 
 interface OwmForecastResponse {
   list: OwmListEntry[];
-  city?: { name: string };
 }
+
+type ForecastResult =
+  | {
+      available: true;
+      summary: string;
+      temperature: number;
+      precipitation: number;
+      probability: number;
+      wind: number;
+      icon?: string;
+    }
+  | { available: false; reason: WeatherUnavailableReason };
+
+const UNAVAILABLE_SUMMARY: Record<WeatherUnavailableReason, string> = {
+  too_far: 'Az előrejelzés még nem elérhető',
+  past: 'A mérkőzés már elkezdődött',
+  no_data: 'Időjárási adat nem elérhető',
+};
 
 @Injectable()
 export class WeatherService {
@@ -47,6 +78,15 @@ export class WeatherService {
       throw new NotFoundException('Meccs nem található.');
     }
 
+    // Time-dependent, so decided before the cache and never cached.
+    const hoursAhead = (match.kickoffAt.getTime() - Date.now()) / 3_600_000;
+    if (hoursAhead > FORECAST_HORIZON_HOURS) {
+      return this.unavailable(match, 'too_far');
+    }
+    if (hoursAhead < 0) {
+      return this.unavailable(match, 'past');
+    }
+
     const cacheKey = `weather:match:${matchId}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) {
@@ -58,22 +98,29 @@ export class WeatherService {
     }
 
     const forecast = await this.fetchForecast(match.kickoffAt);
-    const dto: MatchWeatherForecastDto = {
-      matchId: match.id,
-      city: this.config.city,
-      forecastFor: match.kickoffAt.toISOString(),
-      summary: forecast.summary,
-      temperatureCelsius: forecast.temperature,
-      precipitationMmPerHour: forecast.precipitation,
-      precipitationProbability: forecast.probability,
-      windSpeedMs: forecast.wind,
-      rainWarning: forecast.precipitation > RAIN_WARNING_THRESHOLD_MM,
-      icon: forecast.icon,
-      fallback: forecast.fallback,
-    };
+    const dto: MatchWeatherForecastDto = forecast.available
+      ? {
+          matchId: match.id,
+          city: this.config.city,
+          forecastFor: match.kickoffAt.toISOString(),
+          summary: forecast.summary,
+          temperatureCelsius: forecast.temperature,
+          precipitationMmPerHour: forecast.precipitation,
+          precipitationProbability: forecast.probability,
+          windSpeedMs: forecast.wind,
+          rainWarning: forecast.precipitation > RAIN_WARNING_THRESHOLD_MM,
+          icon: forecast.icon,
+          fallback: false,
+        }
+      : this.unavailable(match, forecast.reason);
 
     await this.redis
-      .set(cacheKey, JSON.stringify(dto), 'EX', this.config.cacheTtlSeconds)
+      .set(
+        cacheKey,
+        JSON.stringify(dto),
+        'EX',
+        dto.fallback ? UNAVAILABLE_CACHE_TTL_SECONDS : this.config.cacheTtlSeconds,
+      )
       .catch((err: unknown) =>
         this.logger.warn(
           `Failed to cache weather forecast for match ${matchId}: ${err instanceof Error ? err.message : err}`,
@@ -83,25 +130,27 @@ export class WeatherService {
     return dto;
   }
 
-  private async fetchForecast(targetDate: Date): Promise<{
-    summary: string;
-    temperature: number;
-    precipitation: number;
-    probability: number;
-    wind: number;
-    icon?: string;
-    fallback: boolean;
-  }> {
+  /** "No forecast": no numbers at all, so nothing can be mistaken for a measurement. */
+  private unavailable(match: Match, reason: WeatherUnavailableReason): MatchWeatherForecastDto {
+    return {
+      matchId: match.id,
+      city: this.config.city,
+      forecastFor: match.kickoffAt.toISOString(),
+      summary: UNAVAILABLE_SUMMARY[reason],
+      temperatureCelsius: null,
+      precipitationMmPerHour: null,
+      precipitationProbability: null,
+      windSpeedMs: null,
+      rainWarning: false,
+      fallback: true,
+      unavailableReason: reason,
+    };
+  }
+
+  private async fetchForecast(targetDate: Date): Promise<ForecastResult> {
     if (!this.config.apiKey) {
-      this.logger.warn('OPENWEATHER_API_KEY not configured — returning neutral forecast.');
-      return {
-        summary: 'Időjárási adat nem elérhető',
-        temperature: 0,
-        precipitation: 0,
-        probability: 0,
-        wind: 0,
-        fallback: true,
-      };
+      this.logger.warn('OPENWEATHER_API_KEY not configured — no forecast available.');
+      return { available: false, reason: 'no_data' };
     }
 
     try {
@@ -123,10 +172,14 @@ export class WeatherService {
           return Math.abs(entry.dt * 1000 - target) < Math.abs(best.dt * 1000 - target)
             ? entry
             : best;
-        }, null) ?? data.list[0];
+        }, null) ?? null;
 
       if (!closest) {
         throw new Error('OpenWeatherMap returned an empty list.');
+      }
+      // Never present a slot that does not actually cover the kickoff.
+      if (Math.abs(closest.dt * 1000 - target) > MAX_SLOT_DISTANCE_MS) {
+        return { available: false, reason: 'too_far' };
       }
 
       const description = closest.weather[0]?.description ?? 'változó időjárás';
@@ -135,25 +188,18 @@ export class WeatherService {
       const precipitation = rain3h / 3;
 
       return {
+        available: true,
         summary: capitalize(description),
         temperature: Number(closest.main.temp.toFixed(1)),
         precipitation: Number(precipitation.toFixed(2)),
         probability: closest.pop ?? 0,
         wind: closest.wind?.speed ?? 0,
         icon: closest.weather[0]?.icon,
-        fallback: false,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown error';
       this.logger.warn(`OpenWeatherMap call failed: ${message}`);
-      return {
-        summary: 'Időjárási adat nem elérhető',
-        temperature: 0,
-        precipitation: 0,
-        probability: 0,
-        wind: 0,
-        fallback: true,
-      };
+      return { available: false, reason: 'no_data' };
     }
   }
 }

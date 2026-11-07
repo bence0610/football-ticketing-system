@@ -62,7 +62,8 @@ export class AuthPage {
     this.phoneField = page.getByLabel(/telefonszám/i);
     this.passwordConfirmField = page.getByLabel('Jelszó megerősítése');
     this.registerSubmitButton = page.getByRole('button', { name: 'Fiók létrehozása' });
-    this.loginLink = page.getByRole('link', { name: 'Bejelentkezés' });
+    // Scoped to the auth card: the toolbar has a link with the same name.
+    this.loginLink = this.authCard.getByRole('link', { name: 'Bejelentkezés' });
   }
 
   async gotoLogin(): Promise<void> {

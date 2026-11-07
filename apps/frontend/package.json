@@ -15,7 +15,10 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
     "test:ci": "ng test --watch=false --browsers=ChromeHeadless --code-coverage",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "e2e": "playwright test --config e2e/playwright.config.ts",
+    "e2e:install": "playwright install chromium firefox",
+    "e2e:report": "playwright show-report e2e/playwright-report"
   },
   "dependencies": {
     "@angular/animations": "^17.3.0",
@@ -47,6 +50,7 @@
     "@angular-eslint/template-parser": "^17.3.0",
     "@angular/cli": "^17.3.0",
     "@angular/compiler-cli": "^17.3.0",
+    "@playwright/test": "1.64.1",
     "@types/jasmine": "~5.1.4",
     "@types/node": "^20.16.10",
     "@typescript-eslint/eslint-plugin": "^7.18.0",

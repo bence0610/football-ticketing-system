@@ -59,7 +59,10 @@ export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
   @Get('count')
-  @ApiOkResponse({ description: 'Total ticket count' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: 'Total ticket count (admin only: it discloses sales volume)' })
   async count(): Promise<{ total: number }> {
     const total = await this.ticketsService.count();
     return { total };

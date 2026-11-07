@@ -7,6 +7,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { AuthService } from '../../core/auth/auth.service';
 import { LoyaltyService } from '../../core/services/loyalty.service';
 import {
   LoyaltySnapshotResponse,
@@ -39,7 +40,7 @@ import {
         <div class="hero" [style.borderColor]="snapshot()!.tier.color">
           <div class="hero-meta">
             <h1>Hűségprogram</h1>
-            <div class="tier-badge" [style.background]="snapshot()!.tier.color">
+            <div class="tier-badge" data-testid="loyalty-tier-badge" [style.background]="snapshot()!.tier.color">
               {{ tierLabel(snapshot()!.tier.tier) }}
             </div>
           </div>
@@ -56,6 +57,7 @@ import {
               <span class="points-needed">{{ snapshot()!.pointsToNextTier }} pont szükséges</span>
             </div>
             <mat-progress-bar
+              data-testid="loyalty-progress-bar"
               mode="determinate"
               [value]="progressPercent()"
               class="kte-progress"
@@ -93,7 +95,12 @@ import {
           @if (snapshot()!.recentTransactions.length === 0) {
             <p class="empty">Még nincs pontmozgásod.</p>
           } @else {
-            <table mat-table [dataSource]="snapshot()!.recentTransactions" class="kte-tx-table">
+            <table
+              mat-table
+              data-testid="loyalty-transaction-table"
+              [dataSource]="snapshot()!.recentTransactions"
+              class="kte-tx-table"
+            >
               <ng-container matColumnDef="createdAt">
                 <th mat-header-cell *matHeaderCellDef>Dátum</th>
                 <td mat-cell *matCellDef="let tx">{{ tx.createdAt | date: 'short' : '' : 'hu-HU' }}</td>
@@ -117,7 +124,7 @@ import {
                 <td mat-cell *matCellDef="let tx">{{ tx.balanceAfter }}</td>
               </ng-container>
               <tr mat-header-row *matHeaderRowDef="tableColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: tableColumns;"></tr>
+              <tr mat-row data-testid="loyalty-transaction-row" *matRowDef="let row; columns: tableColumns;"></tr>
             </table>
           }
         </mat-card>
@@ -203,7 +210,7 @@ export class LoyaltyDashboardPageComponent implements OnInit {
 
   private readonly loyaltyService = inject(LoyaltyService);
   private readonly snack = inject(MatSnackBar);
-  private previousTier: string | null = null;
+  private readonly auth = inject(AuthService);
 
   ngOnInit(): void {
     this.loyaltyService.getTiers().subscribe({
@@ -214,13 +221,16 @@ export class LoyaltyDashboardPageComponent implements OnInit {
       next: (snap) => {
         this.snapshot.set(snap);
         this.loading.set(false);
-        if (this.previousTier && this.previousTier !== snap.tier.tier) {
-          this.snack.open(`Új hűségszintet értél el: ${TIER_LABELS[snap.tier.tier]}`, 'Bezár', {
+        const userId = this.auth.user()?.id;
+        const reached = userId
+          ? this.loyaltyService.recordTierAndDetectUpgrade(userId, snap.tier.tier)
+          : null;
+        if (reached) {
+          this.snack.open(`Új hűségszintet értél el: ${TIER_LABELS[reached]}`, 'Bezár', {
             duration: 5000,
             panelClass: ['kte-toast'],
           });
         }
-        this.previousTier = snap.tier.tier;
       },
       error: () => {
         this.loading.set(false);

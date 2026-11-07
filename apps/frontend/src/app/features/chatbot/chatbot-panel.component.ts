@@ -9,6 +9,7 @@ import {
   computed,
   effect,
   inject,
+  signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -48,18 +49,6 @@ import { ChatbotStore } from './state/chatbot.signals';
         @if (store.isEmpty()) {
           <div class="kte-chatbot-panel__empty">
             <p>Szia! Miben segíthetek?</p>
-            <div class="kte-chatbot-panel__suggestions">
-              @for (suggestion of store.suggestions(); track suggestion) {
-                <button
-                  type="button"
-                  class="kte-chatbot-panel__chip"
-                  (click)="useSuggestion(suggestion)"
-                  [disabled]="store.typing()"
-                >
-                  {{ suggestion }}
-                </button>
-              }
-            </div>
           </div>
         }
 
@@ -80,6 +69,19 @@ import { ChatbotStore } from './state/chatbot.signals';
         }
       </div>
 
+      <div class="kte-chatbot-panel__suggestions kte-chatbot-panel__suggestions--bar">
+        @for (suggestion of store.suggestions(); track suggestion) {
+          <button
+            type="button"
+            class="kte-chatbot-panel__chip"
+            (click)="useSuggestion(suggestion)"
+            [disabled]="store.typing()"
+          >
+            {{ suggestion }}
+          </button>
+        }
+      </div>
+
       <form
         class="kte-chatbot-panel__form"
         (ngSubmit)="onSubmit()"
@@ -92,7 +94,8 @@ import { ChatbotStore } from './state/chatbot.signals';
           class="kte-chatbot-panel__input"
           placeholder="Írd be a kérdésed…"
           maxlength="1000"
-          [(ngModel)]="draft"
+          [ngModel]="draft()"
+          (ngModelChange)="draft.set($event)"
           [disabled]="store.typing()"
         />
         <button
@@ -160,6 +163,9 @@ import { ChatbotStore } from './state/chatbot.signals';
         display: flex;
         flex-direction: column;
         gap: 8px;
+      }
+      .kte-chatbot-panel__suggestions--bar {
+        padding: 0 12px 8px;
       }
       .kte-chatbot-panel__chip {
         background: rgba(255, 255, 255, 0.08);
@@ -256,9 +262,10 @@ export class ChatbotPanelComponent {
   @ViewChild('messages') private messagesEl?: ElementRef<HTMLDivElement>;
   @ViewChild('inputEl') private inputEl?: ElementRef<HTMLInputElement>;
 
-  protected draft = '';
+  // A signal, so `canSend` actually re-evaluates as the user types.
+  protected readonly draft = signal('');
 
-  protected readonly canSend = computed(() => this.draft.trim().length > 0);
+  protected readonly canSend = computed(() => this.draft().trim().length > 0);
 
   constructor() {
     // Auto-scroll on every message addition.
@@ -271,16 +278,16 @@ export class ChatbotPanelComponent {
   }
 
   protected useSuggestion(text: string): void {
-    this.draft = text;
+    this.draft.set(text);
     void this.onSubmit();
   }
 
   protected async onSubmit(): Promise<void> {
-    const value = this.draft.trim();
+    const value = this.draft().trim();
     if (!value || this.store.typing()) {
       return;
     }
-    this.draft = '';
+    this.draft.set('');
     await this.store.send(value);
     this.inputEl?.nativeElement.focus();
   }

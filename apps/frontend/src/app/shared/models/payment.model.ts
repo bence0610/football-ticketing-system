@@ -31,11 +31,17 @@ export interface MatchWeatherForecast {
   readonly city: string;
   readonly forecastFor: string;
   readonly summary: string;
-  readonly temperatureCelsius: number;
-  readonly precipitationMmPerHour: number;
-  readonly precipitationProbability: number;
-  readonly windSpeedMs: number;
+  /** The numbers are null when there is no forecast (`fallback: true`). */
+  readonly temperatureCelsius: number | null;
+  readonly precipitationMmPerHour: number | null;
+  readonly precipitationProbability: number | null;
+  readonly windSpeedMs: number | null;
   readonly rainWarning: boolean;
   readonly icon?: string;
+  /** True when there is no usable forecast; see `unavailableReason`. */
   readonly fallback: boolean;
+  readonly unavailableReason?: WeatherUnavailableReason;
 }
+
+/** too_far: kickoff is beyond the forecast range; past: already started; no_data: provider has none. */
+export type WeatherUnavailableReason = 'too_far' | 'past' | 'no_data';

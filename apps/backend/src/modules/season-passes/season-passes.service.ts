@@ -130,6 +130,8 @@ export class SeasonPassesService {
       price: row.price,
       currency: row.currency,
       seasonLabel: row.seasonLabel,
+      validFrom: row.validFrom.toISOString().slice(0, 10),
+      validUntil: row.validUntil.toISOString().slice(0, 10),
     }));
   }
 

@@ -65,6 +65,7 @@ export const APP_ROUTES: Routes = [
       },
       {
         path: 'loyalty',
+        canActivate: [authGuard],
         loadComponent: () =>
           import('./features/loyalty/loyalty-dashboard.page').then((m) => m.LoyaltyDashboardPageComponent),
         title: 'Hűség Dashboard',

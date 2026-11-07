@@ -1,10 +1,12 @@
 import {
   ForbiddenException,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatbotContextSnapshot } from './chatbot-context.service';
+import { TIER_DEFINITIONS } from '../loyalty/loyalty.constants';
 import { ChatbotService } from './chatbot.service';
 
 const create = jest.fn();
@@ -17,6 +19,37 @@ jest.mock('@anthropic-ai/sdk', () => ({
 
 const SNAPSHOT: ChatbotContextSnapshot = {
   generatedAt: '2030-01-01T10:00:00.000Z',
+  seasonPass: {
+    seasonLabel: '2026/2027',
+    validFrom: '2026-08-01',
+    validUntil: '2027-06-30',
+    prices: [
+      { section: 'VIP', sectionName: 'VIP szektor', price: 45000 },
+      { section: 'B', sectionName: 'B szektor', price: 30000 },
+    ],
+  },
+  rules: {
+    seatHoldMinutes: 5,
+    maxSeatsPerOrder: 6,
+    loanInvitationTtlHours: 72,
+    waitlistClaimMinutes: 10,
+  },
+  loyalty: {
+    tiers: TIER_DEFINITIONS.map((t) => ({
+      tier: t.tier,
+      label: t.label,
+      minPoints: t.minPoints,
+      discountPercent: t.discountPercent,
+    })),
+    earning: {
+      registration: 100,
+      profileCompletion: 50,
+      perTicket: 50,
+      seasonPass: 500,
+      passLoan: 25,
+    },
+    carryoverPercent: 50,
+  },
   upcomingMatches: [
     {
       id: 'm1',
@@ -32,7 +65,25 @@ const SNAPSHOT: ChatbotContextSnapshot = {
       soldSeats: 40,
       availableSeats: 60,
       occupancyPercent: 40,
-      sectors: [{ section: 'B', total: 50, free: 31, sold: 15, locked: 4 }],
+      description: 'Rangadó a bajnokságban.',
+      weather: {
+        summary: 'Gyenge eső',
+        temperatureCelsius: 12,
+        precipitationProbabilityPercent: 65,
+        rainWarning: true,
+      },
+      sectors: [
+        { section: 'B', total: 50, free: 31, sold: 15, locked: 4, minPrice: 5000, maxPrice: 5000 },
+        {
+          section: 'VIP',
+          total: 24,
+          free: 10,
+          sold: 14,
+          locked: 0,
+          minPrice: 12500,
+          maxPrice: 15000,
+        },
+      ],
     },
     {
       id: 'm2',
@@ -48,6 +99,8 @@ const SNAPSHOT: ChatbotContextSnapshot = {
       soldSeats: 0,
       availableSeats: 100,
       occupancyPercent: 0,
+      description: null,
+      weather: null,
       sectors: null,
     },
   ],
@@ -95,6 +148,27 @@ describe('ChatbotService', () => {
         'A chatbot szolgáltatás jelenleg nem elérhető. Próbáld újra később.',
       );
     });
+
+    it.each([
+      [401, 'AUTHENTICATION'],
+      [404, 'UNKNOWN MODEL'],
+      [429, 'RATE LIMIT'],
+    ])(
+      'logs a distinct diagnosis for %s while the user message stays the same',
+      async (status, label) => {
+        const logSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+        create.mockRejectedValue(Object.assign(new Error('x'), { status }));
+        const err = await service.sendMessage({ message: 'Szia', owner: ALICE }).catch((e) => e);
+        expect(err.message).toBe(
+          'A chatbot szolgáltatás jelenleg nem elérhető. Próbáld újra később.',
+        );
+        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining(label));
+        if (status === 404) {
+          expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('test-model'));
+        }
+        logSpy.mockRestore();
+      },
+    );
 
     it('persists nothing when the upstream call failed', async () => {
       create.mockRejectedValue(new Error('boom'));
@@ -158,10 +232,111 @@ describe('ChatbotService', () => {
       const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
       expect(system[0].text).toContain('CSAK akkor mondhatsz');
       expect(system[0].text).toContain('nem tudod');
-      expect(system[1].text).toContain('B szektor: szabad 31, eladott 15, zárolt 4, összes 50');
+      expect(system[1].text).toContain(
+        'B szektor: jegyár 5000 Ft; helyek (mozgó adat): szabad 31, eladott 15, zárolt 4, összes 50',
+      );
       expect(system[1].text).toContain('hazai mérkőzés');
       expect(system[1].text).toContain('idegenbeli mérkőzés');
       expect(system[1].text).toContain('szektoronkénti adat nem elérhető');
+    });
+
+    it('shows sector prices (single and range) and limits the staleness caveat to availability', async () => {
+      create.mockResolvedValue(okResponse());
+      await service.sendMessage({ message: 'mennyibe kerül a VIP jegy?', owner: ALICE });
+      const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
+      // hu-HU groups with a no-break space; compare whitespace-insensitively.
+      expect(system[1].text.replace(/\s/g, ' ')).toContain(
+        'VIP szektor: jegyár 12 500 Ft–15 000 Ft',
+      );
+      const header = system[0].text;
+      expect(header).toContain('CSAK akkor jelezd');
+      expect(header).toContain('Az árakra');
+      expect(header).not.toContain('hely- és szektoradatok');
+    });
+
+    it('says a price is unavailable for sectors cached before prices existed', async () => {
+      create.mockResolvedValue(okResponse());
+      const legacy = new ChatbotService(
+        { getOrThrow: () => ({ apiKey: '', model: 'test-model', maxTokens: 100 }) } as never,
+        {
+          getUpcomingMatchesSnapshot: jest.fn(async () => ({
+            ...SNAPSHOT,
+            upcomingMatches: [
+              {
+                ...SNAPSHOT.upcomingMatches[0],
+                sectors: [{ section: 'B', total: 50, free: 31, sold: 15, locked: 4 }],
+              },
+            ],
+          })),
+        } as never,
+        history as never,
+      );
+      await legacy.sendMessage({ message: 'x', owner: ALICE });
+      const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
+      expect(system[1].text).toContain('B szektor: jegyár nem elérhető');
+    });
+
+    it('puts season-pass prices, config-derived rules, weather and the refund statement into the prompt', async () => {
+      create.mockResolvedValue(okResponse());
+      await service.sendMessage({ message: 'mennyibe kerül a bérlet?', owner: ALICE });
+      const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
+      const text = system[1].text.replace(/\s/g, ' ');
+      expect(text).toContain('VIP szektor: 45 000 Ft');
+      expect(text).toContain('2026-08-01 és 2027-06-30');
+      expect(text).toContain('5 percig tartjuk fenn');
+      expect(text).toContain('legfeljebb 6 jegy');
+      expect(text).toContain('A meghívó 72 óráig érvényes');
+      expect(text).toContain('10 percig erősítheti meg');
+      expect(text).toContain('Gyenge eső, 12 °C, csapadék valószínűsége 65%');
+      expect(text).toContain('Leírás: Rangadó a bajnokságban.');
+      expect(text).toContain('nincs önkiszolgáló jegylemondás');
+      expect(text).toContain('ne találd ki');
+      // The second match has no forecast.
+      expect(text).toContain('Időjárás-előrejelzés a kezdésre: nem elérhető');
+    });
+
+    it('tells the model not to quote pass prices when the price list is unavailable', async () => {
+      create.mockResolvedValue(okResponse());
+      const noPrices = new ChatbotService(
+        { getOrThrow: () => ({ apiKey: '', model: 'test-model', maxTokens: 100 }) } as never,
+        {
+          getUpcomingMatchesSnapshot: jest.fn(async () => ({ ...SNAPSHOT, seasonPass: null })),
+        } as never,
+        history as never,
+      );
+      await noPrices.sendMessage({ message: 'x', owner: ALICE });
+      const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
+      expect(system[1].text).toContain('az árlista jelenleg nem elérhető');
+    });
+
+    it('puts the loyalty rules into the prompt, derived from the real tier table', async () => {
+      create.mockResolvedValue(okResponse());
+      await service.sendMessage({ message: 'Hogyan működik a hűségprogram?', owner: ALICE });
+      const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
+      const text = system[1].text;
+      expect(text).toContain('Hűségprogram szabályai');
+      for (const t of TIER_DEFINITIONS) {
+        expect(text).toContain(t.label);
+        expect(text).toContain(`${t.minPoints.toLocaleString('hu-HU')}`);
+        expect(text).toContain(`${t.discountPercent}%`);
+      }
+      expect(text).toContain('regisztráció +100');
+      expect(text).toContain('bérletvásárlás +500');
+    });
+
+    it('keeps the loyalty rules even when there is no upcoming match', async () => {
+      create.mockResolvedValue(okResponse());
+      const empty = new ChatbotService(
+        { getOrThrow: () => ({ apiKey: '', model: 'test-model', maxTokens: 100 }) } as never,
+        {
+          getUpcomingMatchesSnapshot: jest.fn(async () => ({ ...SNAPSHOT, upcomingMatches: [] })),
+        } as never,
+        history as never,
+      );
+      await empty.sendMessage({ message: 'x', owner: ALICE });
+      const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
+      expect(system[1].text).toContain('nincs közelgő mérkőzés');
+      expect(system[1].text).toContain('Hűségprogram szabályai');
     });
   });
 });

@@ -5,6 +5,7 @@ import { In, Repository } from 'typeorm';
 import { Match, Seat, SeasonPass, SeasonPassStatus, Ticket } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
+import { seatUnitPrice } from './seat-pricing';
 import { MatchSeatsResponseDto, SeatAvailability, SeatStatusDto, SectorSummaryDto } from './dto';
 
 @Injectable()
@@ -208,7 +209,7 @@ export class SeatsService {
       lockedSeatIds,
       seasonPassSeatIds,
     );
-    const price = Math.round(basePrice * Number(seat.priceModifier));
+    const price = seatUnitPrice(basePrice, seat.priceModifier);
 
     return {
       id: seat.id,
@@ -256,10 +257,14 @@ export class SeatsService {
           locked: 0,
           sold: 0,
           occupancyRatio: 0,
+          minPrice: seat.price,
+          maxPrice: seat.price,
         };
         map.set(seat.section, summary);
       }
       summary.total += 1;
+      summary.minPrice = Math.min(summary.minPrice, seat.price);
+      summary.maxPrice = Math.max(summary.maxPrice, seat.price);
       switch (seat.status) {
         case SeatAvailability.AVAILABLE:
           summary.available += 1;

@@ -67,3 +67,8 @@ secrets/
 
 # Local docker
 docker-compose.override.yml
+
+# Playwright
+test-results/
+playwright-report/
+**/e2e/.auth/

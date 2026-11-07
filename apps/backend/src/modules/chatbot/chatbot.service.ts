@@ -13,7 +13,10 @@ import { AnthropicConfig } from '../../config';
 import {
   ChatbotContextService,
   ChatbotContextSnapshot,
+  ChatbotLoyaltySnapshot,
   ChatbotMatchSnapshot,
+  ChatbotRulesSnapshot,
+  ChatbotSectorSnapshot,
 } from './chatbot-context.service';
 import { ChatbotHistoryService, ChatbotMessage } from './chatbot-history.service';
 
@@ -33,10 +36,12 @@ A személyes adatokra (saját jegy, saját rendelés) vonatkozó kérdéseket ut
 Szigorú szabályok a számokra és tényekre:
 - Számot (szabad hely, eladott jegy, ár, kapacitás, százalék, dátum) CSAK akkor mondhatsz, ha szó szerint szerepel az alábbi pillanatképben. Soha ne becsülj, ne kerekíts, ne számolj ki új számot, és ne következtess hiányzó adatból.
 - Ha a kért adat nincs a pillanatképben (például egy szektor, egy meccs vagy egy érték hiányzik, vagy "nem elérhető" áll mellette), mondd meg egyenesen, hogy ezt nem tudod, és irányítsd a felhasználót a jegyvásárlási oldalra vagy a jegy@kte.hu címre.
-- A hely- és szektoradatok a pillanatkép készítésének idejét tükrözik, ezért jelezd, hogy közben változhattak.
+- Csak a szabad, eladott és zárolt helyek számai mozognak gyorsan: ezek a pillanatkép készítésének idejét tükrözik, ezért CSAK akkor jelezd (a pillanatkép időpontjával), hogy közben változhattak, ha ilyen számot mondasz. Az árakra (alapár, szektorárak) és a hűségprogram szabályaira ezt NE mondd: azok nem változnak a pillanatkép érvényességi idején belül. Ha csak árat vagy szabályt közölsz, ne tégy hozzá időbélyeges figyelmeztetést. Az időjárás előrejelzés: így mutasd be, és jelezd, hogy a kezdésig változhat.
 - Hogy egy meccs hazai vagy idegenbeli-e, azt kizárólag a "Hazai/idegenbeli" sor mondja meg; ne találgasd.
 
-A jelenleg ismert következő mérkőzések:`;
+A pillanatkép a mérkőzések mellett a hűségprogram szabályait is tartalmazza; a hűségprogramról ezek alapján válaszolj, az ott szereplő számokat kimondhatod. A felhasználó saját pontjait és szintjét nem ismered — erre a profil oldalra irányítsd.
+
+A jelenleg ismert adatok:`;
 
 export interface ChatbotReply {
   conversationId: string;
@@ -125,7 +130,7 @@ export class ChatbotService {
         `Chatbot reply conv=${conversationId} user=${params.userLabel ?? 'anon'} in=${response.usage.input_tokens} out=${response.usage.output_tokens} cache_read=${response.usage.cache_read_input_tokens ?? 0} cache_create=${response.usage.cache_creation_input_tokens ?? 0}`,
       );
     } catch (error) {
-      this.logger.error(`Anthropic call failed: ${(error as Error).message}`);
+      this.logger.error(this.describeAnthropicFailure(error));
       throw new ServiceUnavailableException(
         'A chatbot szolgáltatás jelenleg nem elérhető. Próbáld újra később.',
       );
@@ -151,6 +156,33 @@ export class ChatbotService {
       reply: assistantText,
       model: this.anthropicConfig.model,
     };
+  }
+
+  /**
+   * Log-only diagnosis; the user always gets the same generic 503. Classified
+   * by HTTP status so it does not depend on SDK class identity.
+   */
+  private describeAnthropicFailure(error: unknown): string {
+    const model = this.anthropicConfig.model;
+    const err = error as { status?: number; message?: string; headers?: Record<string, string> };
+    const status = typeof err?.status === 'number' ? err.status : undefined;
+    const detail = `status=${status ?? 'none'} model=${model} message=${err?.message ?? String(error)}`;
+    switch (status) {
+      case 401:
+        return `Anthropic AUTHENTICATION failure: check ANTHROPIC_API_KEY (missing, invalid or revoked). ${detail}`;
+      case 403:
+        return `Anthropic PERMISSION denied: the key may not use this model or workspace. ${detail}`;
+      case 404:
+        return `Anthropic UNKNOWN MODEL: "${model}" not found, likely retired; update ANTHROPIC_MODEL. ${detail}`;
+      case 429:
+        return `Anthropic RATE LIMIT hit (retry-after=${err.headers?.['retry-after'] ?? 'n/a'}). ${detail}`;
+      case 529:
+        return `Anthropic OVERLOADED. ${detail}`;
+      case undefined:
+        return `Anthropic call failed without an HTTP response (network/timeout?). ${detail}`;
+      default:
+        return `Anthropic call failed. ${detail}`;
+    }
   }
 
   /**
@@ -192,8 +224,13 @@ export class ChatbotService {
 
   private formatContextBlock(context: ChatbotContextSnapshot): string {
     const matches = context.upcomingMatches;
+    const generalSections = [
+      this.formatSeasonPass(context),
+      this.formatRules(context.rules),
+      this.formatLoyalty(context.loyalty),
+    ].join('\n\n');
     if (matches.length === 0) {
-      return 'Jelenleg nincs közelgő mérkőzés a rendszerben.';
+      return `Jelenleg nincs közelgő mérkőzés a rendszerben.\n\n${generalSections}`;
     }
     const generatedLabel = new Intl.DateTimeFormat('hu-HU', {
       year: 'numeric',
@@ -221,10 +258,71 @@ export class ChatbotService {
   Alapár: ${match.basePrice.toLocaleString('hu-HU')} Ft, kapacitás: ${match.capacity}
   Elkelt: ${match.soldSeats} (${match.occupancyPercent}%), szabad: ${match.availableSeats}
   Szektorok: ${this.formatSectors(match)}
+  Időjárás-előrejelzés a kezdésre: ${this.formatWeather(match)}${match.description ? `\n  Leírás: ${match.description}` : ''}
   Státusz: ${match.status}`,
       );
     }
+    lines.push(generalSections);
     return lines.join('\n\n');
+  }
+
+  private formatWeather(match: ChatbotMatchSnapshot): string {
+    // `weather` is absent in snapshots cached before it existed.
+    const w = match.weather;
+    if (!w) {
+      return 'nem elérhető (a kezdés még túl messze van, vagy nincs adat)';
+    }
+    return `${w.summary}, ${w.temperatureCelsius} °C, csapadék valószínűsége ${w.precipitationProbabilityPercent}%${w.rainWarning ? ', esőre figyelmeztetés' : ''}`;
+  }
+
+  private formatSeasonPass(context: ChatbotContextSnapshot): string {
+    const sp = context.seasonPass;
+    if (!sp) {
+      return 'Bérletek: az árlista jelenleg nem elérhető; árat ne mondj, a bérletoldalra irányíts.';
+    }
+    const fmt = (n: number) => `${n.toLocaleString('hu-HU')} Ft`;
+    const prices = sp.prices.map((p) => `  - ${p.sectionName}: ${fmt(p.price)}`).join('\n');
+    return [
+      `Bérletek (${sp.seasonLabel} szezon, érvényes ${sp.validFrom} és ${sp.validUntil} között):`,
+      prices,
+      '  A bérlet a választott szektorban fix helyet ad az érvényességi időszakba eső mérkőzésekre; minden mérkőzéshez a profil oldalon érhető el a belépő QR-kód.',
+      '  Egy fiók szezononként egy bérlet birtokosa lehet. Megvehető másnak is (családtag, gyerek): ilyenkor a vásárláskor meg kell adni a birtokos nevét, vagy ha van fiókja, az e-mail-címét.',
+      '  Ha egy szektorban elfogytak a bérletes helyek, abban a szektorban nem lehet bérletet venni.',
+    ].join('\n');
+  }
+
+  private formatRules(r: ChatbotRulesSnapshot): string {
+    return [
+      'Jegyvásárlás és szabályok:',
+      `  - Kiválasztott székedet ${r.seatHoldMinutes} percig tartjuk fenn a fizetésig; egy vásárlásban legfeljebb ${r.maxSeatsPerOrder} jegy vehető.`,
+      '  - Belépés: minden jegyhez és bérlethez QR-kód tartozik (a profil oldalon), ezt kell a kapunál beolvastatni. Egy QR-kód egyszer használható; a meccs után a fel nem használt jegy lejár.',
+      '  - Bérletkölcsönzés: a bérlet tulajdonosa egy adott mérkőzésre e-mailben meghívhat valakit a helyére.',
+      `    A meghívó ${r.loanInvitationTtlHours} óráig érvényes, és csak a meghívott e-mail-címmel fogadható el. Nem kölcsönözhető saját magadnak, a bérlet vevőjének/birtokosának, már megkezdett mérkőzésre, és olyan mérkőzésre sem, amelyre a bérlettel már beléptek, vagy amelyre már van folyamatban lévő kölcsönzés.`,
+      '    Amíg a kölcsönzés elfogadott, a belépés joga a kölcsönvevőé; a kölcsönadó a kölcsönzést a profil oldalon visszavonhatja.',
+      '  - Várólista: csak teltházas (elfogyott) mérkőzésre lehet jelentkezni, lezárult vagy lemondott mérkőzésre nem; mérkőzésenként egy aktív jelentkezés lehet, megadható darabszám és szektor-preferencia.',
+      `    Ha hely szabadul fel, a sorban következőt értesítjük, aki ${r.waitlistClaimMinutes} percig erősítheti meg; ha nem teszi, a hely a következőé.`,
+      '  - Lemondás, visszatérítés: a portálon nincs önkiszolgáló jegylemondás vagy visszatérítés-kérés. Automatikus visszatérítés csak akkor történik, ha a fizetés után a hely vagy a bérlet mégsem adható ki. Más visszatérítési vagy lemondási szabályt nem ismersz: ezt ne találd ki, hanem irányíts a jegy@kte.hu címre.',
+    ].join('\n');
+  }
+
+  private formatLoyalty(l: ChatbotLoyaltySnapshot): string {
+    const fmt = (n: number) => n.toLocaleString('hu-HU');
+    const tiers = l.tiers
+      .map((t, i) => {
+        const next = l.tiers[i + 1];
+        const range = next
+          ? `${fmt(t.minPoints)}–${fmt(next.minPoints - 1)} pont`
+          : `${fmt(t.minPoints)} pont felett`;
+        return `  - ${t.label}: ${range}, jegykedvezmény: ${t.discountPercent}%`;
+      })
+      .join('\n');
+    const e = l.earning;
+    return [
+      'Hűségprogram szabályai:',
+      tiers,
+      `  Pontszerzés: regisztráció +${e.registration}, profil kitöltése +${e.profileCompletion}, jegyvásárlás +${e.perTicket} jegyenként, bérletvásárlás +${e.seasonPass}, bérletkölcsönzés +${e.passLoan}.`,
+      `  Szezon végén (június 30.) a pontegyenleg ${l.carryoverPercent}%-a megmarad, a többi lejár; a szint ezután újraszámolódik.`,
+    ].join('\n');
   }
 
   private formatSectors(match: ChatbotMatchSnapshot): string {
@@ -235,8 +333,17 @@ export class ChatbotService {
     return match.sectors
       .map(
         (s) =>
-          `${s.section} szektor: szabad ${s.free}, eladott ${s.sold}, zárolt ${s.locked}, összes ${s.total}`,
+          `${s.section} szektor: jegyár ${this.formatSectorPrice(s)}; helyek (mozgó adat): szabad ${s.free}, eladott ${s.sold}, zárolt ${s.locked}, összes ${s.total}`,
       )
       .join('; ');
+  }
+
+  private formatSectorPrice(s: ChatbotSectorSnapshot): string {
+    // Snapshots cached before prices existed have no price fields.
+    if (typeof s.minPrice !== 'number' || typeof s.maxPrice !== 'number') {
+      return 'nem elérhető';
+    }
+    const fmt = (n: number) => `${n.toLocaleString('hu-HU')} Ft`;
+    return s.minPrice === s.maxPrice ? fmt(s.minPrice) : `${fmt(s.minPrice)}–${fmt(s.maxPrice)}`;
   }
 }
