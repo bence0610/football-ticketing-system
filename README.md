@@ -33,14 +33,20 @@ Full-stack ticketing, season pass and loyalty platform for football clubs.
 - npm >= 10
 - MySQL 8+ futó instance
 - Redis 7+ futó instance
+- [Stripe CLI](https://docs.stripe.com/stripe-cli#install), a `PATH`-on elérhető `stripe` paranccsal (az `npm run start:all` ezt indítja)
 
 ## Stripe CLI (fizetés teszteléshez)
 
-1. Töltsd le innen: https://github.com/stripe/stripe-cli/releases
-2. Csomagold ki ide: `C:\stripe`
-3. Futtasd: `stripe login`
-4. Futtasd: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
-5. A kapott `whsec_...` kulcsot másold be az `apps/backend/.env` fájlba `STRIPE_WEBHOOK_SECRET` értékeként
+Az `npm run start:all` (és a `npm run start:stripe`) a `PATH`-on található `stripe` parancsot használja, bármely operációs rendszeren. Ha nincs telepítve, érthető hibaüzenetet ad; a backend és a frontend ilyenkor is elindul, de a webhookok nem érkeznek meg.
+
+1. Telepítsd:
+   - Windows: `scoop install stripe`, vagy a [kiadási oldalról](https://github.com/stripe/stripe-cli/releases) letöltött `stripe.exe` mappáját add hozzá a `PATH`-hoz
+   - macOS: `brew install stripe/stripe-cli/stripe`
+   - Linux: lásd https://docs.stripe.com/stripe-cli#install
+2. Ellenőrzés: `stripe --version`
+3. Futtasd egyszer: `stripe login`
+4. Az `npm run start:all` elindítja a `stripe listen --forward-to localhost:3000/api/webhooks/stripe` parancsot (más cél: `STRIPE_FORWARD_TO` környezeti változó)
+5. A `stripe listen` által kiírt `whsec_...` kulcsot másold be az `apps/backend/.env` fájlba `STRIPE_WEBHOOK_SECRET` értékeként
 
 ## Seed fiókok
 
