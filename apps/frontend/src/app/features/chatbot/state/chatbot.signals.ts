@@ -80,6 +80,14 @@ export class ChatbotStore {
       };
       this._messages.update((current) => [...current, reply]);
     } catch (error) {
+      // The server no longer accepts this conversation (expired, or not ours):
+      // drop the id so the next message starts a fresh one instead of failing forever.
+      if (
+        error instanceof HttpErrorResponse &&
+        (error.status === 403 || error.status === 404)
+      ) {
+        this._conversationId.set(null);
+      }
       const message = this.normalizeError(error);
       this._error.set(message);
     } finally {

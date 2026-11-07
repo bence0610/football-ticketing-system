@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { AppConfig } from '../../config';
 import { Match, MatchStatus, Ticket } from '../../database/entities';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
+import { isHomeMatch } from './match-home';
 import { MatchDetailDto, MatchListItemDto, QueryMatchesDto } from './dto';
 
 const UPCOMING_STATUSES: MatchStatus[] = [MatchStatus.ON_SALE, MatchStatus.SCHEDULED];
@@ -128,7 +129,7 @@ export class MatchesService {
       basePrice: Math.round(Number(match.basePrice)),
       capacity: match.capacity,
       availableSeats: available,
-      isHome: match.homeTeam === this.homeTeamName,
+      isHome: isHomeMatch(match, this.homeTeamName),
       bannerImageUrl: match.bannerImageUrl,
       isSeasonPassEligible: match.isSeasonPassEligible,
     };

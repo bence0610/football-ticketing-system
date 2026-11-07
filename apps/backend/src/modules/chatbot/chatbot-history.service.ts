@@ -64,9 +64,49 @@ export class ChatbotHistoryService {
     }
   }
 
+  /**
+   * Owner of a conversation, or null when the id is unknown / expired.
+   * Redis errors propagate on purpose: ownership cannot be verified, so the
+   * caller must fail closed rather than hand out someone's history.
+   */
+  async getOwner(conversationId: string): Promise<string | null> {
+    return this.redis.get(RedisKeys.chatbotConversationOwner(conversationId));
+  }
+
+  /** Binds a freshly issued conversation id to its owner (never overwrites). */
+  async claim(conversationId: string, owner: string): Promise<void> {
+    try {
+      await this.redis.set(
+        RedisKeys.chatbotConversationOwner(conversationId),
+        owner,
+        'EX',
+        this.ttlSeconds,
+        'NX',
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Chatbot owner claim failed for ${conversationId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /** Keeps the owner record alive as long as the history is. */
+  async touchOwner(conversationId: string): Promise<void> {
+    try {
+      await this.redis.expire(RedisKeys.chatbotConversationOwner(conversationId), this.ttlSeconds);
+    } catch (error) {
+      this.logger.warn(
+        `Chatbot owner refresh failed for ${conversationId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
   async clear(conversationId: string): Promise<void> {
     try {
-      await this.redis.del(RedisKeys.chatbotConversation(conversationId));
+      await this.redis.del(
+        RedisKeys.chatbotConversation(conversationId),
+        RedisKeys.chatbotConversationOwner(conversationId),
+      );
     } catch (error) {
       this.logger.warn(
         `Chatbot history clear failed for ${conversationId}: ${(error as Error).message}`,

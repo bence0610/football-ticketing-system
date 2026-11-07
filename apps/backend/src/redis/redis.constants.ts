@@ -15,6 +15,8 @@ export const RedisKeys = {
   waitlistNotificationLock: (matchId: string): string => `waitlist:notification-lock:${matchId}`,
   // Iteration 5 — Chatbot
   chatbotConversation: (conversationId: string): string => `chatbot:conv:${conversationId}`,
+  chatbotConversationOwner: (conversationId: string): string =>
+    `chatbot:conv-owner:${conversationId}`,
   chatbotContext: (): string => 'chatbot:context:upcoming-matches',
   // Payments — confirmation email idempotency lock
   emailConfirmLock: (paymentIntentId: string, userId: string): string =>

@@ -3,15 +3,28 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { In, MoreThan, Repository } from 'typeorm';
-import { ChatbotConfig } from '../../config';
+import { AppConfig, ChatbotConfig } from '../../config';
 import { Match, MatchStatus, Ticket } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
+import { isHomeMatch } from '../matches/match-home';
+import { SeatsService } from '../seats/seats.service';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 
 const UPCOMING_STATUSES: MatchStatus[] = [MatchStatus.ON_SALE, MatchStatus.SCHEDULED];
 
+/** Per-sector counts, taken from the seat map's own sector summary. */
+export interface ChatbotSectorSnapshot {
+  section: string;
+  total: number;
+  free: number;
+  sold: number;
+  locked: number;
+}
+
 export interface ChatbotMatchSnapshot {
   id: string;
+  /** True when the home side is the configured club (same rule as the match list). */
+  isHome: boolean;
   homeTeam: string;
   awayTeam: string;
   competition: string;
@@ -23,6 +36,8 @@ export interface ChatbotMatchSnapshot {
   soldSeats: number;
   availableSeats: number;
   occupancyPercent: number;
+  /** null = the sector data could not be loaded; [] never means "no seats". */
+  sectors: ChatbotSectorSnapshot[] | null;
 }
 
 export interface ChatbotContextSnapshot {
@@ -36,13 +51,16 @@ const TOP_MATCHES = 5;
 export class ChatbotContextService {
   private readonly logger = new Logger(ChatbotContextService.name);
   private readonly cacheTtlSeconds: number;
+  private readonly homeTeamName: string;
 
   constructor(
     @InjectRepository(Match) private readonly matchRepository: Repository<Match>,
     @InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly seatsService: SeatsService,
     configService: ConfigService,
   ) {
+    this.homeTeamName = configService.getOrThrow<AppConfig>('app').homeTeamName;
     const config = configService.getOrThrow<ChatbotConfig>('chatbot');
     this.cacheTtlSeconds = config.contextCacheTtlSeconds;
   }
@@ -75,8 +93,10 @@ export class ChatbotContextService {
     const aggregates = await this.aggregateSold(matches.map((m) => m.id));
     const snapshot: ChatbotContextSnapshot = {
       generatedAt: new Date().toISOString(),
-      upcomingMatches: matches.map((match) =>
-        this.toSnapshot(match, aggregates.get(match.id) ?? 0),
+      upcomingMatches: await Promise.all(
+        matches.map(async (match) =>
+          this.toSnapshot(match, aggregates.get(match.id) ?? 0, await this.loadSectors(match.id)),
+        ),
       ),
     };
 
@@ -107,11 +127,33 @@ export class ChatbotContextService {
     return result;
   }
 
-  private toSnapshot(match: Match, sold: number): ChatbotMatchSnapshot {
+  /** Reuses the seat map's sector summary so the chatbot and the UI agree. */
+  private async loadSectors(matchId: string): Promise<ChatbotSectorSnapshot[] | null> {
+    try {
+      const { sectorSummary } = await this.seatsService.findSeatsForMatch(matchId);
+      return sectorSummary.map((s) => ({
+        section: s.section,
+        total: s.total,
+        free: s.available,
+        sold: s.sold,
+        locked: s.locked,
+      }));
+    } catch (error) {
+      this.logger.warn(`Chatbot sector data failed for ${matchId}: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  private toSnapshot(
+    match: Match,
+    sold: number,
+    sectors: ChatbotSectorSnapshot[] | null,
+  ): ChatbotMatchSnapshot {
     const available = Math.max(0, match.capacity - sold);
     const occupancy = match.capacity > 0 ? Math.round((sold / match.capacity) * 100) : 0;
     return {
       id: match.id,
+      isHome: isHomeMatch(match, this.homeTeamName),
       homeTeam: match.homeTeam,
       awayTeam: match.awayTeam,
       competition: match.competition,
@@ -123,6 +165,7 @@ export class ChatbotContextService {
       soldSeats: sold,
       availableSeats: available,
       occupancyPercent: occupancy,
+      sectors,
     };
   }
 }

@@ -13,6 +13,7 @@ import Redis from 'ioredis';
 import { ChatbotConfig } from '../../config';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { extractClientIp } from './chatbot-caller';
 
 const WINDOW_SECONDS = 3600;
 
@@ -43,7 +44,7 @@ export class ChatbotRateLimitGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request & { user?: AuthenticatedUser }>();
 
     const isAuthenticated = !!request.user?.id;
-    const identifier = request.user?.id ?? this.extractClientIp(request);
+    const identifier = request.user?.id ?? extractClientIp(request);
     const limit = isAuthenticated ? this.limitAuth : this.limitAnon;
     const scope = isAuthenticated ? 'chatbot:auth' : 'chatbot:anon';
     const key = RedisKeys.rateLimit(scope, identifier);
@@ -82,13 +83,5 @@ export class ChatbotRateLimitGuard implements CanActivate {
       this.logger.warn(`Rate limit Redis failure (fail-open): ${(error as Error).message}`);
       return true;
     }
-  }
-
-  private extractClientIp(req: Request): string {
-    const xff = req.headers['x-forwarded-for'];
-    if (typeof xff === 'string' && xff.length > 0) {
-      return xff.split(',')[0].trim();
-    }
-    return req.ip ?? 'unknown';
   }
 }

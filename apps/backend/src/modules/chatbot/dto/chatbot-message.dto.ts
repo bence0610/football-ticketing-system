@@ -10,7 +10,7 @@ export class ChatbotMessageDto {
 
   @ApiPropertyOptional({
     description:
-      'Kliens által generált beszélgetés-azonosító. Ha hiányzik, a backend új azonosítót oszt ki és visszaadja a válaszban.',
+      'A korábbi válaszban kapott, szerver által kiosztott azonosító. Ha hiányzik, új beszélgetés indul. Csak az indító hívó folytathatja; idegen azonosító 403, ismeretlen vagy lejárt 404.',
   })
   @IsOptional()
   @IsString()

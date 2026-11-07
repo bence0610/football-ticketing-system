@@ -1,14 +1,20 @@
 import Anthropic from '@anthropic-ai/sdk';
 import {
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { AnthropicConfig } from '../../config';
-import { ChatbotContextService, ChatbotMatchSnapshot } from './chatbot-context.service';
+import {
+  ChatbotContextService,
+  ChatbotContextSnapshot,
+  ChatbotMatchSnapshot,
+} from './chatbot-context.service';
 import { ChatbotHistoryService, ChatbotMessage } from './chatbot-history.service';
 
 const SYSTEM_PROMPT_HEADER = `Te a "KTE AI Asszisztens" vagy, a Kecskeméti TE (KTE) hivatalos jegyportáljának chatbotja.
@@ -23,6 +29,12 @@ Felelősséged:
 
 Ha nem tudod a választ, irányítsd a felhasználót az ügyfélszolgálathoz: jegy@kte.hu.
 A személyes adatokra (saját jegy, saját rendelés) vonatkozó kérdéseket utasítsd el — azokat a profil oldalon érheti el a felhasználó.
+
+Szigorú szabályok a számokra és tényekre:
+- Számot (szabad hely, eladott jegy, ár, kapacitás, százalék, dátum) CSAK akkor mondhatsz, ha szó szerint szerepel az alábbi pillanatképben. Soha ne becsülj, ne kerekíts, ne számolj ki új számot, és ne következtess hiányzó adatból.
+- Ha a kért adat nincs a pillanatképben (például egy szektor, egy meccs vagy egy érték hiányzik, vagy "nem elérhető" áll mellette), mondd meg egyenesen, hogy ezt nem tudod, és irányítsd a felhasználót a jegyvásárlási oldalra vagy a jegy@kte.hu címre.
+- A hely- és szektoradatok a pillanatkép készítésének idejét tükrözik, ezért jelezd, hogy közben változhattak.
+- Hogy egy meccs hazai vagy idegenbeli-e, azt kizárólag a "Hazai/idegenbeli" sor mondja meg; ne találgasd.
 
 A jelenleg ismert következő mérkőzések:`;
 
@@ -64,11 +76,18 @@ export class ChatbotService {
     message: string;
     conversationId?: string;
     userLabel?: string;
+    /** Identity the conversation is bound to, see {@link resolveChatbotOwner}. */
+    owner: string;
   }): Promise<ChatbotReply> {
-    const conversationId = params.conversationId?.trim() || randomUUID();
+    const requestedId = params.conversationId?.trim();
+    const conversationId = requestedId || randomUUID();
     const trimmed = params.message.trim();
     if (!trimmed) {
       throw new InternalServerErrorException('Üres üzenet nem küldhető.');
+    }
+
+    if (requestedId) {
+      await this.assertOwnsConversation(requestedId, params.owner);
     }
 
     const [history, context] = await Promise.all([
@@ -83,7 +102,7 @@ export class ChatbotService {
       { type: 'text' as const, text: SYSTEM_PROMPT_HEADER },
       {
         type: 'text' as const,
-        text: this.formatContextBlock(context.upcomingMatches),
+        text: this.formatContextBlock(context),
         cache_control: { type: 'ephemeral' as const },
       },
     ];
@@ -119,6 +138,11 @@ export class ChatbotService {
       content: assistantText,
       createdAt: now,
     };
+    if (requestedId) {
+      await this.historyService.touchOwner(conversationId);
+    } else {
+      await this.historyService.claim(conversationId, params.owner);
+    }
     await this.historyService.append(conversationId, userTurn);
     await this.historyService.append(conversationId, assistantTurn);
 
@@ -127,6 +151,32 @@ export class ChatbotService {
       reply: assistantText,
       model: this.anthropicConfig.model,
     };
+  }
+
+  /**
+   * Only the caller who started a conversation may continue it. An id the
+   * server never issued (or that expired) is rejected too: adopting a
+   * client-chosen id would let anyone squat on a guessable one.
+   */
+  private async assertOwnsConversation(conversationId: string, owner: string): Promise<void> {
+    let storedOwner: string | null;
+    try {
+      storedOwner = await this.historyService.getOwner(conversationId);
+    } catch (error) {
+      this.logger.error(`Conversation owner lookup failed: ${(error as Error).message}`);
+      throw new ServiceUnavailableException(
+        'A chatbot szolgáltatás jelenleg nem elérhető. Próbáld újra később.',
+      );
+    }
+    if (storedOwner === null) {
+      throw new NotFoundException(
+        'Ez a beszélgetés nem található vagy lejárt. Indíts új beszélgetést.',
+      );
+    }
+    if (storedOwner !== owner) {
+      this.logger.warn(`Conversation ${conversationId} continuation rejected: owner mismatch`);
+      throw new ForbiddenException('Ezt a beszélgetést nem folytathatod.');
+    }
   }
 
   private extractText(response: Anthropic.Beta.PromptCaching.PromptCachingBetaMessage): string {
@@ -140,11 +190,20 @@ export class ChatbotService {
     return joined || 'Sajnálom, jelenleg nem tudok választ adni.';
   }
 
-  private formatContextBlock(matches: ChatbotMatchSnapshot[]): string {
+  private formatContextBlock(context: ChatbotContextSnapshot): string {
+    const matches = context.upcomingMatches;
     if (matches.length === 0) {
       return 'Jelenleg nincs közelgő mérkőzés a rendszerben.';
     }
-    const lines: string[] = [];
+    const generatedLabel = new Intl.DateTimeFormat('hu-HU', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Budapest',
+    }).format(new Date(context.generatedAt));
+    const lines: string[] = [`A pillanatkép készült: ${generatedLabel}`];
     for (const match of matches) {
       const kickoff = new Date(match.kickoffAt);
       const dateLabel = new Intl.DateTimeFormat('hu-HU', {
@@ -157,12 +216,27 @@ export class ChatbotService {
       }).format(kickoff);
       lines.push(
         `- ${match.homeTeam} vs ${match.awayTeam} (${match.competition})
+  Hazai/idegenbeli: ${match.isHome ? 'hazai mérkőzés (a KTE otthon játszik)' : 'idegenbeli mérkőzés'}
   Időpont: ${dateLabel}, helyszín: ${match.venue}
   Alapár: ${match.basePrice.toLocaleString('hu-HU')} Ft, kapacitás: ${match.capacity}
   Elkelt: ${match.soldSeats} (${match.occupancyPercent}%), szabad: ${match.availableSeats}
+  Szektorok: ${this.formatSectors(match)}
   Státusz: ${match.status}`,
       );
     }
     return lines.join('\n\n');
+  }
+
+  private formatSectors(match: ChatbotMatchSnapshot): string {
+    // `sectors` is absent in snapshots cached before it existed.
+    if (!match.sectors || match.sectors.length === 0) {
+      return 'szektoronkénti adat nem elérhető';
+    }
+    return match.sectors
+      .map(
+        (s) =>
+          `${s.section} szektor: szabad ${s.free}, eladott ${s.sold}, zárolt ${s.locked}, összes ${s.total}`,
+      )
+      .join('; ');
   }
 }
