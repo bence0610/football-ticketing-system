@@ -7,7 +7,10 @@ import { Match } from './match.entity';
 export enum PassLoanStatus {
   PENDING = 'pending',
   ACCEPTED = 'accepted',
+  /** The lender withdrew an accepted loan. Reserved: no code path sets it yet. */
   REVOKED = 'revoked',
+  /** The pass owner had already entered, so the entry right could not be lent. */
+  OWNER_ENTERED = 'owner_entered',
   EXPIRED = 'expired',
   USED = 'used',
   CANCELLED = 'cancelled',

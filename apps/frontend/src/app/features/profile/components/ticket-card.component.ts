@@ -27,6 +27,11 @@ import { TicketQrDialogComponent } from './ticket-qr-dialog.component';
             · {{ ticket.match.venue }}
           </span>
           <span class="status-badge" [style.background]="statusColor">{{ statusLabel }}</span>
+          @if (ticket.source === 'loan') {
+            <span class="loan-badge" data-testid="borrowed-badge">
+              <mat-icon>swap_horiz</mat-icon> Kölcsönkapott belépő – más bérlete
+            </span>
+          }
         </header>
         <mat-card-content>
           <div class="row">
@@ -98,6 +103,19 @@ import { TicketQrDialogComponent } from './ticket-qr-dialog.component';
         font-weight: 600;
         color: var(--kte-ink);
       }
+      .loan-badge {
+        align-self: flex-start;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 6px;
+        padding: 2px 10px 2px 6px;
+        border: 1px solid var(--kte-surface);
+        border-radius: var(--kte-radius);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .loan-badge mat-icon { font-size: 16px; width: 16px; height: 16px; }
       .row {
         display: flex;
         justify-content: space-between;

@@ -799,12 +799,50 @@ export class SeasonPassesService {
   }
 
   /**
+   * The error for an invitation that is no longer PENDING. Each terminal state
+   * gets a message that says what actually happened to the invitation.
+   */
+  private nonPendingLoanError(status: PassLoanStatus): HttpException {
+    switch (status) {
+      case PassLoanStatus.OWNER_ENTERED:
+        return new ConflictException({
+          statusCode: 409,
+          message:
+            'A bérletestulajdonos már belépett erre a mérkőzésre, ezért a belépőjog nem adható át.',
+          code: 'seat_already_used',
+        });
+      case PassLoanStatus.EXPIRED:
+        return new BadRequestException({
+          statusCode: 400,
+          message: 'A meghívó lejárt.',
+          code: 'loan_expired',
+        });
+      case PassLoanStatus.ACCEPTED:
+      case PassLoanStatus.USED:
+      case PassLoanStatus.COMPLETED:
+        return new BadRequestException({
+          statusCode: 400,
+          message: 'A meghívót már elfogadták.',
+          code: 'loan_already_accepted',
+        });
+      case PassLoanStatus.CANCELLED:
+      case PassLoanStatus.REVOKED:
+      default:
+        return new BadRequestException({
+          statusCode: 400,
+          message: 'A meghívót visszavonták.',
+          code: 'loan_revoked',
+        });
+    }
+  }
+
+  /**
    * Borrower-side acceptance flow.
    *
    * Inside a single transaction:
    *  1. Validates the invitation and marks the loan ACCEPTED.
    *  2. Checks the owner's SEASON_PASS Ticket status. If already USED
-   *     (owner entered the stadium), the loan is marked REVOKED and a 409
+   *     (owner entered the stadium), the loan is marked OWNER_ENTERED and a 409
    *     is returned — a used right of entry cannot be transferred.
    *  3. Deletes the owner's SEASON_PASS Ticket (if PAID) and revokes its
    *     QR — the owner's right of entry is gone for this match.
@@ -823,7 +861,7 @@ export class SeasonPassesService {
    */
   async acceptLoan(invitationToken: string, borrowerUserId: string): Promise<PassLoan> {
     // Set to true inside the transaction when the owner has already entered.
-    // We commit the REVOKED status first, then throw outside the transaction
+    // We commit the OWNER_ENTERED status first, then throw outside the transaction
     // so the terminal state is persisted before the 409 is surfaced.
     let ownerAlreadyEntered = false;
 
@@ -837,24 +875,7 @@ export class SeasonPassesService {
         throw new NotFoundException('Invitation not found');
       }
       if (loan.status !== PassLoanStatus.PENDING) {
-        const statusCodeMap: Partial<Record<PassLoanStatus, string>> = {
-          [PassLoanStatus.EXPIRED]: 'loan_expired',
-          [PassLoanStatus.CANCELLED]: 'loan_revoked',
-          [PassLoanStatus.REVOKED]: 'seat_already_used',
-        };
-        const code = statusCodeMap[loan.status] ?? 'loan_revoked';
-        if (code === 'seat_already_used') {
-          throw new ConflictException({
-            statusCode: 409,
-            message: `A meghívó már nem érvényes (állapot: ${loan.status}).`,
-            code,
-          });
-        }
-        throw new BadRequestException({
-          statusCode: 400,
-          message: `A meghívó már nem érvényes (állapot: ${loan.status}).`,
-          code,
-        });
+        throw this.nonPendingLoanError(loan.status);
       }
       if (loan.expiresAt.getTime() < Date.now()) {
         loan.status = PassLoanStatus.EXPIRED;
@@ -891,10 +912,10 @@ export class SeasonPassesService {
       });
 
       // Guard: owner already entered — the exercised entry right cannot be
-      // transferred retroactively. Mark the loan REVOKED (terminal state)
+      // transferred retroactively. Mark the loan OWNER_ENTERED (terminal state; not a revocation by anyone)
       // and let the transaction commit that status before we throw 409.
       if (ownerTicket?.status === TicketStatus.USED) {
-        loan.status = PassLoanStatus.REVOKED;
+        loan.status = PassLoanStatus.OWNER_ENTERED;
         loan.cancelledAt = new Date();
         loan.cancellationReason = 'Owner already entered the stadium for this match';
         await loanRepo.save(loan);
@@ -969,24 +990,7 @@ export class SeasonPassesService {
     }
 
     if (loan.status !== PassLoanStatus.PENDING) {
-      const statusCodeMap: Partial<Record<PassLoanStatus, string>> = {
-        [PassLoanStatus.EXPIRED]: 'loan_expired',
-        [PassLoanStatus.CANCELLED]: 'loan_revoked',
-        [PassLoanStatus.REVOKED]: 'seat_already_used',
-      };
-      const code = statusCodeMap[loan.status] ?? 'loan_revoked';
-      if (code === 'seat_already_used') {
-        throw new ConflictException({
-          statusCode: 409,
-          message: `A meghívó már nem érvényes (állapot: ${loan.status}).`,
-          code,
-        });
-      }
-      throw new BadRequestException({
-        statusCode: 400,
-        message: `A meghívó már nem érvényes (állapot: ${loan.status}).`,
-        code,
-      });
+      throw this.nonPendingLoanError(loan.status);
     }
 
     // Check time expiry WITHOUT writing back to the database.

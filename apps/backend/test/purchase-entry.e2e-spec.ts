@@ -924,7 +924,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     expect(ticket.status).toBe(TicketStatus.USED);
   });
 
-  it('scenario 9 — acceptLoan refused when owner already entered: USED ticket intact, no LOAN ticket, loan REVOKED', async () => {
+  it('scenario 9 — acceptLoan refused when owner already entered: USED ticket intact, no LOAN ticket, loan OWNER_ENTERED', async () => {
     const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
     const owner = await registerFan('accept-after-entry-owner-9');
     const borrower = await registerFan('accept-after-entry-borrower-9');
@@ -984,11 +984,11 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       .find({ where: { matchId: match.id, seatId: seatA.id, source: TicketSource.LOAN } });
     expect(loanTickets).toHaveLength(0);
 
-    // The loan must end in REVOKED state — a clear terminal signal
+    // The loan must end in OWNER_ENTERED state — a clear terminal signal
     const finalLoan = await ctx.dataSource
       .getRepository(PassLoan)
       .findOneOrFail({ where: { id: loanId } });
-    expect(finalLoan.status).toBe(PassLoanStatus.REVOKED);
+    expect(finalLoan.status).toBe(PassLoanStatus.OWNER_ENTERED);
   });
 
   /* ------------------------------------------------------------------ */

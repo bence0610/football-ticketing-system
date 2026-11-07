@@ -3,6 +3,7 @@ export type PassLoanStatus =
   | 'pending'
   | 'accepted'
   | 'revoked'
+  | 'owner_entered'
   | 'expired'
   | 'used'
   | 'cancelled'
@@ -60,6 +61,7 @@ export const PASS_LOAN_STATUS_LABELS: Record<PassLoanStatus, string> = {
   pending: 'Visszaigazolásra vár',
   accepted: 'Elfogadva',
   revoked: 'Visszavonva',
+  owner_entered: 'Nem átadható – a tulajdonos már belépett',
   expired: 'Lejárt',
   used: 'Felhasznált',
   cancelled: 'Visszavont',

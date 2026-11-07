@@ -11,7 +11,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule, DatePipe, formatDate } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -50,7 +50,24 @@ interface MatchRow {
   state: MatchRowState;
   activeLoan?: PassLoanResponse;
   completedLoan?: PassLoanResponse;
-  scannedAt?: string;
+  /** Scan time as HH:mm, only when it is a real, formattable time. */
+  scannedTime?: string;
+}
+
+/**
+ * "HH:mm" for a scan time, or undefined when there is none or it is not a
+ * valid date. The template drops the whole "beolvasva …-kor" clause then,
+ * so the sentence never has a hole in it.
+ */
+export function scanTimeLabel(value: string | undefined | null): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  try {
+    return formatDate(date, 'HH:mm', 'hu-HU') || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 @Component({
@@ -184,7 +201,7 @@ interface MatchRow {
                     </button>
                   } @else if (row.state === 'used_by_me') {
                     <span class="state-primary dimmed-label" data-testid="used-text">
-                      Felhasználva@if (row.scannedAt) { — beolvasva {{ row.scannedAt | date: 'HH:mm' : '' : 'hu-HU' }}-kor}
+                      Felhasználva@if (row.scannedTime) { — beolvasva {{ row.scannedTime }}-kor}
                     </span>
                   } @else if (row.state === 'loaned_completed') {
                     <span class="state-primary dimmed-label" data-testid="loaned-past-text">
@@ -415,7 +432,7 @@ export class SeasonPassCardComponent implements OnInit, OnChanges {
           state,
           activeLoan,
           completedLoan,
-          scannedAt: ownerTicket?.scannedAt ?? ownerTicket?.usedAt,
+          scannedTime: scanTimeLabel(ownerTicket?.scannedAt ?? ownerTicket?.usedAt),
         };
       });
   }

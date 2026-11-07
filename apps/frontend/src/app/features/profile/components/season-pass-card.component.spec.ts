@@ -6,7 +6,7 @@ import localeHu from '@angular/common/locales/hu';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { SeasonPassCardComponent } from './season-pass-card.component';
+import { SeasonPassCardComponent, scanTimeLabel } from './season-pass-card.component';
 import { MatchesService } from '../../../core/services/matches.service';
 import { SeasonPassesService } from '../../../core/services/season-passes.service';
 import type { MatchResource } from '../../../core/services/matches.service';
@@ -194,5 +194,66 @@ describe('SeasonPassCardComponent — five match-row states', () => {
     expect(el.textContent).toContain('Átadva volt');
     expect(el.querySelector('[data-testid="qr-btn"]')).toBeNull();
     expect(el.querySelector('[data-testid="revoke-btn"]')).toBeNull();
+  });
+
+  describe('scan time in the "Felhasználva" line', () => {
+    const SCANNED = '2026-09-12T16:45:00Z';
+
+    it('shows the scan time when the ticket has one', async () => {
+      const ticket = makeTicket({ status: 'used', scannedAt: SCANNED });
+      const fixture = await createFixture([], [ticket], new Date(PAST_MS).toISOString());
+      const text = fixture.nativeElement.querySelector('[data-testid="used-text"]').textContent;
+      expect(text).toMatch(/Felhasználva — beolvasva \d{2}:\d{2}-kor/);
+    });
+
+    it('falls back to usedAt when scannedAt is missing', async () => {
+      const ticket = makeTicket({ status: 'used', usedAt: SCANNED });
+      const fixture = await createFixture([], [ticket], new Date(PAST_MS).toISOString());
+      const text = fixture.nativeElement.querySelector('[data-testid="used-text"]').textContent;
+      expect(text).toMatch(/beolvasva \d{2}:\d{2}-kor/);
+    });
+
+    it('drops the whole clause when no scan time is known — no "beolvasva -kor"', async () => {
+      const ticket = makeTicket({ status: 'used' });
+      const fixture = await createFixture([], [ticket], new Date(PAST_MS).toISOString());
+      const text = fixture.nativeElement.querySelector('[data-testid="used-text"]').textContent;
+      expect(text).toContain('Felhasználva');
+      expect(text).not.toContain('beolvasva');
+      expect(text).not.toContain('-kor');
+    });
+
+    it('drops the clause for an unparseable timestamp instead of printing a hole', async () => {
+      const ticket = makeTicket({ status: 'used', scannedAt: 'not-a-date' });
+      const fixture = await createFixture([], [ticket], new Date(PAST_MS).toISOString());
+      const text = fixture.nativeElement.querySelector('[data-testid="used-text"]').textContent;
+      expect(text).not.toContain('beolvasva');
+      expect(text).not.toContain('-kor');
+    });
+
+    it('scanTimeLabel never returns an empty string', () => {
+      expect(scanTimeLabel(undefined)).toBeUndefined();
+      expect(scanTimeLabel('')).toBeUndefined();
+      expect(scanTimeLabel('garbage')).toBeUndefined();
+      expect(scanTimeLabel(SCANNED)).toMatch(/^\d{2}:\d{2}$/);
+    });
+  });
+
+  describe('validity window', () => {
+    it('lists only matches whose kickoff is inside the pass validity window', async () => {
+      const inside = { ...baseMatch, id: 'in', homeTeam: 'Belül', kickoffAt: new Date(FUTURE_MS).toISOString() };
+      const before = { ...baseMatch, id: 'before', homeTeam: 'Előtte', kickoffAt: '2026-07-31T18:00:00Z' };
+      const after = { ...baseMatch, id: 'after', homeTeam: 'Utána', kickoffAt: '2027-07-01T18:00:00Z' };
+      matchesServiceSpy.listAll.and.returnValue(of([before, inside, after]));
+      const fixture = TestBed.createComponent(SeasonPassCardComponent);
+      fixture.componentRef.setInput('pass', { ...basePass, loans: [] });
+      fixture.componentRef.setInput('myTickets', []);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const text: string = fixture.nativeElement.textContent;
+      expect(text).toContain('Belül');
+      expect(text).not.toContain('Előtte');
+      expect(text).not.toContain('Utána');
+    });
   });
 });

@@ -19,10 +19,12 @@ import {
   User,
 } from '../../database/entities';
 
-describe('SeasonPassesService – previewLoan', () => {
+describe('SeasonPassesService – previewLoan and match QR', () => {
   let service: SeasonPassesService;
 
   const mockPassLoanRepo = { findOne: jest.fn() };
+  const mockSeasonPassRepo = { findOne: jest.fn() };
+  const mockMatchRepo = { findOne: jest.fn() };
 
   const FUTURE = new Date(Date.now() + 72 * 60 * 60 * 1000);
   const PAST = new Date(Date.now() - 1 * 60 * 60 * 1000);
@@ -57,9 +59,9 @@ describe('SeasonPassesService – previewLoan', () => {
       providers: [
         SeasonPassesService,
         { provide: getRepositoryToken(PassLoan), useValue: mockPassLoanRepo },
-        { provide: getRepositoryToken(SeasonPass), useValue: { findOne: jest.fn() } },
+        { provide: getRepositoryToken(SeasonPass), useValue: mockSeasonPassRepo },
         { provide: getRepositoryToken(SeasonPassPrice), useValue: { find: jest.fn() } },
-        { provide: getRepositoryToken(Match), useValue: { findOne: jest.fn() } },
+        { provide: getRepositoryToken(Match), useValue: mockMatchRepo },
         { provide: getRepositoryToken(User), useValue: { findOne: jest.fn() } },
         { provide: DataSource, useValue: { transaction: jest.fn(), getRepository: jest.fn() } },
         {
@@ -156,11 +158,66 @@ describe('SeasonPassesService – previewLoan', () => {
     });
   });
 
-  it('throws 409 seat_already_used when the loan was REVOKED', async () => {
-    mockPassLoanRepo.findOne.mockResolvedValue(makeLoan(PassLoanStatus.REVOKED));
+  it('throws 409 seat_already_used when the owner had already entered (OWNER_ENTERED)', async () => {
+    mockPassLoanRepo.findOne.mockResolvedValue(makeLoan(PassLoanStatus.OWNER_ENTERED));
     await expect(service.previewLoan('tok-abc')).rejects.toMatchObject({
       status: 409,
-      response: { code: 'seat_already_used' },
+      response: {
+        code: 'seat_already_used',
+        message: expect.stringContaining('már belépett'),
+      },
+    });
+  });
+
+  it('a genuine REVOKED loan says it was withdrawn, never that the owner entered', async () => {
+    mockPassLoanRepo.findOne.mockResolvedValue(makeLoan(PassLoanStatus.REVOKED));
+    await expect(service.previewLoan('tok-abc')).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'loan_revoked', message: 'A meghívót visszavonták.' },
+    });
+  });
+
+  it.each([
+    [PassLoanStatus.CANCELLED, 'loan_revoked', 'A meghívót visszavonták.'],
+    [PassLoanStatus.EXPIRED, 'loan_expired', 'A meghívó lejárt.'],
+    [PassLoanStatus.ACCEPTED, 'loan_already_accepted', 'A meghívót már elfogadták.'],
+  ])('status %s has its own code and message instead of echoing the raw state', async (status, code, message) => {
+    mockPassLoanRepo.findOne.mockResolvedValue(makeLoan(status));
+    await expect(service.previewLoan('tok-abc')).rejects.toMatchObject({
+      response: { code, message },
+    });
+  });
+
+  describe('getMatchQr validity window (server-side guard)', () => {
+    const pass = {
+      id: 'pass-1',
+      userId: 'u1',
+      holderUserId: 'u1',
+      status: 'active',
+      seatId: 'seat-1',
+      validFrom: new Date('2026-08-01T00:00:00Z'),
+      validUntil: new Date('2027-06-30T23:59:59Z'),
+      holderName: 'Holder',
+    };
+
+    beforeEach(() => mockSeasonPassRepo.findOne.mockResolvedValue(pass));
+
+    it.each([
+      ['before validFrom', '2026-07-31T18:00:00Z'],
+      ['after validUntil', '2027-07-01T18:00:00Z'],
+    ])('rejects a match %s with 400 match_outside_validity and issues no QR', async (_label, kickoff) => {
+      mockMatchRepo.findOne.mockResolvedValue({ id: 'm1', kickoffAt: new Date(kickoff) });
+      await expect(service.getMatchQr('pass-1', 'm1', 'u1')).rejects.toMatchObject({
+        status: 400,
+        response: { code: 'match_outside_validity' },
+      });
+    });
+
+    it('does not even reach the QR step for an outside match (nothing is materialised)', async () => {
+      mockMatchRepo.findOne.mockResolvedValue({ id: 'm1', kickoffAt: new Date('2028-01-01T18:00:00Z') });
+      const spy = jest.spyOn(service as never, 'materializeSeasonPassTicket');
+      await expect(service.getMatchQr('pass-1', 'm1', 'u1')).rejects.toBeTruthy();
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 });
