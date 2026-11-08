@@ -19,6 +19,8 @@ export interface CartItem {
   readonly ownerToken: string;
   /** Epoch ms */
   readonly lockExpiresAtMs: number;
+  /** Hold length granted by the server (`ttlSeconds`); absent on carts persisted before this field existed. */
+  readonly lockTtlSeconds?: number;
   readonly addedAtMs: number;
 }
 

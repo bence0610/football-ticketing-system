@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Store } from '@ngrx/store';
 import { Observable, firstValueFrom, of } from 'rxjs';
 import { catchError, take } from 'rxjs/operators';
+import { lockExpiryFromTtl } from '../../shared/utils/hold-duration';
 import { CartItem, MAX_CART_ITEMS } from '../../shared/models/cart.model';
 import { SeatStatus } from '../../shared/models/seat.model';
 import { SeatsApiService } from '../../shared/services/seats.api.service';
@@ -93,7 +94,8 @@ export class CartFacade {
       category: seat.category,
       price: seat.price,
       ownerToken: lock.ownerToken,
-      lockExpiresAtMs: new Date(lock.expiresAt).getTime(),
+      lockExpiresAtMs: lockExpiryFromTtl(lock.ttlSeconds),
+      lockTtlSeconds: lock.ttlSeconds,
       addedAtMs: Date.now(),
     };
     this.store.dispatch(CartActions.addItem({ item }));

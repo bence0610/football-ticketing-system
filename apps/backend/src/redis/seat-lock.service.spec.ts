@@ -117,6 +117,29 @@ describe('SeatLockService', () => {
       expect(second).toBeNull();
     });
 
+    it('reports the configured TTL and actually applies it in Redis', async () => {
+      const configured = 420;
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          SeatLockService,
+          { provide: REDIS_CLIENT, useValue: redisMock },
+          {
+            provide: ConfigService,
+            useValue: {
+              getOrThrow: jest.fn().mockReturnValue({ seatLockTtlSeconds: configured }),
+            },
+          },
+        ],
+      }).compile();
+      const configuredService = moduleRef.get(SeatLockService);
+
+      const lock = await configuredService.acquire({ matchId: 'm1', seatId: 's9' });
+
+      // what the lock endpoint reports must equal what Redis enforces
+      expect(lock?.ttlSeconds).toBe(configured);
+      expect(await configuredService.getRemainingTtl('m1', 's9')).toBe(configured);
+    });
+
     it('honours a custom TTL', async () => {
       const lock = await service.acquire({ matchId: 'm1', seatId: 's2', ttlSeconds: 60 });
       expect(lock?.ttlSeconds).toBe(60);

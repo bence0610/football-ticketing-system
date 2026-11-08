@@ -11,6 +11,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { CartFacade } from '../../core/cart/cart.facade';
 import { CartItem } from '../../shared/models/cart.model';
 import { HufCurrencyPipe } from '../../shared/pipes/huf-currency.pipe';
+import { holdNoticeText } from '../../shared/utils/hold-duration';
 import { CountdownPipe } from '../../shared/pipes/countdown.pipe';
 
 interface CartRow extends CartItem {
@@ -98,7 +99,7 @@ interface CartRow extends CartItem {
             </div>
             <p class="kte-cart__warning">
               <mat-icon inline>info</mat-icon>
-              A foglalás 5 percig érvényes — ezalatt fejezd be a fizetést, különben a szék felszabadul.
+              {{ holdNotice() }}
             </p>
             <button
               mat-flat-button
@@ -246,6 +247,10 @@ export class CartPageComponent {
       remainingMs: Math.max(0, item.lockExpiresAtMs - now),
     }));
   });
+
+  protected readonly holdNotice = computed(() =>
+    holdNoticeText(this.cart.items().find((i) => i.lockTtlSeconds)?.lockTtlSeconds),
+  );
 
   protected readonly totalPrice = computed(() => this.cart.total());
 
