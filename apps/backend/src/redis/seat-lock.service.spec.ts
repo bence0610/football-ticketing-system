@@ -183,6 +183,17 @@ describe('SeatLockService', () => {
       expect(await service.getRemainingTtl('m1', 's1')).toBe(600);
     });
 
+    it('restarts the lock at the configured TTL when no TTL is given', async () => {
+      const lock = await service.acquire({ matchId: 'm1', seatId: 's7', ttlSeconds: 30 });
+      expect(await service.getRemainingTtl('m1', 's7')).toBe(30);
+
+      const extended = await service.extend('m1', 's7', lock!.ownerToken);
+
+      expect(extended).toBe(true);
+      // the configured default (300 in this spec's config), not a literal in the caller
+      expect(await service.getRemainingTtl('m1', 's7')).toBe(300);
+    });
+
     it('refuses to extend when the owner token differs', async () => {
       await service.acquire({ matchId: 'm1', seatId: 's1', ttlSeconds: 60 });
       const extended = await service.extend('m1', 's1', 'wrong', 600);

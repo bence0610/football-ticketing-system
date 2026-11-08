@@ -12,6 +12,7 @@ import { NgClass, NgFor, NgIf } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { SECTOR_COMPASS_LABEL, SeatStatus } from '../../../../shared/models/seat.model';
+import { coverLabel } from '../../../../shared/utils/sector-cover';
 
 interface SeatRow {
   readonly row: string;
@@ -28,6 +29,13 @@ interface SeatRow {
       <header class="kte-seat-grid__header">
         <h3>
           {{ section }} – {{ compassLabel(section) }}
+          <span
+            class="kte-seat-grid__cover"
+            *ngIf="coverText() as label"
+            [class.kte-seat-grid__cover--covered]="covered === true"
+            data-testid="grid-cover"
+            >{{ label }}</span
+          >
         </h3>
         <p>Kattints egy szabad székre a foglaláshoz.</p>
       </header>
@@ -93,6 +101,23 @@ interface SeatRow {
         font-size: 24px;
         font-weight: 700;
         color: var(--kte-brand-deep);
+      }
+
+      .kte-seat-grid__cover {
+        margin-left: 8px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        background: var(--border-light);
+        color: var(--muted);
+        font-family: var(--font-body);
+        font-size: 13px;
+        font-weight: 600;
+        vertical-align: middle;
+      }
+
+      .kte-seat-grid__cover--covered {
+        background: var(--brand-tint);
+        color: var(--brand-deep);
       }
 
       .kte-seat-grid__header p {
@@ -264,6 +289,8 @@ interface SeatRow {
 export class SeatGridComponent implements OnChanges {
   @Input() seats: readonly SeatStatus[] = [];
   @Input() section: string | null = null;
+  /** Is the selected sector under a roof? null = unknown (nothing is shown). */
+  @Input() covered: boolean | null = null;
   @Input() selectedSeat: SeatStatus | null = null;
   @Output() seatSelected = new EventEmitter<SeatStatus>();
 
@@ -334,6 +361,10 @@ export class SeatGridComponent implements OnChanges {
 
   protected trackBySeat(_index: number, seat: SeatStatus): string {
     return seat.id;
+  }
+
+  protected coverText(): string | null {
+    return coverLabel(this.covered);
   }
 
   protected compassLabel(section: string): string {

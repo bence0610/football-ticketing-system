@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -14,6 +14,7 @@ import {
   ConfirmPaymentResponseDto,
   CreatePaymentIntentDto,
   PaymentIntentResponseDto,
+  PaymentStatusResponseDto,
 } from './dto';
 import { PaymentsService } from './payments.service';
 
@@ -36,6 +37,22 @@ export class PaymentsController {
     @Body() dto: CreatePaymentIntentDto,
   ): Promise<PaymentIntentResponseDto> {
     return this.paymentsService.createPaymentIntent(user.id, dto);
+  }
+
+  @Get(':paymentIntentId/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Egy fizetés állapota (megerősítő oldalhoz)',
+    description:
+      'Csak a hívó saját fizetésére válaszol. `issued`: a jegyek létrejöttek (az összeg és a jóváírt pontok a valós adatbázisból jönnek). `processing`: a Stripe már feldolgozza/feldolgozta a fizetést, de a jegyek még nem készültek el. `failed`: a fizetés nem sikerült.',
+  })
+  @ApiOkResponse({ type: PaymentStatusResponseDto })
+  async getStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('paymentIntentId') paymentIntentId: string,
+  ): Promise<PaymentStatusResponseDto> {
+    return this.paymentsService.getPaymentStatus(paymentIntentId, user.id);
   }
 
   @Post('confirm')

@@ -1,6 +1,72 @@
 import { Injectable } from '@angular/core';
-import { Stripe, StripeElements, loadStripe } from '@stripe/stripe-js';
+import { Appearance, Stripe, StripeElements, loadStripe } from '@stripe/stripe-js';
 import { environment } from '../../../environments/environment';
+
+/** Value of a design token (CSS custom property) on :root, or the fallback. */
+function token(name: string, fallback: string): string {
+  if (typeof document === 'undefined') {
+    return fallback;
+  }
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+/**
+ * Appearance of the Payment Element. Stripe renders it in an iframe that does
+ * not see our CSS custom properties, so the concrete values are read from the
+ * design tokens at runtime - the tokens stay the single source. Fields are
+ * 50px tall with a 1.5px --border and a 10px radius; labels are 13px/500 in
+ * --muted. Stripe's own payment-method tabs are kept (layout 'tabs').
+ */
+export function stripeAppearance(): Appearance {
+  const border = token('--border', '#E7E4EC');
+  const brandDeep = token('--brand-deep', '#4A1D6A');
+  const ink = token('--ink', '#14121A');
+  const muted = token('--muted', '#5B5566');
+  const surface = token('--surface', '#FFFFFF');
+  const danger = token('--seat-sold', '#8A1C1C');
+  return {
+    theme: 'stripe',
+    labels: 'above',
+    variables: {
+      colorPrimary: brandDeep,
+      colorBackground: surface,
+      colorText: ink,
+      colorTextSecondary: muted,
+      colorDanger: danger,
+      fontFamily: 'IBM Plex Sans, system-ui, sans-serif',
+      borderRadius: '10px',
+      spacingUnit: '4px',
+    },
+    rules: {
+      '.Input': {
+        border: `1.5px solid ${border}`,
+        boxShadow: 'none',
+        padding: '12px 14px',
+        lineHeight: '24px',
+        fontSize: '16px',
+      },
+      '.Input:focus': {
+        border: `1.5px solid ${brandDeep}`,
+        boxShadow: 'none',
+      },
+      '.Label': {
+        fontSize: '13px',
+        fontWeight: '500',
+        color: muted,
+      },
+      '.Tab': {
+        border: `1.5px solid ${border}`,
+        boxShadow: 'none',
+      },
+      '.Tab--selected': {
+        border: `1.5px solid ${brandDeep}`,
+        color: brandDeep,
+        boxShadow: 'none',
+      },
+    },
+  };
+}
 
 /**
  * Lazy-loads Stripe.js once and exposes a thin Promise-based API for
@@ -31,20 +97,13 @@ export class StripeService {
     const elements = stripe.elements({
       clientSecret,
       locale: 'hu',
-      // Stripe Elements appearance values must be concrete strings — the
-      // Elements iframe does not inherit the host page's CSS custom
-      // properties. Keep these in sync with --kte-brand-deep,
-      // --kte-surface, --kte-ink, --kte-font-body, --kte-radius-sm.
-      appearance: {
-        theme: 'stripe',
-        variables: {
-          colorPrimary: '#4A1D6A',  // --kte-brand-deep
-          colorBackground: '#FFFFFF', // --kte-surface
-          colorText: '#14121A',       // --kte-ink
-          fontFamily: 'IBM Plex Sans, system-ui, sans-serif',
-          borderRadius: '8px',        // --kte-radius-sm
+      appearance: stripeAppearance(),
+      fonts: [
+        {
+          cssSrc:
+            'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap',
         },
-      },
+      ],
     });
     return { stripe, elements };
   }

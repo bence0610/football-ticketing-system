@@ -745,7 +745,7 @@
 
 **Acceptance Criteria:**
 - [x] Payment decline shows specific Stripe decline message (e.g., "Insufficient funds")
-- [x] Seat locks are extended by 2 minutes on payment failure to allow retry
+- [x] Seat locks are restarted at the configured hold (SEAT_LOCK_TTL_SECONDS) on payment failure to allow retry
 - [x] "Try Again" button re-initiates payment without navigating away
 - [x] After 3 consecutive failures, user is shown a support contact option
 - [x] Network error is handled separately from card decline

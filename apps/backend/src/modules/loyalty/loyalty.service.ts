@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, QueryFailedError, Repository } from 'typeorm';
 import {
   LoyaltyTier,
   LoyaltyTransaction,
@@ -118,6 +118,25 @@ export class LoyaltyService {
       ticketPointsPerTicket: this.config.ticketPointsPerTicket,
       recentTransactions,
     };
+  }
+
+  /**
+   * Points actually credited to the user for the given ticket-purchase
+   * references (`ticket:<id>`). Reads the ledger, so it reflects what was
+   * really awarded - not what the rules say should have been.
+   */
+  async pointsCreditedFor(userId: string, referenceIds: readonly string[]): Promise<number> {
+    if (referenceIds.length === 0) {
+      return 0;
+    }
+    const rows = await this.loyaltyRepository.find({
+      where: {
+        userId,
+        source: LoyaltyTransactionSource.TICKET_PURCHASE,
+        referenceId: In([...referenceIds]),
+      },
+    });
+    return rows.reduce((sum, row) => sum + row.points, 0);
   }
 
   getTierDefinitions(): readonly TierDefinition[] {

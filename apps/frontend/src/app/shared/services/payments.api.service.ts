@@ -6,6 +6,7 @@ import {
   CreatePaymentIntentRequest,
   MatchWeatherForecast,
   PaymentIntentResponse,
+  PaymentStatusResponse,
 } from '../models/payment.model';
 import { SKIP_ERROR_SNACKBAR } from '../../core/interceptors/error.interceptor';
 
@@ -36,6 +37,14 @@ export class PaymentsApiService {
       { paymentIntentId },
       { withCredentials: true, context: FORM_CONTEXT },
     );
+  }
+
+  /** Where a payment stands - polled by the confirmation page. Own error handling, no global snackbar. */
+  status(paymentIntentId: string): Observable<PaymentStatusResponse> {
+    return this.http.get<PaymentStatusResponse>(`/payments/${paymentIntentId}/status`, {
+      withCredentials: true,
+      context: FORM_CONTEXT,
+    });
   }
 
   weatherForMatch(matchId: string): Observable<MatchWeatherForecast> {

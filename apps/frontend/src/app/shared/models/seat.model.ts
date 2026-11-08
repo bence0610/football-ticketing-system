@@ -15,6 +15,11 @@ export interface SeatStatus {
 
 export interface SectorSummary {
   readonly section: string;
+  /**
+   * Is the sector under a roof? From the `sectors` table via the seat map.
+   * null = the server has no data: nothing may be claimed about it.
+   */
+  readonly covered: boolean | null;
   readonly total: number;
   readonly available: number;
   readonly locked: number;

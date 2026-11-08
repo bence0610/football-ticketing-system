@@ -36,6 +36,7 @@ A személyes adatokra (saját jegy, saját rendelés) vonatkozó kérdéseket ut
 Szigorú szabályok a számokra és tényekre:
 - Számot (szabad hely, eladott jegy, ár, kapacitás, százalék, dátum) CSAK akkor mondhatsz, ha szó szerint szerepel az alábbi pillanatképben. Soha ne becsülj, ne kerekíts, ne számolj ki új számot, és ne következtess hiányzó adatból.
 - Ha a kért adat nincs a pillanatképben (például egy szektor, egy meccs vagy egy érték hiányzik, vagy "nem elérhető" áll mellette), mondd meg egyenesen, hogy ezt nem tudod, és irányítsd a felhasználót a jegyvásárlási oldalra vagy a jegy@kte.hu címre.
+- A szektor fedettsége (fedett / nem fedett) állandó adat: ha a pillanatkép megadja, válaszolj róla közvetlenül (például a „melyik szektor fedett?” kérdésre sorold fel a fedett szektorokat), időbélyeges figyelmeztetés nélkül. Ha a fedettség mellett „nem elérhető” áll, mondd meg, hogy ezt nem tudod.
 - Csak a szabad, eladott és zárolt helyek számai mozognak gyorsan: ezek a pillanatkép készítésének idejét tükrözik, ezért CSAK akkor jelezd (a pillanatkép időpontjával), hogy közben változhattak, ha ilyen számot mondasz. Az árakra (alapár, szektorárak) és a hűségprogram szabályaira ezt NE mondd: azok nem változnak a pillanatkép érvényességi idején belül. Ha csak árat vagy szabályt közölsz, ne tégy hozzá időbélyeges figyelmeztetést. Az időjárás előrejelzés: így mutasd be, és jelezd, hogy a kezdésig változhat.
 - Hogy egy meccs hazai vagy idegenbeli-e, azt kizárólag a "Hazai/idegenbeli" sor mondja meg; ne találgasd.
 
@@ -333,9 +334,20 @@ export class ChatbotService {
     return match.sectors
       .map(
         (s) =>
-          `${s.section} szektor: jegyár ${this.formatSectorPrice(s)}; helyek (mozgó adat): szabad ${s.free}, eladott ${s.sold}, zárolt ${s.locked}, összes ${s.total}`,
+          `${s.section} szektor: jegyár ${this.formatSectorPrice(s)}; helyek (mozgó adat): szabad ${s.free}, eladott ${s.sold}, zárolt ${s.locked}, összes ${s.total}; fedettség: ${this.formatCoverage(s)}`,
       )
       .join('; ');
+  }
+
+  /** Only an explicit true/false is stated; a missing value is "unknown", never "open". */
+  private formatCoverage(s: ChatbotSectorSnapshot): string {
+    if (s.covered === true) {
+      return 'fedett';
+    }
+    if (s.covered === false) {
+      return 'nem fedett';
+    }
+    return 'nem elérhető';
   }
 
   private formatSectorPrice(s: ChatbotSectorSnapshot): string {

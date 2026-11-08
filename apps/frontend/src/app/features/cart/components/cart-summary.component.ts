@@ -2,17 +2,14 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { NgIf } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { LoyaltyTier } from '../../../core/models/loyalty.models';
+import {
+  TierDiscount,
+  TierDiscountRowComponent,
+} from '../../../shared/components/tier-discount-row/tier-discount-row.component';
 import { CountdownPipe } from '../../../shared/pipes/countdown.pipe';
 import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
 
-export interface CartDiscount {
-  readonly tier: LoyaltyTier;
-  readonly label: string;
-  readonly percent: number;
-  /** Forints deducted. */
-  readonly amount: number;
-}
+export type CartDiscount = TierDiscount;
 
 /**
  * Sticky summary card: ticket count and subtotal, the loyalty discount row
@@ -26,7 +23,7 @@ export interface CartDiscount {
   selector: 'kte-cart-summary',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIf, MatButtonModule, MatIconModule, CountdownPipe, HufCurrencyPipe],
+  imports: [NgIf, MatButtonModule, MatIconModule, CountdownPipe, HufCurrencyPipe, TierDiscountRowComponent],
   template: `
     <aside class="summary" aria-label="Összesítő">
       <dl class="summary__rows">
@@ -40,13 +37,7 @@ export interface CartDiscount {
         </div>
       </dl>
 
-      <div class="summary__discount" *ngIf="discount as d" [attr.data-tier]="d.tier" data-testid="summary-discount">
-        <span class="summary__discount-label">
-          <mat-icon inline aria-hidden="true">star</mat-icon>
-          {{ d.label }} kedvezmény · {{ d.percent }}%
-        </span>
-        <strong>−{{ d.amount | hufCurrency }}</strong>
-      </div>
+      <kte-tier-discount-row *ngIf="discount as d" [discount]="d"></kte-tier-discount-row>
 
       <div class="summary__total">
         <span>Fizetendő</span>
@@ -115,35 +106,6 @@ export interface CartDiscount {
         margin: 0;
         color: var(--ink);
         font-weight: 500;
-      }
-
-      .summary__discount {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 12px;
-        border-radius: var(--radius-block);
-        border: 1px solid var(--tier-pill-border);
-        background: var(--tier-pill-bg);
-        color: var(--tier-pill-fg);
-        font-size: 14px;
-        font-weight: 600;
-      }
-
-      .summary__discount-label {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .summary__discount mat-icon {
-        color: var(--tier-star);
-      }
-
-      .summary__discount strong {
-        white-space: nowrap;
-        font-family: var(--font-display);
       }
 
       .summary__total {

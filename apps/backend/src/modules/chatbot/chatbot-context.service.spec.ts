@@ -148,6 +148,13 @@ describe('ChatbotContextService', () => {
         findOne: jest.fn(async ({ where }) => matches.find((m) => m.id === where.id) ?? null),
       } as never,
       { find: jest.fn(async () => []) } as never,
+      // sectors table: B is covered, A is open, C has no row (unknown)
+      {
+        find: jest.fn(async () => [
+          { code: 'A', name: 'A szektor', isCovered: false },
+          { code: 'B', name: 'B szektor', isCovered: true },
+        ]),
+      } as never,
       redis as never,
     );
 
@@ -185,6 +192,22 @@ describe('ChatbotContextService', () => {
       weather as never,
       config,
     );
+  });
+
+  it('includes each sector\'s coverage, from the same data as the seat map', async () => {
+    const snapshot = await service.getUpcomingMatchesSnapshot();
+
+    for (const m of snapshot.upcomingMatches) {
+      const map = await seatsService.findSeatsForMatch(m.id);
+      for (const sector of m.sectors!) {
+        const onMap = map.sectorSummary.find((s) => s.section === sector.section)!;
+        expect(sector.covered).toBe(onMap.covered);
+      }
+      const by = (n: string) => m.sectors!.find((s) => s.section === n)!;
+      expect(by('B').covered).toBe(true);
+      expect(by('A').covered).toBe(false);
+      expect(by('C').covered).toBeNull(); // no row: unknown, not "open"
+    }
   });
 
   it("per-sector free counts equal the seat map's available seats", async () => {

@@ -7,6 +7,14 @@ export class SectorSummaryDto {
   @ApiProperty({ example: 'A' })
   section!: string;
 
+  @ApiProperty({
+    nullable: true,
+    example: false,
+    description:
+      'Igaz, ha a szektor fedett (esőben száraz). null: nincs adat a szektorról - ilyenkor semmit nem állítunk a fedettségről.',
+  })
+  covered!: boolean | null;
+
   @ApiProperty({ example: 100 })
   total!: number;
 

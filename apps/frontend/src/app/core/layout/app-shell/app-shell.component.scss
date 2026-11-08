@@ -152,6 +152,26 @@
     }
   }
 
+  // Brand without a link (payment step) and the right-hand security label
+  &__brand--static {
+    cursor: default;
+  }
+
+  &__secure {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--faint);
+
+    mat-icon {
+      width: 18px;
+      height: 18px;
+      font-size: 18px;
+    }
+  }
+
   &__spacer {
     flex: 1 1 auto;
   }

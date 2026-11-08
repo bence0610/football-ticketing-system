@@ -40,6 +40,7 @@ import {
   PaymentIntentSeatDto,
   PaymentIntentSeatLineDto,
 } from './dto';
+import { PaymentStatusResponseDto } from './dto/payment-status.dto';
 import { STRIPE_CLIENT } from './stripe.provider';
 
 function isDuplicateKeyError(error: unknown): boolean {
@@ -220,6 +221,90 @@ export class PaymentsService {
     } else {
       await this.finalizePaymentIntent(intent);
     }
+  }
+
+  /**
+   * State of one payment for the confirmation page. Only the owner can read
+   * it. Tickets existing means `issued` (amount and points come from the
+   * database and the loyalty ledger); otherwise Stripe is asked, so the page
+   * can tell "still being processed" from "the payment did not go through".
+   */
+  async getPaymentStatus(paymentIntentId: string, userId: string): Promise<PaymentStatusResponseDto> {
+    if (!/^pi_[A-Za-z0-9]+$/.test(paymentIntentId)) {
+      throw new BadRequestException('Érvénytelen Stripe PaymentIntent azonosító.');
+    }
+
+    const tickets = await this.ticketRepository.find({
+      where: { stripePaymentIntentId: paymentIntentId, userId },
+      relations: { match: true, seat: true },
+    });
+    if (tickets.length > 0) {
+      const match = tickets[0].match;
+      const pointsCredited = await this.loyaltyService.pointsCreditedFor(
+        userId,
+        tickets.map((t) => `ticket:${t.id}`),
+      );
+      return {
+        status: 'issued',
+        ticketIds: tickets.map((t) => t.id),
+        amountPaid: tickets.reduce((sum, t) => sum + Number(t.pricePaid), 0),
+        currency: tickets[0].currency,
+        pointsCredited,
+        confirmationEmailSentAt: this.emailSentAt(tickets),
+        match: match
+          ? {
+              id: match.id,
+              homeTeam: match.homeTeam,
+              awayTeam: match.awayTeam,
+              venue: match.venue,
+              kickoffAt: match.kickoffAt.toISOString(),
+            }
+          : null,
+        seats: tickets.map((t) => ({
+          section: t.seat?.section ?? '',
+          row: t.seat?.row ?? '',
+          number: t.seat?.number ?? 0,
+          price: Number(t.pricePaid),
+        })),
+      };
+    }
+
+    let intent: Stripe.PaymentIntent;
+    try {
+      intent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+    } catch {
+      throw new NotFoundException('A fizetés nem található.');
+    }
+    if (intent.metadata.userId && intent.metadata.userId !== userId) {
+      // Do not reveal that the payment exists.
+      throw new NotFoundException('A fizetés nem található.');
+    }
+
+    const failed = intent.status === 'canceled' || intent.status === 'requires_payment_method';
+    return {
+      status: failed ? 'failed' : 'processing',
+      ticketIds: [],
+      amountPaid: 0,
+      currency: intent.currency,
+      pointsCredited: 0,
+      confirmationEmailSentAt: null,
+      match: null,
+      seats: [],
+    };
+  }
+
+  /**
+   * When the confirmation email went out for these tickets, or null. The email
+   * covers every ticket of the payment in one message, so it counts as sent
+   * only when all of them are marked - anything less is "not sent (yet)".
+   */
+  private emailSentAt(tickets: readonly Ticket[]): string | null {
+    const stamps = tickets.map((t) => t.confirmationEmailSentAt);
+    if (stamps.length === 0 || stamps.some((s) => s == null)) {
+      return null;
+    }
+    const earliest = Math.min(...stamps.map((s) => new Date(s as Date).getTime()));
+    return new Date(earliest).toISOString();
   }
 
   /**
@@ -698,18 +783,21 @@ export class PaymentsService {
       return;
     }
 
-    // KTE-037: extend each seat lock by 120 seconds so the user can retry.
+    // KTE-037: after a failed payment, restart each seat lock at the configured
+    // hold length (SEAT_LOCK_TTL_SECONDS) so the user can retry. Deliberately no
+    // separate, shorter retry window: a second hold length would disagree with the
+    // countdown the user sees and could even cut a hold short.
     await Promise.all(
       seatIds.map((seatId, idx) => {
         const ownerToken = ownerTokens[idx];
         if (!ownerToken) {
           return Promise.resolve(false);
         }
-        return this.seatLockService.extend(matchId, seatId, ownerToken, 120);
+        return this.seatLockService.extend(matchId, seatId, ownerToken);
       }),
     );
     this.logger.warn(
-      `payment_intent.payment_failed ${intent.id} — extended ${seatIds.length} seat lock(s) by 120s.`,
+      `payment_intent.payment_failed ${intent.id} — restarted ${seatIds.length} seat lock(s) at the configured hold.`,
     );
   }
 

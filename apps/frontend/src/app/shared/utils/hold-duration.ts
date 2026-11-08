@@ -32,3 +32,14 @@ export function holdNoticeText(ttlSeconds: number | null | undefined): string {
   const duration = ttlSeconds ? `${formatHoldDuration(ttlSeconds)}ig érvényes` : 'korlátozott ideig érvényes';
   return `A foglalás ${duration} — ezalatt fejezd be a fizetést, különben a szék felszabadul.`;
 }
+
+/**
+ * Live "time left" for a hold as a Hungarian duration with the -ig suffix:
+ * "3 perc 12 másodpercig", "45 másodpercig". Built from the same
+ * formatHoldDuration() as the cart notice, so the number is only ever the
+ * server-granted hold counting down.
+ */
+export function holdRemainingText(remainingMs: number): string {
+  const seconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  return `${formatHoldDuration(seconds)}ig`;
+}

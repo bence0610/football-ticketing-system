@@ -17,6 +17,7 @@ export const CHECKOUT_STEPS: readonly string[] = ['Helyválasztás', 'Kosár', '
   imports: [MatIconModule],
   template: `
     <nav class="steps" aria-label="Vásárlás lépései">
+      <div class="steps__bar">
       <ol class="steps__list">
         @for (label of steps; track label; let i = $index; let last = $last) {
           <li
@@ -42,6 +43,8 @@ export const CHECKOUT_STEPS: readonly string[] = ['Helyválasztás', 'Kosár', '
           </li>
         }
       </ol>
+      <div class="steps__end"><ng-content></ng-content></div>
+      </div>
     </nav>
   `,
   styles: [
@@ -55,14 +58,32 @@ export const CHECKOUT_STEPS: readonly string[] = ['Helyválasztás', 'Kosár', '
         border-bottom: 1px solid var(--border);
       }
 
-      .steps__list {
+      .steps__bar {
         max-width: 1180px;
         margin: 0 auto;
         padding: 16px 32px;
+        display: flex;
+        align-items: center;
+        gap: 12px 32px;
+        flex-wrap: wrap;
+      }
+
+      .steps__list {
+        flex: 1 1 360px;
+        margin: 0;
+        padding: 0;
         list-style: none;
         display: flex;
         align-items: center;
         gap: 0;
+      }
+
+      .steps__end:empty {
+        display: none;
+      }
+
+      .steps__end {
+        flex: 0 0 auto;
       }
 
       .steps__item {
@@ -149,8 +170,11 @@ export const CHECKOUT_STEPS: readonly string[] = ['Helyválasztás', 'Kosár', '
       }
 
       @media (max-width: 599px) {
-        .steps__list {
+        .steps__bar {
           padding: 12px 16px;
+        }
+        .steps__end {
+          flex: 1 1 100%;
         }
         .steps__line {
           margin: 0 8px;
@@ -172,5 +196,6 @@ export const CHECKOUT_STEPS: readonly string[] = ['Helyválasztás', 'Kosár', '
 })
 export class CheckoutStepsComponent {
   @Input() current = 0;
-  protected readonly steps = CHECKOUT_STEPS;
+  /** Step labels, in order. The cart shows four; checkout shows three. */
+  @Input() steps: readonly string[] = CHECKOUT_STEPS;
 }

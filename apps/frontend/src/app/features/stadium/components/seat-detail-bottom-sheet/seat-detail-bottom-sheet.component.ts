@@ -12,6 +12,7 @@ import { SeatDetailPanelComponent } from '../seat-detail-panel/seat-detail-panel
 
 export interface SeatDetailBottomSheetData {
   readonly seat: SeatStatus | null;
+  readonly covered: boolean | null;
   readonly activeLock: LockSeatResponse | null;
   readonly lockExpiresAtMs: number | null;
   readonly locking: boolean;
@@ -25,6 +26,7 @@ export interface SeatDetailBottomSheetData {
   template: `
     <kte-seat-detail-panel
       [seat]="seat"
+      [covered]="covered"
       [activeLock]="activeLock"
       [lockExpiresAtMs]="lockExpiresAtMs"
       [locking]="locking"
@@ -44,6 +46,7 @@ export interface SeatDetailBottomSheetData {
 })
 export class SeatDetailBottomSheetComponent {
   @Input() seat: SeatStatus | null = null;
+  @Input() covered: boolean | null = null;
   @Input() activeLock: LockSeatResponse | null = null;
   @Input() lockExpiresAtMs: number | null = null;
   @Input() locking = false;
@@ -54,6 +57,7 @@ export class SeatDetailBottomSheetComponent {
 
   constructor(@Inject(MAT_BOTTOM_SHEET_DATA) data: SeatDetailBottomSheetData) {
     this.seat = data.seat;
+    this.covered = data.covered;
     this.activeLock = data.activeLock;
     this.lockExpiresAtMs = data.lockExpiresAtMs;
     this.locking = data.locking;

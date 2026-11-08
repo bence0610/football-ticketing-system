@@ -26,6 +26,38 @@ export interface ConfirmPaymentResponse {
   readonly ticketIds: readonly string[];
 }
 
+export type PaymentStatusKind = 'issued' | 'processing' | 'failed';
+
+/** GET /payments/:paymentIntentId/status - amount and points come from the server's records. */
+export interface PaymentStatusResponse {
+  readonly status: PaymentStatusKind;
+  readonly ticketIds: readonly string[];
+  /** HUF actually paid; 0 until issued. */
+  readonly amountPaid: number;
+  readonly currency: string;
+  /** Points credited for these tickets (loyalty ledger); 0 until credited. */
+  readonly pointsCredited: number;
+  /**
+   * When the confirmation email was handed to the mail server. Null until it
+   * has been sent (it goes out shortly AFTER the tickets are issued, and may
+   * never go out): only a set value allows saying an email was sent.
+   */
+  readonly confirmationEmailSentAt?: string | null;
+  readonly match: {
+    readonly id: string;
+    readonly homeTeam: string;
+    readonly awayTeam: string;
+    readonly venue: string;
+    readonly kickoffAt: string;
+  } | null;
+  readonly seats: readonly {
+    readonly section: string;
+    readonly row: string;
+    readonly number: number;
+    readonly price: number;
+  }[];
+}
+
 export interface MatchWeatherForecast {
   readonly matchId: string;
   readonly city: string;

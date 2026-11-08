@@ -109,20 +109,19 @@ export class MatchSeatsController {
   @ApiOperation({
     summary: 'Szék zárolásának meghosszabbítása',
     description:
-      'A meglévő TTL-t újraindítja a megadott értékre, ha az ownerToken egyezik. Fizetési hiba utáni retry forgatókönyvhöz használjuk.',
+      'A meglévő TTL-t újraindítja a beállított foglalási időre (SEAT_LOCK_TTL_SECONDS), ha az ownerToken egyezik. A hossz szerveroldali beállítás, a kliens nem adhat meg sajátot. Fizetési hiba utáni retry forgatókönyvhöz használjuk.',
   })
   @ApiOkResponse({ type: LockSeatResponseDto })
   async extendLock(
     @Param('matchId', new ParseUUIDPipe()) matchId: string,
     @Param('seatId', new ParseUUIDPipe()) seatId: string,
     @Query('ownerToken') ownerToken: string,
-    @Query('ttlSeconds') ttlSeconds?: string,
   ): Promise<LockSeatResponseDto> {
     if (!ownerToken) {
       throw new NotFoundException('ownerToken query paraméter kötelező.');
     }
-    const ttl = ttlSeconds ? Math.max(parseInt(ttlSeconds, 10) || 0, 60) : undefined;
-    const ok = await this.seatLockService.extend(matchId, seatId, ownerToken, ttl);
+    // The hold length is the configured one (SeatLockService default); never client-chosen.
+    const ok = await this.seatLockService.extend(matchId, seatId, ownerToken);
     if (!ok) {
       throw new ConflictException('A zárolás már lejárt vagy másé.');
     }

@@ -33,6 +33,12 @@ export interface ChatbotSectorSnapshot {
   /** Ticket price in HUF, from the seat map's sector summary (see seatUnitPrice). */
   minPrice: number;
   maxPrice: number;
+  /**
+   * Is the sector under a roof, from the `sectors` table via the seat map's sector
+   * summary. null = no data. Absent in snapshots cached before it existed - both
+   * mean "unknown", never "open".
+   */
+  covered?: boolean | null;
 }
 
 /** Forecast for the kickoff; only present when the match is inside the forecast horizon. */
@@ -312,6 +318,7 @@ export class ChatbotContextService {
         locked: s.locked,
         minPrice: s.minPrice,
         maxPrice: s.maxPrice,
+        covered: s.covered ?? null,
       }));
     } catch (error) {
       this.logger.warn(`Chatbot sector data failed for ${matchId}: ${(error as Error).message}`);

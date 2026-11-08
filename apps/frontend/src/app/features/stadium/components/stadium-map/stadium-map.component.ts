@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import { NgFor, NgIf } from '@angular/common';
 import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/seat.model';
+import { coverDescription, coverLabel } from '../../../../shared/utils/sector-cover';
 
 interface SectorPath {
   readonly section: string;
@@ -71,7 +72,7 @@ const SECTORS: readonly SectorPath[] = [
             tabindex="0"
             role="button"
             [attr.aria-pressed]="sector.section === selectedSection"
-            [attr.aria-label]="sector.label + ': ' + getSummaryText(sector.section)"
+            [attr.aria-label]="sector.label + ': ' + getSummaryText(sector.section) + coverAria(sector.section)"
           >
             <path
               [attr.d]="sector.path"
@@ -101,6 +102,19 @@ const SECTORS: readonly SectorPath[] = [
               pointer-events="none"
             >
               {{ compassLabel(sector.section) }}
+            </text>
+            <text
+              *ngIf="coverText(sector.section) as cover"
+              [attr.x]="sector.labelX"
+              [attr.y]="sector.labelY + 32"
+              text-anchor="middle"
+              font-size="10"
+              font-weight="600"
+              fill="#ffffff"
+              pointer-events="none"
+              data-testid="map-cover"
+            >
+              {{ cover }}
             </text>
           </g>
         </g>
@@ -176,6 +190,16 @@ export class StadiumMapComponent {
 
   protected trackBySection(_index: number, item: SectorPath): string {
     return item.section;
+  }
+
+  /** "Fedett" / "Nyitott", or null when the server has no data for the sector. */
+  protected coverText(section: string): string | null {
+    return coverLabel(this.sectorSummary.find((s) => s.section === section)?.covered);
+  }
+
+  protected coverAria(section: string): string {
+    const text = coverDescription(this.sectorSummary.find((s) => s.section === section)?.covered);
+    return text ? ', ' + text : '';
   }
 
   protected compassLabel(section: string): string {

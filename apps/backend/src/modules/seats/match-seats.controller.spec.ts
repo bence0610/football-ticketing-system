@@ -12,6 +12,7 @@ import {
   Seat,
   SeasonPass,
   SeatCategory,
+  Sector,
   Ticket,
   TicketStatus,
 } from '../../database/entities';
@@ -139,6 +140,7 @@ describe('MatchSeatsController – integration', () => {
   let seatRepoMock: { find: jest.Mock };
   let ticketRepoMock: { find: jest.Mock };
   let seasonPassRepoMock: { find: jest.Mock };
+  let sectorRepoMock: { find: jest.Mock };
 
   // Shared Redis mock — pipeline.exec is reconfigured per test via setData().
   let redisPipeline: { get: jest.Mock; exec: jest.Mock };
@@ -163,6 +165,7 @@ describe('MatchSeatsController – integration', () => {
     seatRepoMock = { find: jest.fn() };
     ticketRepoMock = { find: jest.fn() };
     seasonPassRepoMock = { find: jest.fn() };
+    sectorRepoMock = { find: jest.fn() };
 
     redisPipeline = {
       get: jest.fn().mockReturnThis(),
@@ -190,6 +193,7 @@ describe('MatchSeatsController – integration', () => {
         { provide: getRepositoryToken(Ticket), useValue: ticketRepoMock },
         { provide: getRepositoryToken(Match), useValue: matchRepoMock },
         { provide: getRepositoryToken(SeasonPass), useValue: seasonPassRepoMock },
+        { provide: getRepositoryToken(Sector), useValue: sectorRepoMock },
         { provide: REDIS_CLIENT, useValue: redisMock },
         {
           provide: SeatLockService,
@@ -230,6 +234,13 @@ describe('MatchSeatsController – integration', () => {
     seatRepoMock.find.mockResolvedValue([]);
     ticketRepoMock.find.mockResolvedValue([]);
     seasonPassRepoMock.find.mockResolvedValue([]);
+    // the real stadium: VIP and B are covered, A and C are open
+    sectorRepoMock.find.mockResolvedValue([
+      { code: 'A', name: 'A szektor', isCovered: false },
+      { code: 'B', name: 'B szektor', isCovered: true },
+      { code: 'C', name: 'C szektor', isCovered: false },
+      { code: 'VIP', name: 'VIP szektor', isCovered: true },
+    ]);
     redisPipeline.get.mockReturnThis();
     redisPipeline.exec.mockResolvedValue([]);
     redisMock.pipeline.mockReturnValue(redisPipeline);
@@ -386,6 +397,34 @@ describe('MatchSeatsController – integration', () => {
       expect(summary.sold).toBe(1);
       // (locked + sold) / total = 2/3 ≈ 0.67
       expect(summary.occupancyRatio).toBeCloseTo(0.67, 1);
+    });
+
+    it('carries each sector\'s covered flag from the sectors table (VIP and B covered, A and C open)', async () => {
+      setData(makeMatch(), [
+        makeSeat(SEAT_ID_FREE, 'A', '1', 1),
+        makeSeat('b-1', 'B', '1', 1),
+        makeSeat('c-1', 'C', '1', 1),
+        makeSeat('v-1', 'VIP', '1', 1),
+      ]);
+
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+
+      const covered = Object.fromEntries(
+        res.body.sectorSummary.map((s: { section: string; covered: boolean | null }) => [s.section, s.covered]),
+      );
+      expect(covered).toEqual({ A: false, B: true, C: false, VIP: true });
+    });
+
+    it('reports a sector with no row in the sectors table as unknown (null), never as open', async () => {
+      sectorRepoMock.find.mockResolvedValue([{ code: 'B', name: 'B szektor', isCovered: true }]);
+      setData(makeMatch(), [makeSeat('b-1', 'B', '1', 1), makeSeat('x-1', 'X', '1', 1)]);
+
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+
+      const bySection = Object.fromEntries(
+        res.body.sectorSummary.map((s: { section: string; covered: boolean | null }) => [s.section, s.covered]),
+      );
+      expect(bySection).toEqual({ B: true, X: null });
     });
 
     it('should sort sectorSummary alphabetically by section', async () => {
@@ -580,6 +619,30 @@ describe('MatchSeatsController – integration', () => {
       await request(app.getHttpServer())
         .delete(`/matches/${MATCH_ID}/seats/not-a-uuid/lock?ownerToken=${OWNER_TOKEN}`)
         .expect(400);
+    });
+  });
+
+  describe('POST /matches/:matchId/seats/:seatId/lock/extend', () => {
+    it('restarts the lock at the configured hold and ignores any client-supplied TTL', async () => {
+      setData(makeMatch());
+
+      await request(app.getHttpServer())
+        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock/extend?ownerToken=${OWNER_TOKEN}&ttlSeconds=99999`)
+        .expect(200);
+
+      // (match, seat, token) only: no TTL is passed, the lock service applies its configured default
+      expect(seatLockExtend).toHaveBeenCalledWith(MATCH_ID, SEAT_ID_FREE, OWNER_TOKEN);
+    });
+
+    it('returns the remaining hold read back from Redis', async () => {
+      setData(makeMatch());
+      seatLockGetRemainingTtl.mockResolvedValue(300);
+
+      const res = await request(app.getHttpServer())
+        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock/extend?ownerToken=${OWNER_TOKEN}`)
+        .expect(200);
+
+      expect(res.body.ttlSeconds).toBe(300);
     });
   });
 });

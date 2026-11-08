@@ -33,7 +33,7 @@ describe('PaymentsService', () => {
     webhooks: { constructEvent: jest.fn() },
     refunds: { create: jest.fn() },
   };
-  const mockSeatLockService = { release: jest.fn() };
+  const mockSeatLockService = { release: jest.fn(), extend: jest.fn() };
   const mockDataSource = {
     transaction: jest.fn(),
     getRepository: jest.fn().mockReturnValue({ findOne: jest.fn().mockResolvedValue(null) }),
@@ -140,6 +140,30 @@ describe('PaymentsService', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+  });
+
+  describe('payment_intent.payment_failed', () => {
+    it('restarts each seat lock at the configured hold - no separate retry length', async () => {
+      mockSeatLockService.extend.mockResolvedValue(true);
+      const event = {
+        type: 'payment_intent.payment_failed',
+        data: {
+          object: {
+            id: 'pi_3Failed',
+            metadata: { matchId: 'm-1', seatIds: 's-1,s-2', ownerTokens: 'tok-1,tok-2' },
+          },
+        },
+      } as never;
+
+      await service.handleEvent(event);
+
+      // exactly (match, seat, token): the TTL argument is left to the lock service's
+      // configured default (SEAT_LOCK_TTL_SECONDS), so it can never disagree with the hold
+      expect(mockSeatLockService.extend.mock.calls).toEqual([
+        ['m-1', 's-1', 'tok-1'],
+        ['m-1', 's-2', 'tok-2'],
+      ]);
     });
   });
 

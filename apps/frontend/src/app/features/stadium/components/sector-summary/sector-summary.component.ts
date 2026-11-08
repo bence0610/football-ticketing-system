@@ -9,6 +9,7 @@ import { NgClass, NgFor, NgIf } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/seat.model';
+import { coverDescription, coverLabel } from '../../../../shared/utils/sector-cover';
 
 @Component({
   selector: 'kte-sector-summary',
@@ -34,6 +35,14 @@ import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/s
           <header class="kte-sector-card__header">
             <span class="kte-sector-card__section">{{ summary.section }}</span>
             <span class="kte-sector-card__compass">{{ compassLabel(summary.section) }}</span>
+            <span
+              class="kte-sector-card__cover"
+              *ngIf="cover(summary) as label"
+              [class.kte-sector-card__cover--covered]="summary.covered === true"
+              [attr.title]="coverText(summary)"
+              data-testid="sector-cover"
+              >{{ label }}</span
+            >
           </header>
 
           <p class="kte-sector-card__numbers">
@@ -108,6 +117,21 @@ import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/s
         color: var(--kte-brand-deep);
       }
 
+      .kte-sector-card__cover {
+        margin-left: auto;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--border-light);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .kte-sector-card__cover--covered {
+        background: var(--brand-tint);
+        color: var(--brand-deep);
+      }
+
       .kte-sector-card__compass {
         font-size: 11px;
         text-transform: uppercase;
@@ -163,6 +187,15 @@ import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/s
 })
 export class SectorSummaryComponent {
   @Input() summaries: readonly SectorSummary[] = [];
+
+  protected cover(summary: SectorSummary): string | null {
+    return coverLabel(summary.covered);
+  }
+
+  protected coverText(summary: SectorSummary): string | null {
+    return coverDescription(summary.covered);
+  }
+
   @Input() selectedSection: string | null = null;
   @Output() sectorSelected = new EventEmitter<string>();
 

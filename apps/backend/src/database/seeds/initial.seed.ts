@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { Match, MatchStatus, Competition } from '../entities/match.entity';
 import { Seat, SeatCategory } from '../entities/seat.entity';
+import { Sector } from '../entities/sector.entity';
 import { SeasonPassPrice } from '../entities/season-pass-price.entity';
 import { User, UserRole, LoyaltyTier } from '../entities/user.entity';
 
@@ -48,6 +49,14 @@ const STADIUM_LAYOUT: SeatBlueprint[] = [
     category: SeatCategory.VIP,
     priceModifier: '2.50',
   },
+];
+
+/** Which stadium sectors are under a roof. Mirrors the Sectors migration. */
+const SECTORS: ReadonlyArray<{ code: string; name: string; isCovered: boolean }> = [
+  { code: 'A', name: 'A szektor', isCovered: false },
+  { code: 'B', name: 'B szektor', isCovered: true },
+  { code: 'C', name: 'C szektor', isCovered: false },
+  { code: 'VIP', name: 'VIP szektor', isCovered: true },
 ];
 
 export async function runInitialSeed(dataSource: DataSource): Promise<void> {
@@ -113,6 +122,16 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
     logger.log('Created kapu@kte.hu (password: Kapu123!)');
   } else {
     logger.log('Gate user already exists, skipping.');
+  }
+
+  // 4b. Sectors (idempotent per code; never overwrites a value someone changed)
+  const sectorRepo = dataSource.getRepository(Sector);
+  for (const sector of SECTORS) {
+    const existing = await sectorRepo.findOne({ where: { code: sector.code } });
+    if (!existing) {
+      await sectorRepo.save(sectorRepo.create({ id: randomUUID(), ...sector }));
+      logger.log(`Created sector ${sector.code} (covered: ${sector.isCovered})`);
+    }
   }
 
   // 5. Seats (idempotent)

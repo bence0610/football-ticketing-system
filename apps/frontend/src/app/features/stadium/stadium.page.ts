@@ -37,7 +37,7 @@ import {
   selectSelectedSeat,
   selectSelectedSection,
 } from '../../state/seats';
-import { LockSeatResponse, SeatStatus } from '../../shared/models/seat.model';
+import { LockSeatResponse, SeatStatus, SectorSummary } from '../../shared/models/seat.model';
 import { CartFacade } from '../../core/cart/cart.facade';
 import { MatchListItem } from '../../shared/models/match.model';
 import { MatchSelectorComponent } from './components/match-selector/match-selector.component';
@@ -128,6 +128,7 @@ import { lockErrorMessage } from '../../shared/utils/lock-error';
           >
             <kte-seat-detail-panel
               [seat]="(selectedSeat$ | async) ?? null"
+              [covered]="(selectedSeatCovered$ | async) ?? null"
               [activeLock]="(activeLock$ | async) ?? null"
               [lockExpiresAtMs]="(lockExpiresAtMs$ | async) ?? null"
               [locking]="(locking$ | async) ?? false"
@@ -152,6 +153,7 @@ import { lockErrorMessage } from '../../shared/utils/lock-error';
             <kte-seat-grid
               [seats]="(seatsForSector$ | async) ?? []"
               [section]="(selectedSection$ | async) ?? null"
+              [covered]="(selectedSectorCovered$ | async) ?? null"
               [selectedSeat]="(selectedSeat$ | async) ?? null"
               (seatSelected)="onSeatSelected($event)"
             ></kte-seat-grid>
@@ -338,8 +340,17 @@ export class StadiumPageComponent implements OnInit {
   protected readonly locking$ = this.store.select(selectLocking);
   protected readonly seatsForSector$ = this.store.select(selectSeatsForSelectedSector);
 
+  /** Coverage of the selected sector / seat, from the seat map's sector summary. */
+  protected readonly selectedSectorCovered$ = combineLatest([this.selectedSection$, this.summaries$]).pipe(
+    map(([section, sums]) => sums.find((s) => s.section === section)?.covered ?? null),
+  );
+  protected readonly selectedSeatCovered$ = combineLatest([this.selectedSeat$, this.summaries$]).pipe(
+    map(([seat, sums]) => (seat ? sums.find((s) => s.section === seat.section)?.covered ?? null : null)),
+  );
+
   protected readonly isMobile = signal<boolean>(false);
 
+  private latestSummaries: readonly SectorSummary[] = [];
   private currentMatchId: string | null = null;
   private currentMatch: MatchListItem | null = null;
   private currentLock: LockSeatResponse | null = null;
@@ -388,6 +399,8 @@ export class StadiumPageComponent implements OnInit {
       .subscribe((state) => {
         this.isMobile.set(state.matches);
       });
+
+    this.summaries$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((s) => (this.latestSummaries = s));
 
     // Mobile bottom-sheet for the selected seat.
     combineLatest([
@@ -535,7 +548,8 @@ export class StadiumPageComponent implements OnInit {
       this.mobileSheetRef = null;
     }
 
-    const data: SeatDetailBottomSheetData = { seat, activeLock, lockExpiresAtMs, locking };
+    const covered = this.latestSummaries.find((s) => s.section === seat.section)?.covered ?? null;
+    const data: SeatDetailBottomSheetData = { seat, covered, activeLock, lockExpiresAtMs, locking };
     this.mobileSheetRef = this.bottomSheet.open(SeatDetailBottomSheetComponent, {
       data,
       panelClass: 'kte-bottom-sheet',

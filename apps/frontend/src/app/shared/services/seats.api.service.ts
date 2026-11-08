@@ -43,18 +43,12 @@ export class SeatsApiService {
   }
 
   /**
-   * POST /matches/:matchId/seats/:seatId/lock/extend — extends an existing lock.
+   * POST /matches/:matchId/seats/:seatId/lock/extend — restarts an existing lock.
    * Used by KTE-037 to give the user a retry window after a failed payment.
+   * The new hold length is the server's configured one; the client cannot pick it.
    */
-  extendLock(
-    matchId: string,
-    seatId: string,
-    ownerToken: string,
-    ttlSeconds = 120,
-  ): Observable<LockSeatResponse> {
-    const params = new HttpParams()
-      .set('ownerToken', ownerToken)
-      .set('ttlSeconds', String(ttlSeconds));
+  extendLock(matchId: string, seatId: string, ownerToken: string): Observable<LockSeatResponse> {
+    const params = new HttpParams().set('ownerToken', ownerToken);
     return this.http.post<LockSeatResponse>(
       `/matches/${matchId}/seats/${seatId}/lock/extend`,
       {},

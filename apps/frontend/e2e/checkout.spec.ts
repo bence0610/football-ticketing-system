@@ -6,134 +6,145 @@ import {
   SEAT_ID_AVAILABLE,
   OWNER_TOKEN,
   PAYMENT_INTENT_RESPONSE,
-  PAYMENT_INTENT_ID,
   WEATHER_RAIN_WARNING,
   WEATHER_CLEAR,
   AUTH_RESPONSE,
 } from './fixtures/api-mocks';
 
 /**
- * E2E tests for the Checkout page (/checkout) and Confirmation page
- * (/checkout/confirmation) – EPIC E6.
+ * E2E tests for the Checkout page (/checkout) and the Confirmation page
+ * (/checkout/confirmation).
  *
- * The Stripe.js payment element renders inside a third-party iframe that we
- * cannot interact with in a fully mocked test. Instead, these tests:
- *  - Stub the /api/payments/intent endpoint to skip real API calls.
- *  - Override window.Stripe via page.addInitScript() so the Angular
- *    StripeService resolves without loading the Stripe SDK from cdn.
- *  - Assert on the Angular-owned UI (loading spinner, buyer details,
- *    order summary, weather banner, error states, confirmation page).
+ * The Stripe Payment Element renders inside a third-party iframe that cannot
+ * be driven in a fully mocked test, so window.Stripe is replaced by a stub
+ * that reports `ready` and returns a scripted payment result. The assertions
+ * are on the Angular-owned UI.
  *
- * Scenarios:
- *  Checkout page:
- *   1. Empty cart shows the empty-state card on /checkout
- *   2. With cart items: page heading and "Back to cart" link visible
- *   3. Buyer details card shows the authenticated user's name and email
- *   4. Order summary shows each seat and the total
- *   5. Lock countdown is visible in the summary aside
- *   6. Stripe loading spinner appears while the payment element mounts
- *   7. Weather rain warning banner shows for non-VIP sectors
- *   8. Weather banner is NOT shown when the forecast has no rain warning
- *   9. Weather banner is NOT shown when all cart seats are in the VIP sector
- *  10. Payment button is initially disabled while Stripe element is loading
- *  11. Initialization error renders when the /payments/intent API fails
- *
- *  Confirmation page:
- *  12. Guard card renders when arriving at /checkout/confirmation without state
- *  13. Success card renders with order ID, seats, and total when state is set
- *  14. "Profil megnyitása" link goes to /profile
- *  15. "Vissza a kezdőlapra" link goes to /
+ * Checkout:
+ *   1. Empty cart shows the empty state
+ *   2. Stripped header: mark, "Biztonságos fizetés", no navigation to wander off
+ *   3. Step bar (Helyválasztás done, Fizetés current) and the live hold pill
+ *   4. Buyer line, the Stripe note and the order summary
+ *   5. Loading state, disabled pay button, initialisation error
+ *   6. Weather band only for a real forecast, with the coverage line
+ *   7. A hold that expires: alert names the seat, nothing charged, pay for the rest
+ *   8. At 360px: no sideways scroll, summary below the form
+ * Confirmation:
+ *   9. No payment id -> nothing to confirm
+ *  10. Issued -> "Megvan a jegyed" with real amount/points; processing -> calm
+ *      state without retry, refreshes by itself; failed -> plain message
  */
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const PI = 'pi_3E2ePayment000001';
+const SECOND_PI = 'pi_3E2ePayment000002';
 
-async function mockRefreshSuccess(page: import('@playwright/test').Page): Promise<void> {
+async function mockRefreshSuccess(page: Page): Promise<void> {
   await page.route('**/auth/refresh', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(AUTH_RESPONSE) }),
+  );
+}
+
+async function mockLoyalty(page: Page, snapshot?: Record<string, unknown>): Promise<void> {
+  await page.route('**/loyalty/me', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(AUTH_RESPONSE),
+      body: JSON.stringify(
+        snapshot ?? {
+          points: 0,
+          tier: { tier: 'bronze', label: 'Kék', minPoints: 0, discountPercent: 0, color: '#1F5C8B' },
+          ticketPointsPerTicket: 50,
+          recentTransactions: [],
+        },
+      ),
     }),
   );
 }
 
-async function mockRefreshFail(page: import('@playwright/test').Page): Promise<void> {
-  await page.route('**/auth/refresh', (route) =>
-    route.fulfill({ status: 401, body: 'Unauthorized' }),
-  );
-}
-
-async function mockPaymentIntent(page: import('@playwright/test').Page): Promise<void> {
-  await page.route('**/payments/create-intent', (route) =>
-    route.fulfill({
-      status: 201,
-      contentType: 'application/json',
-      body: JSON.stringify(PAYMENT_INTENT_RESPONSE),
-    }),
-  );
-}
-
-async function mockPaymentIntentFail(page: import('@playwright/test').Page): Promise<void> {
-  await page.route('**/payments/create-intent', (route) =>
-    route.fulfill({
-      status: 500,
-      contentType: 'application/json',
-      body: JSON.stringify({ statusCode: 500, message: 'Internal Server Error' }),
-    }),
-  );
-}
-
-async function mockWeather(
-  page: import('@playwright/test').Page,
-  body: unknown,
+/** The seat map's sector summary, with the coverage flag the weather band reads. */
+async function mockSectors(
+  page: Page,
+  covered: Record<string, boolean | null> = { A: false, B: true, C: false, VIP: true },
 ): Promise<void> {
-  await page.route('**/weather/match/**', (route) =>
+  await page.route('**/matches/*/seats', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        matchId: MATCH_ID_1,
+        seats: [],
+        sectorSummary: Object.entries(covered).map(([section, flag]) => ({
+          section,
+          covered: flag,
+          total: 100,
+          available: 50,
+          locked: 0,
+          sold: 50,
+          occupancyRatio: 0.5,
+          minPrice: 3500,
+          maxPrice: 3500,
+        })),
+      }),
     }),
   );
 }
 
-async function mockWeatherFail(page: import('@playwright/test').Page): Promise<void> {
-  await page.route('**/weather/match/**', (route) =>
-    route.fulfill({ status: 404 }),
+async function mockMatchDetail(page: Page): Promise<void> {
+  await page.route(`**/matches/${MATCH_ID_1}`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: MATCH_ID_1, venue: 'Széktói Stadion, Kecskemét' }),
+    }),
   );
 }
 
-/**
- * Injects a minimal Stripe mock so StripeService.createElements() resolves
- * without loading stripe.js from cdn. The returned object exposes only the
- * methods that CheckoutPage calls.
- */
-async function injectStripeMock(page: import('@playwright/test').Page): Promise<void> {
+async function mockPaymentIntent(page: Page, onRequest?: (body: unknown) => void): Promise<void> {
+  await page.route('**/payments/create-intent', (route) => {
+    onRequest?.(route.request().postDataJSON());
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(PAYMENT_INTENT_RESPONSE) });
+  });
+}
+
+async function mockPaymentIntentFail(page: Page): Promise<void> {
+  await page.route('**/payments/create-intent', (route) =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ statusCode: 500, message: 'Internal Server Error' }) }),
+  );
+}
+
+async function mockWeather(page: Page, body: unknown): Promise<void> {
+  await page.route('**/weather/match/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
+  );
+}
+
+async function mockWeatherFail(page: Page): Promise<void> {
+  await page.route('**/weather/match/**', (route) => route.fulfill({ status: 404 }));
+}
+
+/** Stripe stub: reports `ready` when mounted, so the pay button can enable. */
+async function injectStripeMock(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const mockElement = {
       mount: () => undefined,
       destroy: () => undefined,
-      on: () => undefined,
+      on: (event: string, cb: () => void) => {
+        if (event === 'ready') {
+          setTimeout(cb, 0);
+        }
+      },
     };
-    const mockElements = {
-      create: () => mockElement,
-      submit: async () => ({ error: null }),
-    };
+    const mockElements = { create: () => mockElement, submit: async () => ({ error: null }) };
     const mockStripe = {
       elements: () => mockElements,
       confirmPayment: async () => ({ error: null, paymentIntent: null }),
     };
-    // @ts-ignore
+    // @ts-expect-error test double for the Stripe.js global
     window.Stripe = () => mockStripe;
   });
 }
 
-function makeCartItem(
-  seatId = SEAT_ID_AVAILABLE,
-  section = 'A',
-  price = 3500,
-): Record<string, unknown> {
+function makeCartItem(seatId = SEAT_ID_AVAILABLE, section = 'A', price = 3500): Record<string, unknown> {
   return {
     seatId,
     matchId: MATCH_ID_1,
@@ -152,264 +163,390 @@ function makeCartItem(
 }
 
 // ---------------------------------------------------------------------------
-// Checkout page tests
+// Checkout page
 // ---------------------------------------------------------------------------
 
 test.describe('Checkout Page – /checkout', () => {
-  // The authGuard redirects unauthenticated visitors — every checkout test
-  // needs a valid session.
   test.beforeEach(async ({ page }) => {
     await mockRefreshSuccess(page);
+    await mockLoyalty(page);
+    await mockMatchDetail(page);
+    await mockSectors(page); // VIP and B covered, A and C open
+    await injectStripeMock(page);
   });
 
-  test('should show the empty-state card when the cart has no items', async ({ page }) => {
-    // Do NOT seed the cart
+  test('shows the empty state when the cart has no items', async ({ page }) => {
     await page.goto('/checkout');
-
     const checkout = new CheckoutPage(page);
     await expect(checkout.pageHeading).toContainText('Fizetés');
-    await expect(checkout.emptyState).toBeVisible();
     await expect(checkout.emptyState).toContainText('A kosarad üres');
   });
 
-  test('should show the page heading and Back-to-cart link when items are in the cart', async ({
-    page,
-  }) => {
+  test('has a stripped header: the mark and "Biztonságos fizetés", and nothing to wander off to', async ({ page }) => {
     await CartPage.seedSessionCart(page, [makeCartItem()], MATCH_ID_1);
     await mockPaymentIntent(page);
     await mockWeatherFail(page);
-    await injectStripeMock(page);
-
     await page.goto('/checkout');
     const checkout = new CheckoutPage(page);
 
-    await expect(checkout.pageHeading).toContainText('Fizetés');
-    await expect(checkout.backToCartLink).toBeVisible();
-    await expect(checkout.backToCartLink).toHaveAttribute('href', /\/cart/);
+    await expect(checkout.toolbar).toContainText('Jegyportál');
+    await expect(checkout.secureLabel).toContainText('Biztonságos fizetés');
+    await expect(checkout.headerNav).toHaveCount(0);
+    await expect(checkout.headerLinks).toHaveCount(0); // no nav, cart, user menu or login
   });
 
-  test('should display the authenticated user name and email in the buyer details card', async ({
-    page,
-  }) => {
+  test('shows the step bar with the payment step current and the live hold pill', async ({ page }) => {
     await CartPage.seedSessionCart(page, [makeCartItem()], MATCH_ID_1);
     await mockPaymentIntent(page);
     await mockWeatherFail(page);
-    await injectStripeMock(page);
+    await page.goto('/checkout');
+    const checkout = new CheckoutPage(page);
 
+    await expect(checkout.steps.locator('li')).toHaveCount(3);
+    await expect(checkout.steps.locator('[aria-current="step"]')).toContainText('Fizetés');
+    await expect(checkout.holdPill).toContainText('A helyeid');
+    await expect(checkout.holdPill).toContainText('vannak fenntartva');
+    await expect(checkout.holdPill).toContainText(/\d+ (perc|másodperc)/);
+  });
+
+  test('shows the buyer, the Stripe note and the summary with a "Fizetés · total" button', async ({ page }) => {
+    await CartPage.seedSessionCart(page, [makeCartItem(), makeCartItem('seed-seat-x', 'B', 3000)], MATCH_ID_1);
+    await mockPaymentIntent(page);
+    await mockWeatherFail(page);
     await page.goto('/checkout');
     const checkout = new CheckoutPage(page);
 
     // AUTH_RESPONSE.user = { firstName: 'Teszt', lastName: 'Felhasználó', email: 'test@kte.hu' }
-    await expect(checkout.buyerName).toContainText('Felhasználó');
-    await expect(checkout.buyerName).toContainText('Teszt');
-    await expect(checkout.buyerEmail).toContainText('test@kte.hu');
+    await expect(checkout.buyer).toContainText('Felhasználó');
+    await expect(checkout.buyer).toContainText('test@kte.hu');
+    await expect(checkout.stripeNote).toContainText('soha nem jutnak el a mi szerverünkre');
+
+    await expect(checkout.summary).toContainText('Kecskeméti TE – Ferencvárosi TC');
+    await expect(checkout.summary).toContainText('Széktói Stadion, Kecskemét');
+    await expect(checkout.summarySeats).toHaveCount(2);
+    await expect(checkout.summaryTotal).toContainText(/6\s?500/);
+    await expect(checkout.paymentButton).toContainText(/Fizetés · 6\s?500/);
+    await expect(checkout.issueNote).toContainText('amikor a Stripe megerősíti a fizetést');
+    await expect(checkout.pointsLine).toContainText('100 hűségpontot'); // 2 tickets x the server's points per ticket
   });
 
-  test('should list each seat in the summary aside', async ({ page }) => {
-    await CartPage.seedSessionCart(page, [makeCartItem()], MATCH_ID_1);
-    await mockPaymentIntent(page);
-    await mockWeatherFail(page);
-    await injectStripeMock(page);
-
-    await page.goto('/checkout');
-    const checkout = new CheckoutPage(page);
-
-    // Bronze tier user: 1 seat line + 1 total line = 2 lines.
-    // Gold/silver/platinum users get an additional discount line — see
-    // checkout-discount.spec.ts for those scenarios (KTE-046).
-    await expect(checkout.summaryAside.locator('.kte-checkout__line')).toHaveCount(
-      2, // 1 seat line + 1 total line (no discount for bronze)
-    );
-    await expect(checkout.summaryAside).toContainText('A');
-  });
-
-  test('should display a lock countdown in the summary aside', async ({ page }) => {
-    await CartPage.seedSessionCart(page, [makeCartItem()], MATCH_ID_1);
-    await mockPaymentIntent(page);
-    await mockWeatherFail(page);
-    await injectStripeMock(page);
-
-    await page.goto('/checkout');
-    const checkout = new CheckoutPage(page);
-
-    await expect(checkout.lockStatusCountdown).toBeVisible();
-    await expect(checkout.lockStatusCountdown).toContainText(':');
-  });
-
-  test('should show a loading indicator while the payment element is initializing', async ({
-    page,
-  }) => {
-    await CartPage.seedSessionCart(page, [makeCartItem()], MATCH_ID_1);
-    await mockWeatherFail(page);
-    await injectStripeMock(page);
-
-    // Delay the payment intent response so we can observe the loading state
-    await page.route('**/payments/create-intent', async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      await route.fulfill({
-        status: 201,
-        contentType: 'application/json',
-        body: JSON.stringify(PAYMENT_INTENT_RESPONSE),
-      });
+  test('shows the loyalty discount in the tier look', async ({ page }) => {
+    await page.unroute('**/loyalty/me');
+    await mockLoyalty(page, {
+      points: 1000,
+      tier: { tier: 'silver', label: 'Ezüst', minPoints: 500, discountPercent: 10, color: '#aaa' },
+      ticketPointsPerTicket: 50,
+      recentTransactions: [],
     });
-
+    await CartPage.seedSessionCart(page, [makeCartItem(SEAT_ID_AVAILABLE, 'A', 5000)], MATCH_ID_1);
+    await mockPaymentIntent(page);
+    await mockWeatherFail(page);
     await page.goto('/checkout');
     const checkout = new CheckoutPage(page);
 
-    // Stripe loading spinner must appear while the intent is pending
+    await expect(checkout.discountRow).toHaveAttribute('data-tier', 'silver');
+    await expect(checkout.discountRow).toContainText('Ezüst kedvezmény · 10%');
+    await expect(checkout.discountRow).toContainText(/500/);
+    await expect(checkout.summaryTotal).toContainText(/4\s?500/);
+  });
+
+  test('shows a loading indicator and a disabled pay button while the payment is being prepared', async ({ page }) => {
+    await CartPage.seedSessionCart(page, [makeCartItem()], MATCH_ID_1);
+    await mockWeatherFail(page);
+    // Hold the payment intent until the test lets it go, so the "preparing" state
+    // is observed for as long as needed rather than for a fixed delay.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/payments/create-intent', async (route) => {
+      await gate;
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(PAYMENT_INTENT_RESPONSE) });
+    });
+    await page.goto('/checkout');
+    const checkout = new CheckoutPage(page);
+
     await expect(checkout.stripeLoader).toBeVisible();
-  });
-
-  test('should show a rain warning banner for non-VIP seats when rain is forecast', async ({
-    page,
-  }) => {
-    await CartPage.seedSessionCart(page, [makeCartItem(SEAT_ID_AVAILABLE, 'A')], MATCH_ID_1);
-    await mockPaymentIntent(page);
-    await mockWeather(page, WEATHER_RAIN_WARNING);
-    await injectStripeMock(page);
-
-    await page.goto('/checkout');
-    const checkout = new CheckoutPage(page);
-
-    await expect(checkout.weatherBanner).toBeVisible({ timeout: 5000 });
-    await expect(checkout.weatherBanner).toContainText('Esőzés várható');
-    await expect(checkout.weatherBannerChangeSection).toBeVisible();
-  });
-
-  test('should NOT show the weather banner when no rain is forecast', async ({ page }) => {
-    await CartPage.seedSessionCart(page, [makeCartItem(SEAT_ID_AVAILABLE, 'A')], MATCH_ID_1);
-    await mockPaymentIntent(page);
-    await mockWeather(page, WEATHER_CLEAR);
-    await injectStripeMock(page);
-
-    await page.goto('/checkout');
-    const checkout = new CheckoutPage(page);
-
-    // Wait for the weather call to resolve
-    await page.waitForTimeout(500);
-    await expect(checkout.weatherBanner).not.toBeVisible();
-  });
-
-  test('should NOT show the weather banner when all cart seats are in the VIP (covered) sector', async ({
-    page,
-  }) => {
-    // VIP is in the COVERED_SECTORS set inside WeatherBannerComponent
-    await CartPage.seedSessionCart(
-      page,
-      [makeCartItem(SEAT_ID_AVAILABLE, 'VIP')],
-      MATCH_ID_1,
-    );
-    await mockPaymentIntent(page);
-    await mockWeather(page, WEATHER_RAIN_WARNING);
-    await injectStripeMock(page);
-
-    await page.goto('/checkout');
-    const checkout = new CheckoutPage(page);
-
-    await page.waitForTimeout(500);
-    await expect(checkout.weatherBanner).not.toBeVisible();
-  });
-
-  test('should disable the pay button while the payment intent is still loading', async ({
-    page,
-  }) => {
-    await CartPage.seedSessionCart(page, [makeCartItem()], MATCH_ID_1);
-    await mockWeatherFail(page);
-    await injectStripeMock(page);
-
-    // Return the intent only after a short delay
-    await page.route('**/payments/create-intent', async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      await route.fulfill({
-        status: 201,
-        contentType: 'application/json',
-        body: JSON.stringify(PAYMENT_INTENT_RESPONSE),
-      });
-    });
-
-    await page.goto('/checkout');
-    const checkout = new CheckoutPage(page);
-
-    // Before the intent arrives, the button is disabled
     await expect(checkout.paymentButton).toBeDisabled();
+
+    release();
+    await expect(checkout.paymentButton).toBeEnabled({ timeout: 10_000 });
+    await expect(checkout.stripeLoader).toHaveCount(0);
   });
 
-  test('should show an initialization error when the payment intent API fails', async ({
-    page,
-  }) => {
+  test('shows an initialisation error when the payment intent API fails', async ({ page }) => {
     await CartPage.seedSessionCart(page, [makeCartItem()], MATCH_ID_1);
     await mockPaymentIntentFail(page);
     await mockWeatherFail(page);
-    await injectStripeMock(page);
+    await page.goto('/checkout');
+    await expect(new CheckoutPage(page).initializationError).toBeVisible({ timeout: 5000 });
+  });
 
+  // ---- weather band --------------------------------------------------------
+
+  test('weather band: forecast for kickoff and "nem fedett" for an open sector in the rain', async ({ page }) => {
+    await CartPage.seedSessionCart(page, [makeCartItem(SEAT_ID_AVAILABLE, 'A')], MATCH_ID_1);
+    await mockPaymentIntent(page);
+    await mockWeather(page, WEATHER_RAIN_WARNING);
     await page.goto('/checkout');
     const checkout = new CheckoutPage(page);
 
-    await expect(checkout.initializationError).toBeVisible({ timeout: 5000 });
+    await expect(checkout.weatherBand).toBeVisible();
+    await expect(checkout.weatherBand).toContainText('Kezdéskor: eső várható');
+    await expect(checkout.weatherBand).toContainText('14 °C');
+    await expect(checkout.weatherCover).toContainText('nem fedett');
+    await expect(checkout.weatherCover).toContainText('esőre számíts');
+  });
+
+  test('weather band: shown for a dry forecast too, without telling anyone to expect rain', async ({ page }) => {
+    await CartPage.seedSessionCart(page, [makeCartItem(SEAT_ID_AVAILABLE, 'A')], MATCH_ID_1);
+    await mockPaymentIntent(page);
+    await mockWeather(page, WEATHER_CLEAR);
+    await page.goto('/checkout');
+    const checkout = new CheckoutPage(page);
+
+    await expect(checkout.weatherBand).toContainText('Kezdéskor: derült');
+    await expect(checkout.weatherCover).not.toContainText('esőre');
+  });
+
+  test('weather band: a covered (VIP) sector says so', async ({ page }) => {
+    await CartPage.seedSessionCart(page, [makeCartItem(SEAT_ID_AVAILABLE, 'VIP')], MATCH_ID_1);
+    await mockPaymentIntent(page);
+    await mockWeather(page, WEATHER_RAIN_WARNING);
+    await page.goto('/checkout');
+    const checkout = new CheckoutPage(page);
+
+    await expect(checkout.weatherCover).toContainText('fedett');
+    await expect(checkout.weatherCover).not.toContainText('nem fedett');
+  });
+
+  test('weather band: the claim follows the sector flag from the server, not a hard-coded sector', async ({ page }) => {
+    // the same sector (A), the same forecast: only the flag differs
+    await page.unroute('**/matches/*/seats');
+    await mockSectors(page, { A: true, B: true, C: false, VIP: false });
+    await CartPage.seedSessionCart(page, [makeCartItem(SEAT_ID_AVAILABLE, 'A')], MATCH_ID_1);
+    await mockPaymentIntent(page);
+    await mockWeather(page, WEATHER_RAIN_WARNING);
+    await page.goto('/checkout');
+    const checkout = new CheckoutPage(page);
+
+    await expect(checkout.weatherCover).toContainText('(A szektor) fedett');
+    await expect(checkout.weatherCover).not.toContainText('nem fedett');
+    await expect(checkout.weatherCover).not.toContainText('esőre');
+  });
+
+  test('weather band: a sector the server has no flag for gets no coverage claim', async ({ page }) => {
+    await page.unroute('**/matches/*/seats');
+    await mockSectors(page, { A: null });
+    await CartPage.seedSessionCart(page, [makeCartItem(SEAT_ID_AVAILABLE, 'A')], MATCH_ID_1);
+    await mockPaymentIntent(page);
+    await mockWeather(page, WEATHER_RAIN_WARNING);
+    await page.goto('/checkout');
+    const checkout = new CheckoutPage(page);
+
+    await expect(checkout.weatherBand).toContainText('Kezdéskor:'); // the forecast is real
+    await expect(checkout.weatherCover).toHaveCount(0); // but no claim about a roof
+  });
+
+  test('weather band: no real forecast means no band at all', async ({ page }) => {
+    await CartPage.seedSessionCart(page, [makeCartItem()], MATCH_ID_1);
+    await mockPaymentIntent(page);
+    await mockWeather(page, {
+      ...WEATHER_CLEAR,
+      summary: 'Az előrejelzés még nem elérhető',
+      temperatureCelsius: null,
+      precipitationProbability: null,
+      fallback: true,
+      unavailableReason: 'too_far',
+    });
+    await page.goto('/checkout');
+    const checkout = new CheckoutPage(page);
+
+    await expect(checkout.summary).toBeVisible();
+    await page.waitForTimeout(400);
+    await expect(checkout.weatherBand).toHaveCount(0);
+  });
+
+  // ---- expired hold -----------------------------------------------------------
+
+  test('a hold that runs out is not dropped silently: the alert names the seat and offers real options', async ({ page }) => {
+    const intentRequests: { seats: { seatId: string }[] }[] = [];
+    await CartPage.seedSessionCart(
+      page,
+      [{ lockExpiresAtMs: Date.now() + 6_000, seatNumber: 9 }, { lockExpiresAtMs: Date.now() + 120_000 }],
+      MATCH_ID_1,
+    );
+    await mockPaymentIntent(page, (body) => intentRequests.push(body as { seats: { seatId: string }[] }));
+    await mockWeatherFail(page);
+    await page.goto('/checkout');
+    const checkout = new CheckoutPage(page);
+
+    await expect(checkout.summarySeats).toHaveCount(2);
+    await expect(checkout.paymentButton).toBeEnabled();
+
+    await expect(checkout.expiredAlert).toBeVisible({ timeout: 12_000 });
+    await expect(checkout.expiredAlert).toContainText('Lejárt a foglalás');
+    await expect(checkout.expiredAlert.locator('s')).toContainText('A szektor · 1. sor · 9. szék');
+    await expect(checkout.expiredAlert).toContainText('A fizetés nem indult el, a kártyádat nem terheltük.');
+    await expect(checkout.chooseSeatLink).toBeVisible();
+    await expect(checkout.payRemainingButton).toContainText('Fizetés a megmaradt 1 helyre');
+    await expect(checkout.paymentButton).toBeDisabled(); // cannot pay for the lapsed seat
+
+    // Pay only for what is still held: a new payment for just that seat
+    await checkout.payRemainingButton.click();
+    await expect(checkout.expiredAlert).toHaveCount(0);
+    await expect(checkout.summarySeats).toHaveCount(1);
+    await expect(checkout.paymentButton).toBeEnabled();
+    expect(intentRequests.length).toBe(2);
+    expect(intentRequests[0].seats.length).toBe(2);
+    expect(intentRequests[1].seats.length).toBe(1);
+    expect(intentRequests[1].seats[0].seatId).toBe('seed-seat-1');
+  });
+
+  test('when every hold has run out, only choosing a new seat is offered', async ({ page }) => {
+    await CartPage.seedSessionCart(page, [{ lockExpiresAtMs: Date.now() + 2_000 }], MATCH_ID_1);
+    await mockPaymentIntent(page);
+    await mockWeatherFail(page);
+    await page.goto('/checkout');
+    const checkout = new CheckoutPage(page);
+
+    await expect(checkout.expiredAlert).toBeVisible({ timeout: 8000 });
+    await expect(checkout.expiredAlert).toContainText('Már egy fenntartott helyed sincs');
+    await expect(checkout.payRemainingButton).toHaveCount(0);
+    await expect(checkout.chooseSeatLink).toHaveAttribute('href', new RegExp(`matchId=${MATCH_ID_1}`));
+    await expect(checkout.paymentButton).toHaveCount(0);
+  });
+
+  // ---- mobile -------------------------------------------------------------------
+
+  test('at 360px nothing scrolls sideways and the summary sits below the form', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await CartPage.seedSessionCart(page, [makeCartItem(), makeCartItem('seed-seat-x', 'B', 3000)], MATCH_ID_1);
+    await mockPaymentIntent(page);
+    await mockWeather(page, WEATHER_RAIN_WARNING);
+    await page.goto('/checkout');
+    const checkout = new CheckoutPage(page);
+
+    await expect(checkout.summary).toBeVisible();
+    await expect(checkout.summary).toHaveCSS('position', 'static');
+    const overflow = await page.evaluate(() => {
+      const sc = document.querySelector('mat-sidenav-content')!;
+      return sc.scrollWidth - sc.clientWidth;
+    });
+    expect(overflow).toBeLessThanOrEqual(0);
+    const formBox = await page.locator('section.card').boundingBox();
+    const summaryBox = await checkout.summary.boundingBox();
+    expect(summaryBox!.y).toBeGreaterThan(formBox!.y);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Confirmation page tests
+// Confirmation page
 // ---------------------------------------------------------------------------
+
+const ISSUED = {
+  status: 'issued',
+  ticketIds: ['t1'],
+  amountPaid: 3325,
+  currency: 'huf',
+  pointsCredited: 50,
+  confirmationEmailSentAt: new Date().toISOString(),
+  match: { id: MATCH_ID_1, homeTeam: 'Kecskeméti TE', awayTeam: 'Ferencvárosi TC', venue: 'Széktói Stadion', kickoffAt: new Date(Date.now() + 86_400_000).toISOString() },
+  seats: [{ section: 'A', row: '1', number: 5, price: 3325 }],
+};
+const PROCESSING = { status: 'processing', ticketIds: [], amountPaid: 0, currency: 'huf', pointsCredited: 0, match: null, seats: [] };
+
+async function mockStatus(page: Page, ...bodies: unknown[]): Promise<{ calls: () => number }> {
+  let n = 0;
+  await page.route('**/payments/*/status', (route) => {
+    const body = bodies[Math.min(n, bodies.length - 1)];
+    n += 1;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  return { calls: () => n };
+}
 
 test.describe('Confirmation Page – /checkout/confirmation', () => {
   test.beforeEach(async ({ page }) => {
     await mockRefreshSuccess(page);
   });
 
-  test('should render the guard card when there is no navigation state', async ({ page }) => {
-    // Navigate directly — no router state is passed
+  test('without a payment there is nothing to confirm', async ({ page }) => {
     await page.goto('/checkout/confirmation');
-
     const checkout = new CheckoutPage(page);
     await expect(checkout.guardCard).toBeVisible();
     await expect(checkout.guardCard).toContainText('Nincs megerősíthető fizetés');
   });
 
-  /**
-   * Opens /checkout/confirmation the way the app does after a successful
-   * payment: a client-side navigation carrying router state. (A page reload
-   * cannot do this — the router replaces history.state on the initial
-   * navigation — so the state is pushed and delivered through popstate.)
-   * Asserts the SUCCESS card is showing, so the tests below cannot pass on
-   * the "no payment to confirm" guard card, which has similar links.
-   */
-  async function openConfirmationWithState(page: Page): Promise<CheckoutPage> {
-    const state = {
-      paymentIntentId: PAYMENT_INTENT_ID,
-      seats: [{ section: 'A', row: '1', seatNumber: 5, price: 3500 }],
-      totalPaid: 3500,
-    };
-    await mockRefreshSuccess(page);
-    await page.goto('/');
-    await expect(page.locator('kte-app-shell, main').first()).toBeVisible();
-    await page.evaluate((navState) => {
-      window.history.pushState(navState, '', '/checkout/confirmation');
-      window.dispatchEvent(new PopStateEvent('popstate', { state: navState }));
-    }, state);
+  test('issued: "Megvan a jegyed", the real email, the amount and points from the server', async ({ page }) => {
+    await mockStatus(page, ISSUED);
     const checkout = new CheckoutPage(page);
-    await expect(checkout.successHeading).toContainText('Sikeres fizetés');
-    await expect(checkout.guardCard).toHaveCount(0);
-    return checkout;
-  }
+    await checkout.gotoConfirmation(PI);
 
-  test('should render the success card with order data when navigation state is set', async ({
-    page,
-  }) => {
-    const checkout = await openConfirmationWithState(page);
-
-    await expect(checkout.orderIdBlock).toContainText(PAYMENT_INTENT_ID);
-    await expect(checkout.seatList).toHaveCount(1);
+    await expect(checkout.confirmTitle).toHaveText('Megvan a jegyed');
+    await expect(checkout.confirmLead).toContainText('test@kte.hu');
+    await expect(checkout.confirmLead).toContainText('a QR-kód pedig a profilodban található');
+    await expect(checkout.confirmId).toHaveText(PI);
+    await expect(checkout.confirmAmount).toContainText(/3\s?325/);
+    await expect(checkout.confirmPoints).toContainText('+50 pont');
+    await expect(checkout.openTicketLink).toHaveAttribute('href', /\/profile/);
+    await expect(checkout.backToMatchesLink).toHaveAttribute('href', '/');
   });
 
-  test('should have a "Profil megnyitása" link that points to /profile', async ({ page }) => {
-    const checkout = await openConfirmationWithState(page);
-    await expect(checkout.profileLink).toHaveAttribute('href', /\/profile/);
+  test('issued but email not marked as sent: the ticket is ready, and no email is mentioned', async ({ page }) => {
+    await mockStatus(page, { ...ISSUED, confirmationEmailSentAt: null });
+    const checkout = new CheckoutPage(page);
+    await checkout.gotoConfirmation(PI);
+
+    await expect(checkout.confirmTitle).toHaveText('Megvan a jegyed');
+    await expect(checkout.confirmLead).toHaveText('A jegyed elkészült, a QR-kódot a profilodban találod.');
+    await expect(page.locator('section.confirm')).not.toContainText('test@kte.hu');
+    await expect(page.locator('section.confirm')).not.toContainText(/e-?mail|elküldtük/i);
   });
 
-  test('should have a "Vissza a kezdőlapra" link that points to /', async ({ page }) => {
-    const checkout = await openConfirmationWithState(page);
-    await expect(checkout.homeLink).toHaveAttribute('href', '/');
+  test('the email claim appears once the server marks it as sent', async ({ page }) => {
+    await mockStatus(page, { ...ISSUED, confirmationEmailSentAt: null }, ISSUED);
+    const checkout = new CheckoutPage(page);
+    await checkout.gotoConfirmation(PI);
+
+    await expect(checkout.confirmLead).toContainText('A jegyed elkészült');
+    await expect(checkout.confirmLead).toContainText('elküldtük', { timeout: 10_000 });
+    await expect(checkout.confirmLead).toContainText('test@kte.hu');
+  });
+
+  test('processing: a calm state with no retry or payment button that resolves by itself', async ({ page }) => {
+    const status = await mockStatus(page, PROCESSING, PROCESSING, ISSUED);
+    const checkout = new CheckoutPage(page);
+    await checkout.gotoConfirmation(SECOND_PI);
+
+    await expect(checkout.confirmTitle).toHaveText('Feldolgozás alatt');
+    await expect(checkout.confirmLead).toContainText('ne fizess újra');
+    await expect(page.locator('section.confirm').getByRole('button')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /fizet|újra|próbál/i })).toHaveCount(0);
+    await expect(checkout.confirmId).toHaveText(SECOND_PI);
+
+    await expect(checkout.confirmTitle).toHaveText('Megvan a jegyed', { timeout: 15_000 });
+    expect(status.calls()).toBeGreaterThanOrEqual(3);
+  });
+
+  test('failed: says plainly that the card was not charged and links back to the cart', async ({ page }) => {
+    await mockStatus(page, { ...PROCESSING, status: 'failed' });
+    const checkout = new CheckoutPage(page);
+    await checkout.gotoConfirmation(PI);
+
+    await expect(checkout.confirmTitle).toHaveText('A fizetés nem sikerült');
+    await expect(checkout.confirmLead).toContainText('nem terheltük');
+    await expect(page.getByRole('link', { name: /vissza a kosárhoz/i })).toHaveAttribute('href', /\/cart/);
+  });
+
+  test('at 360px the confirmation fits the screen', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await mockStatus(page, ISSUED);
+    const checkout = new CheckoutPage(page);
+    await checkout.gotoConfirmation(PI);
+    await expect(checkout.confirmTitle).toBeVisible();
+    const overflow = await page.evaluate(() => {
+      const sc = document.querySelector('mat-sidenav-content')!;
+      return sc.scrollWidth - sc.clientWidth;
+    });
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });

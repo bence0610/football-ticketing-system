@@ -73,7 +73,26 @@ const SNAPSHOT: ChatbotContextSnapshot = {
         rainWarning: true,
       },
       sectors: [
-        { section: 'B', total: 50, free: 31, sold: 15, locked: 4, minPrice: 5000, maxPrice: 5000 },
+        {
+          section: 'B',
+          total: 50,
+          free: 31,
+          sold: 15,
+          locked: 4,
+          minPrice: 5000,
+          maxPrice: 5000,
+          covered: true,
+        },
+        {
+          section: 'A',
+          total: 100,
+          free: 40,
+          sold: 60,
+          locked: 0,
+          minPrice: 7500,
+          maxPrice: 7500,
+          covered: false,
+        },
         {
           section: 'VIP',
           total: 24,
@@ -82,6 +101,7 @@ const SNAPSHOT: ChatbotContextSnapshot = {
           locked: 0,
           minPrice: 12500,
           maxPrice: 15000,
+          covered: null, // no data for this sector
         },
       ],
     },
@@ -238,6 +258,22 @@ describe('ChatbotService', () => {
       expect(system[1].text).toContain('hazai mérkőzés');
       expect(system[1].text).toContain('idegenbeli mérkőzés');
       expect(system[1].text).toContain('szektoronkénti adat nem elérhető');
+    });
+
+    it('answers "which sector is covered?" from the snapshot: covered, not covered, or unknown', async () => {
+      create.mockResolvedValue(okResponse());
+      await service.sendMessage({ message: 'melyik szektor fedett?', owner: ALICE });
+      const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
+
+      // the data the answer is built from, in the snapshot the model reads
+      expect(system[1].text).toContain('B szektor: jegyár 5000 Ft; helyek (mozgó adat): szabad 31, eladott 15, zárolt 4, összes 50; fedettség: fedett');
+      expect(system[1].text).toContain('A szektor: jegyár 7500 Ft; helyek (mozgó adat): szabad 40, eladott 60, zárolt 0, összes 100; fedettség: nem fedett');
+      // a sector without data is "unknown", never "open"
+      expect(system[1].text.replace(/\s/g, ' ')).toMatch(/VIP szektor: .*fedettség: nem elérhető/);
+
+      // and the rules tell the model to answer it directly rather than refuse
+      expect(system[0].text).toContain('melyik szektor fedett?');
+      expect(system[0].text).toContain('állandó adat');
     });
 
     it('shows sector prices (single and range) and limits the staleness caveat to availability', async () => {

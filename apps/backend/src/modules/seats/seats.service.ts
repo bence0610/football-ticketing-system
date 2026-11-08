@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { In, Repository } from 'typeorm';
-import { Match, Seat, SeasonPass, SeasonPassStatus, Ticket } from '../../database/entities';
+import { Match, Seat, SeasonPass, SeasonPassStatus, Sector, Ticket } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { seatUnitPrice } from './seat-pricing';
@@ -21,6 +21,8 @@ export class SeatsService {
     private readonly matchRepository: Repository<Match>,
     @InjectRepository(SeasonPass)
     private readonly seasonPassRepository: Repository<SeasonPass>,
+    @InjectRepository(Sector)
+    private readonly sectorRepository: Repository<Sector>,
     @Inject(REDIS_CLIENT)
     private readonly redis: Redis,
   ) {}
@@ -71,7 +73,8 @@ export class SeatsService {
       this.toSeatStatus(seat, basePrice, soldSeatIds, lockedSeatIds, seasonPassSeatIds),
     );
 
-    const sectorSummary = this.buildSectorSummary(seatStatuses);
+    const coverage = await this.loadCoverage();
+    const sectorSummary = this.buildSectorSummary(seatStatuses, coverage);
 
     return {
       matchId,
@@ -244,7 +247,16 @@ export class SeatsService {
     return SeatAvailability.AVAILABLE;
   }
 
-  private buildSectorSummary(seats: SeatStatusDto[]): SectorSummaryDto[] {
+  /** Sector code -> is it covered, from the `sectors` table (the single source of truth). */
+  private async loadCoverage(): Promise<Map<string, boolean>> {
+    const sectors = await this.sectorRepository.find();
+    return new Map(sectors.map((s) => [s.code, s.isCovered]));
+  }
+
+  private buildSectorSummary(
+    seats: SeatStatusDto[],
+    coverage: ReadonlyMap<string, boolean> = new Map(),
+  ): SectorSummaryDto[] {
     const map = new Map<string, SectorSummaryDto>();
 
     for (const seat of seats) {
@@ -252,6 +264,8 @@ export class SeatsService {
       if (!summary) {
         summary = {
           section: seat.section,
+          // no row for a sector means no information, not "open"
+          covered: coverage.get(seat.section) ?? null,
           total: 0,
           available: 0,
           locked: 0,

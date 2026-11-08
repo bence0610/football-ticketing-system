@@ -1,92 +1,90 @@
-import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { RouterLink } from '@angular/router';
 import { MatchWeatherForecast } from '../../../shared/models/payment.model';
 
-const COVERED_SECTORS = new Set<string>(['VIP']);
+/** Material icon for an OpenWeather icon code ("10d", "01n", ...). */
+export function weatherIcon(code: string | undefined): string {
+  switch (code?.slice(0, 2)) {
+    case '01':
+      return 'wb_sunny';
+    case '09':
+    case '10':
+      return 'umbrella';
+    case '11':
+      return 'thunderstorm';
+    case '13':
+      return 'ac_unit';
+    case '50':
+      return 'foggy';
+    default:
+      return 'cloud';
+  }
+}
 
+/**
+ * Weather band above the payment form: the forecast for kickoff and whether
+ * the chosen sector is covered. It renders only for a real forecast - with the
+ * "no forecast yet", "no data" and "already started" states it renders
+ * nothing at all rather than an empty band.
+ */
 @Component({
   selector: 'kte-weather-banner',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, MatIconModule, MatButtonModule, RouterLink],
+  imports: [MatIconModule],
   template: `
-    @if (shouldShow()) {
-      <div class="kte-weather" role="alert" aria-live="polite">
-        <mat-icon class="kte-weather__icon">cloud</mat-icon>
-        <div class="kte-weather__body">
-          <strong>Esőzés várható a meccs idején</strong>
-          <p>
-            Időjárás-előrejelzés: <em>{{ forecast?.summary }}</em>,
-            csapadék {{ forecast?.precipitationMmPerHour | number: '1.1-1' }} mm/h,
-            valószínűség {{ percentProbability() }}%.
-          </p>
-          <p>
-            A kiválasztott szektor (<strong>{{ uncoveredSectorsLabel }}</strong>) nem fedett —
-            érdemes lehet egy fedett szektorba átülnöd.
-          </p>
+    @if (forecast && !forecast.fallback) {
+      <section class="weather" data-testid="weather-band" aria-label="Időjárás a mérkőzés kezdésére">
+        <mat-icon class="weather__icon" aria-hidden="true">{{ icon() }}</mat-icon>
+        <div class="weather__body">
+          <p class="weather__forecast">{{ forecastLine() }}</p>
+          @if (coverLine(); as line) {
+            <p class="weather__cover" data-testid="weather-cover">{{ line }}</p>
+          }
         </div>
-        <a mat-stroked-button color="primary" routerLink="/stadium">
-          <mat-icon>event_seat</mat-icon>
-          Másik szektor választása
-        </a>
-      </div>
-    } @else if (noForecastMessage()) {
-      <p class="kte-weather-note" role="status" data-testid="weather-no-forecast">
-        <mat-icon>cloud_off</mat-icon>
-        <span>{{ noForecastMessage() }}</span>
-      </p>
+      </section>
     }
   `,
   styles: [
     `
-      .kte-weather-note {
+      :host {
+        display: block;
+      }
+
+      .weather {
         display: flex;
         align-items: center;
-        gap: var(--kte-spacing-2);
-        margin: 0 0 var(--kte-spacing-4);
-        color: var(--kte-muted);
-        font-size: 13px;
+        gap: 14px;
+        padding: 14px 18px;
+        background: var(--brand-tint);
+        border: 1px solid var(--kte-brand-edge);
+        border-radius: var(--radius-card);
+        color: var(--brand-deep);
       }
-      .kte-weather-note mat-icon {
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
+
+      .weather__icon {
+        flex: 0 0 auto;
+        width: 32px;
+        height: 32px;
+        font-size: 32px;
       }
-      .kte-weather {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        gap: var(--kte-spacing-3);
-        align-items: center;
-        padding: var(--kte-spacing-4);
-        background: var(--kte-brand-tint);
-        border-left: 4px solid var(--kte-seat-pass);
-        border-radius: var(--kte-radius);
-        margin-bottom: var(--kte-spacing-4);
+
+      .weather__body {
+        min-width: 0;
       }
-      .kte-weather__icon {
-        color: var(--kte-seat-pass);
-        font-size: 36px;
-        width: 36px;
-        height: 36px;
-      }
-      .kte-weather__body strong {
-        display: block;
-        margin-bottom: 4px;
-      }
-      .kte-weather__body p {
+
+      .weather__body p {
         margin: 0;
-        font-size: 13px;
       }
-      @media (max-width: 600px) {
-        .kte-weather {
-          grid-template-columns: auto 1fr;
-        }
-        .kte-weather a {
-          grid-column: 1 / -1;
-        }
+
+      .weather__forecast {
+        font-weight: 600;
+        font-size: 15px;
+      }
+
+      .weather__cover {
+        font-size: 14px;
+        color: var(--ink);
       }
     `,
   ],
@@ -94,44 +92,62 @@ const COVERED_SECTORS = new Set<string>(['VIP']);
 export class WeatherBannerComponent {
   @Input() forecast: MatchWeatherForecast | null = null;
   @Input() sectionsInCart: readonly string[] = [];
+  /**
+   * Is each sector covered? section -> flag, from the server (the seat map's
+   * sector summary). A section that is missing or null has no data, and the
+   * band then says nothing about it.
+   */
+  @Input() coverage: Readonly<Record<string, boolean | null | undefined>> = {};
 
-  protected shouldShow(): boolean {
-    if (!this.forecast || !this.forecast.rainWarning || this.forecast.fallback) {
-      return false;
-    }
-    return this.uncoveredSections().length > 0;
+  protected icon(): string {
+    return weatherIcon(this.forecast?.icon);
   }
 
-  /** Text for the "no forecast" state; null when there is nothing to say. */
-  protected noForecastMessage(): string | null {
-    if (!this.forecast?.fallback) {
-      return null;
+  /** "Kezdéskor: gyenge eső · 9 °C · 65% csapadékvalószínűség" - only values the forecast really has. */
+  protected forecastLine(): string {
+    const f = this.forecast;
+    if (!f) {
+      return '';
     }
-    switch (this.forecast.unavailableReason) {
-      case 'too_far':
-        return 'Az időjárás-előrejelzés még nem elérhető: a mérkőzés kezdése még túl messze van.';
-      case 'no_data':
-        return 'Az időjárás-előrejelzés jelenleg nem elérhető.';
-      default:
-        // `past` or an older backend without a reason: nothing useful to show.
-        return null;
+    const parts: string[] = [];
+    if (f.summary) {
+      parts.push(f.summary.charAt(0).toLowerCase() + f.summary.slice(1));
     }
+    if (f.temperatureCelsius !== null) {
+      parts.push(`${Math.round(f.temperatureCelsius)} °C`);
+    }
+    if (f.precipitationProbability !== null) {
+      parts.push(`${Math.round(f.precipitationProbability * 100)}% csapadékvalószínűség`);
+    }
+    return `Kezdéskor: ${parts.join(' · ')}`;
   }
 
-  protected get uncoveredSectorsLabel(): string {
-    return this.uncoveredSections().join(', ');
-  }
-
-  protected percentProbability(): number {
-    if (!this.forecast || this.forecast.precipitationProbability === null) {
-      return 0;
+  /**
+   * Whether the chosen sector(s) are covered - read from the flag, never assumed.
+   * Sectors without data are left out; with no data at all there is no line.
+   */
+  protected coverLine(): string {
+    const sections = Array.from(new Set(this.sectionsInCart));
+    const covered = sections.filter((s) => this.coverage[s] === true);
+    const open = sections.filter((s) => this.coverage[s] === false);
+    if (covered.length === 0 && open.length === 0) {
+      return '';
     }
-    return Math.round(this.forecast.precipitationProbability * 100);
-  }
+    const rain = this.forecast?.rainWarning === true;
+    const name = (s: string) => (s === 'VIP' ? 'VIP' : `${s} szektor`);
 
-  private uncoveredSections(): string[] {
-    return Array.from(new Set(this.sectionsInCart)).filter(
-      (section) => !COVERED_SECTORS.has(section),
-    );
+    if (open.length === 0) {
+      return covered.length === 1
+        ? `A választott szektor (${name(covered[0])}) fedett.`
+        : 'A választott szektorok mind fedettek.';
+    }
+    const openText = open.map(name).join(', ');
+    const tail = rain ? ' — esőre számíts.' : '.';
+    if (covered.length === 0) {
+      return open.length === 1
+        ? `A választott szektor (${openText}) nem fedett${tail}`
+        : `A választott szektorok (${openText}) nem fedettek${tail}`;
+    }
+    return `Fedett: ${covered.map(name).join(', ')} · nem fedett: ${openText}${tail}`;
   }
 }

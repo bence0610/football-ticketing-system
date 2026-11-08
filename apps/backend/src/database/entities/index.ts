@@ -2,6 +2,7 @@ export * from './base.entity';
 export * from './user.entity';
 export * from './match.entity';
 export * from './seat.entity';
+export * from './sector.entity';
 export * from './ticket.entity';
 export * from './season-pass.entity';
 export * from './season-pass-price.entity';

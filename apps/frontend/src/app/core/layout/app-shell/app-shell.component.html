@@ -46,72 +46,85 @@
   <mat-sidenav-content class="kte-shell__content">
     <mat-toolbar class="kte-shell__toolbar">
       <div class="kte-shell__bar">
-        <button
-          mat-icon-button
-          type="button"
-          aria-label="Menü"
-          (click)="toggleSidenav()"
-          class="kte-shell__menu-btn"
-        >
-          <mat-icon>menu</mat-icon>
-        </button>
+        @if (paymentFocus()) {
+          <!-- Payment: no navigation, nothing that leads away mid-payment -->
+          <span class="kte-shell__brand kte-shell__brand--static">
+            <span class="kte-shell__brand-mark" aria-hidden="true">KTE</span>
+            <span class="kte-shell__brand-text">Jegyportál</span>
+          </span>
+          <span class="kte-shell__spacer"></span>
+          <span class="kte-shell__secure" data-testid="secure-label">
+            <mat-icon aria-hidden="true">lock</mat-icon>
+            Biztonságos fizetés
+          </span>
+        } @else {
+          <button
+            mat-icon-button
+            type="button"
+            aria-label="Menü"
+            (click)="toggleSidenav()"
+            class="kte-shell__menu-btn"
+          >
+            <mat-icon>menu</mat-icon>
+          </button>
 
-        <a routerLink="/" class="kte-shell__brand" aria-label="KTE Jegyportál">
-          <span class="kte-shell__brand-mark">KTE</span>
-          <span class="kte-shell__brand-text">Jegyportál</span>
-        </a>
+          <a routerLink="/" class="kte-shell__brand" aria-label="KTE Jegyportál">
+            <span class="kte-shell__brand-mark">KTE</span>
+            <span class="kte-shell__brand-text">Jegyportál</span>
+          </a>
 
-        <nav class="kte-shell__nav" aria-label="Fő navigáció">
-          @for (item of visibleNavItems(); track item.route) {
-            <a
-              class="kte-shell__nav-link"
-              [routerLink]="item.route"
-              [routerLinkActive]="'kte-active'"
-              [routerLinkActiveOptions]="{ exact: !!item.exact }"
+          <nav class="kte-shell__nav" aria-label="Fő navigáció">
+            @for (item of visibleNavItems(); track item.route) {
+              <a
+                class="kte-shell__nav-link"
+                [routerLink]="item.route"
+                [routerLinkActive]="'kte-active'"
+                [routerLinkActiveOptions]="{ exact: !!item.exact }"
+              >
+                {{ item.label }}
+              </a>
+            }
+          </nav>
+
+          <span class="kte-shell__spacer"></span>
+
+          <a
+            mat-icon-button
+            class="kte-shell__cart"
+            routerLink="/cart"
+            aria-label="Kosár"
+            [matBadge]="cartCount() > 0 ? cartCount() : null"
+            matBadgeColor="accent"
+            matBadgeSize="small"
+          >
+            <mat-icon>shopping_cart</mat-icon>
+          </a>
+
+          @if (isAuthenticated()) {
+            <button
+              type="button"
+              [matMenuTriggerFor]="userMenu"
+              class="kte-shell__user"
+              aria-label="Felhasználói menü"
             >
-              {{ item.label }}
+              <span class="kte-shell__avatar" aria-hidden="true">{{ userInitials() }}</span>
+              <span class="kte-shell__user-label">{{ user()?.firstName }}</span>
+            </button>
+            <mat-menu #userMenu="matMenu">
+              <a mat-menu-item routerLink="/profile">
+                <mat-icon>person</mat-icon>
+                <span>Profil</span>
+              </a>
+              <button mat-menu-item type="button" (click)="logout()">
+                <mat-icon>logout</mat-icon>
+                <span>Kijelentkezés</span>
+              </button>
+            </mat-menu>
+          } @else {
+            <a mat-flat-button color="primary" class="kte-shell__login" routerLink="/login">
+              Bejelentkezés
             </a>
           }
-        </nav>
-
-        <span class="kte-shell__spacer"></span>
-
-        <a
-          mat-icon-button
-          class="kte-shell__cart"
-          routerLink="/cart"
-          aria-label="Kosár"
-          [matBadge]="cartCount() > 0 ? cartCount() : null"
-          matBadgeColor="accent"
-          matBadgeSize="small"
-        >
-          <mat-icon>shopping_cart</mat-icon>
-        </a>
-
-        @if (isAuthenticated()) {
-          <button
-            type="button"
-            [matMenuTriggerFor]="userMenu"
-            class="kte-shell__user"
-            aria-label="Felhasználói menü"
-          >
-            <span class="kte-shell__avatar" aria-hidden="true">{{ userInitials() }}</span>
-            <span class="kte-shell__user-label">{{ user()?.firstName }}</span>
-          </button>
-          <mat-menu #userMenu="matMenu">
-            <a mat-menu-item routerLink="/profile">
-              <mat-icon>person</mat-icon>
-              <span>Profil</span>
-            </a>
-            <button mat-menu-item type="button" (click)="logout()">
-              <mat-icon>logout</mat-icon>
-              <span>Kijelentkezés</span>
-            </button>
-          </mat-menu>
-        } @else {
-          <a mat-flat-button color="primary" class="kte-shell__login" routerLink="/login">
-            Bejelentkezés
-          </a>
         }
       </div>
     </mat-toolbar>
