@@ -52,6 +52,7 @@ import {
   SeatDetailBottomSheetData,
 } from './components/seat-detail-bottom-sheet/seat-detail-bottom-sheet.component';
 import { WaitlistJoinButtonComponent } from './components/waitlist-join-button/waitlist-join-button.component';
+import { lockErrorMessage } from '../../shared/utils/lock-error';
 
 @Component({
   selector: 'kte-stadium-page',
@@ -490,9 +491,7 @@ export class StadiumPageComponent implements OnInit {
         duration: 4000,
       });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'A szék zárolása sikertelen.';
-      this.snackBar.open(message, 'Bezárás', { duration: 5000 });
+      this.snackBar.open(lockErrorMessage(error), 'Bezárás', { duration: 5000 });
     }
   }
 

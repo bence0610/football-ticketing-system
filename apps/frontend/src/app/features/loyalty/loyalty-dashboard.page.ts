@@ -13,6 +13,7 @@ import {
   LoyaltySnapshotResponse,
   LoyaltyTierResponse,
   TIER_COLORS,
+  TIER_TEXT_COLORS,
   TIER_LABELS,
   TRANSACTION_SOURCE_LABELS,
   LoyaltyTransactionResponse,
@@ -40,7 +41,7 @@ import {
         <div class="hero" [style.borderColor]="snapshot()!.tier.color">
           <div class="hero-meta">
             <h1>Hűségprogram</h1>
-            <div class="tier-badge" data-testid="loyalty-tier-badge" [style.background]="snapshot()!.tier.color">
+            <div class="tier-badge" data-testid="loyalty-tier-badge" [style.background]="snapshot()!.tier.color" [style.color]="tierTextColor(snapshot()!.tier.tier)">
               {{ tierLabel(snapshot()!.tier.tier) }}
             </div>
           </div>
@@ -162,7 +163,7 @@ import {
       .points-value {
         font-size: 56px;
         font-weight: 700;
-        color: var(--kte-gold);
+        color: var(--kte-gold-ink);
         line-height: 1;
         font-family: var(--kte-font-display);
       }
@@ -171,7 +172,7 @@ import {
       .progress-card { background: var(--kte-surface); border: 1px solid var(--kte-border); padding: 20px; margin-bottom: 16px; color: var(--kte-ink); }
       .progress-header { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; }
       .points-needed { color: var(--kte-muted); }
-      .progress-info { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--kte-faint); }
+      .progress-info { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--kte-muted); }
 
       .kte-progress {
         --mdc-linear-progress-track-color: var(--kte-line);
@@ -253,6 +254,10 @@ export class LoyaltyDashboardPageComponent implements OnInit {
 
   protected tierLabel(tier: string): string {
     return TIER_LABELS[tier as keyof typeof TIER_LABELS] ?? tier;
+  }
+
+  protected tierTextColor(tier: string): string {
+    return TIER_TEXT_COLORS[tier as keyof typeof TIER_TEXT_COLORS] ?? '#14121A';
   }
 
   protected tierColor(tier: string): string {

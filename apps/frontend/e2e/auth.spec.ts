@@ -54,7 +54,25 @@ async function mockRefreshSuccess(page: import('@playwright/test').Page): Promis
   );
 }
 
+// The home page loads the signed-in user's loyalty snapshot. These tests sign in
+// with a fake token, so the backend would answer 401 and the app would log the
+// user straight back out - mock the endpoint like the auth calls.
+async function mockLoyalty(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/loyalty/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        points: 0,
+        tier: { tier: 'bronze', label: 'Kék', minPoints: 0, discountPercent: 0, color: '#1F5C8B' },
+        recentTransactions: [],
+      }),
+    }),
+  );
+}
+
 async function mockLoginSuccess(page: import('@playwright/test').Page): Promise<void> {
+  await mockLoyalty(page);
   await page.route('**/auth/login', (route) =>
     route.fulfill({
       status: 200,
@@ -75,6 +93,7 @@ async function mockLoginFailure(page: import('@playwright/test').Page, status = 
 }
 
 async function mockRegisterSuccess(page: import('@playwright/test').Page): Promise<void> {
+  await mockLoyalty(page);
   await page.route('**/auth/register', (route) =>
     route.fulfill({
       status: 201,

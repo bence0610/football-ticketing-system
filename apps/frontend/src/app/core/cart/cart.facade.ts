@@ -10,6 +10,7 @@ import { SeatsApiService } from '../../shared/services/seats.api.service';
 import { CartActions } from '../../state/cart/cart.actions';
 import {
   selectCartCount,
+  selectCartExpired,
   selectCartIsEmpty,
   selectCartItems,
   selectCartMatchId,
@@ -23,6 +24,7 @@ interface PersistedCart {
   readonly version: 1;
   readonly matchId: string | null;
   readonly items: readonly CartItem[];
+  readonly expired?: readonly CartItem[];
 }
 
 interface MatchContext {
@@ -45,6 +47,8 @@ export class CartFacade {
   private readonly seatsApi = inject(SeatsApiService);
 
   readonly items = toSignal(this.store.select(selectCartItems), { initialValue: [] });
+  /** Holds that ran out and are waiting for the user to re-book or discard them. */
+  readonly expired = toSignal(this.store.select(selectCartExpired), { initialValue: [] });
   readonly matchId = toSignal(this.store.select(selectCartMatchId), { initialValue: null });
   readonly count = toSignal(this.store.select(selectCartCount), { initialValue: 0 });
   readonly isEmpty = toSignal(this.store.select(selectCartIsEmpty), { initialValue: true });
@@ -57,7 +61,8 @@ export class CartFacade {
     effect(() => {
       const items = this.items();
       const matchId = this.matchId();
-      this.persist({ version: 1, items, matchId });
+      const expired = this.expired();
+      this.persist({ version: 1, items, matchId, expired });
     });
   }
 
@@ -100,6 +105,39 @@ export class CartFacade {
     };
     this.store.dispatch(CartActions.addItem({ item }));
     return item;
+  }
+
+  /**
+   * Tries to lock an expired seat again. Goes through the same `add()` (and so
+   * the same lock call and errors) as picking the seat on the map. On failure the
+   * expired entry stays, so the user can still discard it.
+   */
+  async relock(seatId: string): Promise<CartItem> {
+    const lapsed = this.expired().find((e) => e.seatId === seatId);
+    if (!lapsed) {
+      throw new Error('Ez a foglalás már nem szerepel a kosárban.');
+    }
+    const seat: SeatStatus = {
+      id: lapsed.seatId,
+      section: lapsed.section,
+      row: lapsed.row,
+      number: lapsed.seatNumber,
+      category: lapsed.category,
+      price: lapsed.price,
+      status: 'available',
+      isAccessible: false,
+    };
+    return this.add(seat, {
+      matchId: lapsed.matchId,
+      homeTeam: lapsed.homeTeam,
+      awayTeam: lapsed.awayTeam,
+      kickoffAt: lapsed.kickoffAt,
+    });
+  }
+
+  /** The user discarded an expired hold. */
+  dismissExpired(seatId: string): void {
+    this.store.dispatch(CartActions.dismissExpired({ seatId }));
   }
 
   /**
@@ -182,8 +220,18 @@ export class CartFacade {
       }
       const now = Date.now();
       const live = parsed.items.filter((item) => item.lockExpiresAtMs > now);
+      // A hold that ran out while the page was closed is shown as expired, not dropped.
+      const lapsed = parsed.items.filter((item) => item.lockExpiresAtMs <= now);
+      const expired = [
+        ...(parsed.expired ?? []).filter((e) => !lapsed.some((l) => l.seatId === e.seatId)),
+        ...lapsed,
+      ];
       this.store.dispatch(
-        CartActions.hydrateFromStorage({ items: live, matchId: parsed.matchId }),
+        CartActions.hydrateFromStorage({
+          items: live,
+          matchId: live.length > 0 ? parsed.matchId : null,
+          expired,
+        }),
       );
     } catch {
       // ignore malformed payload

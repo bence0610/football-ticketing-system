@@ -17,19 +17,27 @@ export class CartPage {
   // Page structure
   readonly pageHeading: Locator;
   readonly itemCount: Locator;
+  readonly steps: Locator;
 
   // Empty state
   readonly emptyCard: Locator;
   readonly emptyGoToStadiumLink: Locator;
 
-  // Cart rows
+  // One card per match, one row per seat
+  readonly matchCards: Locator;
   readonly cartRows: Locator;
+
+  // Expired holds
+  readonly expiredCards: Locator;
+  readonly relockButton: Locator;
+  readonly dismissButton: Locator;
 
   // Summary card
   readonly summaryCard: Locator;
   readonly totalPrice: Locator;
   readonly checkoutButton: Locator;
   readonly expiryWarning: Locator;
+  readonly pointsLine: Locator;
 
   // Snackbar (Material)
   readonly snackbar: Locator;
@@ -39,16 +47,23 @@ export class CartPage {
 
     this.pageHeading = page.locator('section.kte-cart h1');
     this.itemCount = page.locator('.kte-cart__count');
+    this.steps = page.getByRole('navigation', { name: 'Vásárlás lépései' });
 
-    this.emptyCard = page.locator('mat-card.kte-cart__empty');
-    this.emptyGoToStadiumLink = page.getByRole('link', { name: /stadiontérkép/i });
+    this.emptyCard = page.locator('[data-testid="cart-empty"]');
+    this.emptyGoToStadiumLink = page.getByRole('link', { name: /helyet választok/i });
 
-    this.cartRows = page.locator('mat-card.kte-cart__row');
+    this.matchCards = page.locator('[data-testid="cart-match"]');
+    this.cartRows = page.locator('[data-testid="cart-seat"]');
 
-    this.summaryCard = page.locator('mat-card.kte-cart__summary');
-    this.totalPrice = page.locator('.kte-cart__summary-row--total strong').last();
-    this.checkoutButton = page.getByRole('button', { name: /tovább a pénztárhoz/i });
-    this.expiryWarning = page.locator('.kte-cart__warning');
+    this.expiredCards = page.locator('[data-testid="cart-expired"]');
+    this.relockButton = page.getByRole('button', { name: /újra lefoglalom/i });
+    this.dismissButton = page.getByRole('button', { name: /elvetem/i });
+
+    this.summaryCard = page.locator('kte-cart-summary .summary');
+    this.totalPrice = page.locator('[data-testid="summary-total"]');
+    this.checkoutButton = page.getByRole('button', { name: /tovább a fizetéshez/i });
+    this.expiryWarning = page.locator('[data-testid="summary-hold"]');
+    this.pointsLine = page.locator('[data-testid="summary-points"]');
 
     this.snackbar = page.locator('mat-snack-bar-container');
   }
@@ -58,10 +73,11 @@ export class CartPage {
   }
 
   /**
-   * Returns the countdown element inside the nth cart row (zero-based).
+   * Returns the hold countdown in the nth match card (zero-based). One hold
+   * pill per match, showing the shortest hold of that match's seats.
    */
-  countdownInRow(index: number): Locator {
-    return this.cartRows.nth(index).locator('.kte-cart__countdown');
+  countdownInMatch(index: number): Locator {
+    return this.matchCards.nth(index).locator('.kte-cart__countdown');
   }
 
   /**
@@ -82,23 +98,26 @@ export class CartPage {
     page: Page,
     items: readonly Partial<CartItem>[],
     matchId: string,
+    expiredItems: readonly Partial<CartItem>[] = [],
   ): Promise<void> {
-    const fullItems = items.map((item, i) => ({
-      seatId: `seed-seat-${i}`,
+    const build = (list: readonly Partial<CartItem>[], offset: number) => list.map((item, i) => ({
+      seatId: `seed-seat-${i + offset}`,
       matchId,
       homeTeam: 'Kecskeméti TE',
       awayTeam: 'Ferencvárosi TC',
       kickoffAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       section: 'A',
       row: '1',
-      seatNumber: i + 1,
+      seatNumber: i + offset + 1,
       category: 'standard',
       price: 3500,
-      ownerToken: `owner-token-${i}`,
+      ownerToken: `owner-token-${i + offset}`,
       lockExpiresAtMs: Date.now() + 280_000,
       addedAtMs: Date.now() - 20_000,
       ...item,
     }));
+    const fullItems = build(items, 0);
+    const fullExpired = build(expiredItems, 100).map((e) => ({ ...e, lockExpiresAtMs: Date.now() - 5_000 }));
 
     // addInitScript runs in every new document BEFORE the app boots, so it also
     // works ahead of the first page.goto() (page.evaluate would throw a
@@ -110,7 +129,7 @@ export class CartPage {
           window.sessionStorage.setItem(key, JSON.stringify(payload));
         }
       },
-      [STORAGE_KEY, { version: 1, matchId, items: fullItems }] as [string, unknown],
+      [STORAGE_KEY, { version: 1, matchId, items: fullItems, expired: fullExpired }] as [string, unknown],
     );
   }
 }

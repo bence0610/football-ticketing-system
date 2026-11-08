@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import { resolve } from 'path';
 import * as Handlebars from 'handlebars';
 import { EmailContextMap, EmailTemplateName } from './email.types';
+import { capitalArticle, hungarianArticle } from '../../common/hungarian-article';
 
 /**
  * Compiles Handlebars templates eagerly at boot and caches them in memory.
@@ -26,6 +27,10 @@ export class EmailTemplateService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     Handlebars.registerHelper('eq', (a: unknown, b: unknown): boolean => a === b);
+    // Hungarian definite article for the following name: {{article name}} -> a / az,
+    // {{Article name}} -> A / Az (sentence start).
+    Handlebars.registerHelper('article', (name: unknown): string => hungarianArticle(String(name ?? '')));
+    Handlebars.registerHelper('Article', (name: unknown): string => capitalArticle(String(name ?? '')));
     for (const [name, fileName] of Object.entries(this.templates)) {
       const filePath = resolve(__dirname, 'templates', fileName);
       try {

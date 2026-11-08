@@ -105,8 +105,9 @@ interface SeatRow {
         text-align: center;
         margin-bottom: 12px;
         padding: 6px;
-        background: var(--kte-success-bg);
-        color: var(--kte-success);
+        background: var(--border-light);
+        color: var(--muted);
+        border: 1px solid var(--border);
         font-size: 12px;
         font-weight: 600;
         letter-spacing: 0.08em;
@@ -175,7 +176,7 @@ interface SeatRow {
 
       .kte-seat--locked {
         --seat-bg: var(--kte-seat-locked);
-        --seat-fg: #ffffff;
+        --seat-fg: var(--kte-ink); /* white on this amber is 3.5:1; ink is 5.4:1 */
       }
 
       .kte-seat--sold {

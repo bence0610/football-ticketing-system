@@ -20,9 +20,9 @@
                 <p style="margin:0 0 16px; font-size:16px; line-height:24px;">Szia <strong>{{recipientName}}</strong>,</p>
 
                 {{#if isLender}}
-                  <p style="margin:0 0 16px; font-size:16px; line-height:24px;">A(z) <strong>{{matchTitle}}</strong> ({{matchKickoffLabel}}) mérkőzésre létrehozott bérletkölcsön sikeresen visszavonva.</p>
+                  <p style="margin:0 0 16px; font-size:16px; line-height:24px;">{{Article matchTitle}} <strong>{{matchTitle}}</strong> ({{matchKickoffLabel}}) mérkőzésre létrehozott bérletkölcsön sikeresen visszavonva.</p>
                 {{else}}
-                  <p style="margin:0 0 16px; font-size:16px; line-height:24px;">A(z) <strong>{{matchTitle}}</strong> ({{matchKickoffLabel}}) mérkőzésre szóló bérletkölcsönt a tulajdonos visszavonta. A korábban kapott QR kód érvénytelen.</p>
+                  <p style="margin:0 0 16px; font-size:16px; line-height:24px;">{{Article matchTitle}} <strong>{{matchTitle}}</strong> ({{matchKickoffLabel}}) mérkőzésre szóló bérletkölcsönt a tulajdonos visszavonta. A korábban kapott QR kód érvénytelen.</p>
                 {{/if}}
 
                 {{#if reason}}

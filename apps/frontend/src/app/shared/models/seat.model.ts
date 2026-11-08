@@ -20,6 +20,9 @@ export interface SectorSummary {
   readonly locked: number;
   readonly sold: number;
   readonly occupancyRatio: number;
+  /** Lowest / highest seat price in the sector (HUF). Sent by the API. */
+  readonly minPrice: number;
+  readonly maxPrice: number;
 }
 
 export interface MatchSeatsResponse {

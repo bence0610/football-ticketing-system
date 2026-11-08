@@ -1,0 +1,64 @@
+// Loyalty tier identities. Anything with a `data-tier` attribute (the home
+// strip, the cart's discount row, ...) gets the --tier-* custom properties for
+// that tier, so every surface shows a tier the same way.
+//
+//   pill-*       the tier pill / row     fill + edge  progress fill and its outline
+//   soft         tinted band at the top tier
+//
+// Gold (--gold*) is used for the Arany tier only. Every fill (or its edge) has
+// >= 3:1 against the track and every label >= 4.5:1 against its pill - the
+// loyalty-strip spec asserts both.
+
+[data-tier] {
+  --tier-pill-bg: var(--border-light);
+  --tier-pill-fg: var(--ink);
+  --tier-pill-border: var(--muted);
+  --tier-star: var(--muted);
+  --tier-fill: var(--muted);
+  --tier-fill-edge: var(--muted);
+  --tier-soft: var(--border-light);
+}
+
+// Kék: light neutral, outlined
+[data-tier='bronze'] {
+  --tier-pill-bg: var(--border-light);
+  --tier-pill-fg: var(--ink);
+  --tier-pill-border: var(--muted);
+  --tier-star: var(--muted);
+  --tier-fill: var(--muted);
+  --tier-fill-edge: var(--muted);
+  --tier-soft: var(--border-light);
+}
+
+// Ezüst: mid neutral, filled
+[data-tier='silver'] {
+  --tier-pill-bg: var(--faint);
+  --tier-pill-fg: var(--ink);
+  --tier-pill-border: var(--faint);
+  --tier-star: var(--ink);
+  --tier-fill: var(--faint);
+  --tier-fill-edge: var(--muted);
+  --tier-soft: var(--border-light);
+}
+
+// Arany: the only place gold is used
+[data-tier='gold'] {
+  --tier-pill-bg: var(--gold-bg);
+  --tier-pill-fg: var(--gold-ink);
+  --tier-pill-border: var(--gold-border);
+  --tier-star: var(--gold);
+  --tier-fill: var(--gold);
+  --tier-fill-edge: var(--gold-ink);
+  --tier-soft: var(--gold-bg);
+}
+
+// KTE Legenda: brand
+[data-tier='platinum'] {
+  --tier-pill-bg: var(--brand-deep);
+  --tier-pill-fg: #fff;
+  --tier-pill-border: var(--brand-deep);
+  --tier-star: #fff;
+  --tier-fill: var(--brand-deep);
+  --tier-fill-edge: var(--brand-deep);
+  --tier-soft: var(--brand-tint);
+}

@@ -261,7 +261,7 @@ export function scanTimeLabel(value: string | undefined | null): string | undefi
         padding: 12px 0;
       }
 
-      .empty { color: var(--kte-faint); font-size: 13px; }
+      .empty { color: var(--muted); font-size: 13px; }
 
       .match-row {
         display: flex;

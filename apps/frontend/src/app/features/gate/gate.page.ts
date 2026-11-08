@@ -57,7 +57,7 @@ function extractTicketId(token: string): string | null {
   ],
   template: `
     <section class="kte-gate-page">
-      <mat-card class="kte-gate-card" appearance="outlined">
+      <mat-card class="kte-gate-card on-dark" appearance="outlined">
         @if (loading()) {
           <mat-progress-bar mode="indeterminate" />
         }

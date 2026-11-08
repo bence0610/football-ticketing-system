@@ -35,13 +35,6 @@ const SECTORS: readonly SectorPath[] = [
   template: `
     <div class="kte-map" role="img" aria-label="Széktói Stadion lelátóinak térképe">
       <svg viewBox="0 0 640 520" xmlns="http://www.w3.org/2000/svg" aria-hidden="false">
-        <defs>
-          <linearGradient id="kte-pitch-gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#1d8348" />
-            <stop offset="100%" stop-color="#196f3d" />
-          </linearGradient>
-        </defs>
-
         <!-- Pitch -->
         <rect
           x="180"
@@ -49,16 +42,15 @@ const SECTORS: readonly SectorPath[] = [
           width="280"
           height="200"
           rx="8"
-          fill="url(#kte-pitch-gradient)"
-          stroke="#ffffff"
+          class="kte-map__pitch"
           stroke-width="3"
         />
-        <line x1="320" y1="160" x2="320" y2="360" stroke="#ffffff" stroke-width="2" />
-        <circle cx="320" cy="260" r="28" fill="none" stroke="#ffffff" stroke-width="2" />
+        <line class="kte-map__pitch-line" x1="320" y1="160" x2="320" y2="360" stroke-width="2" />
+        <circle class="kte-map__pitch-line" cx="320" cy="260" r="28" fill="none" stroke-width="2" />
         <text
+          class="kte-map__pitch-label"
           x="320"
           y="265"
-          fill="#ffffff"
           font-size="14"
           font-weight="700"
           text-anchor="middle"
@@ -135,6 +127,18 @@ const SECTORS: readonly SectorPath[] = [
         display: block;
         width: 100%;
         height: auto;
+      }
+
+      /* The pitch is NOT a seat state: neutral fill, never a seat-state colour. */
+      .kte-map__pitch {
+        fill: var(--border-light);
+        stroke: var(--muted);
+      }
+      .kte-map__pitch-line {
+        stroke: var(--muted);
+      }
+      .kte-map__pitch-label {
+        fill: var(--muted);
       }
 
       .kte-map__sector {

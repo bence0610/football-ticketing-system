@@ -341,7 +341,7 @@ type PageState =
     }
     .accept-card__technical {
       font-size: 12px !important;
-      color: var(--kte-faint) !important;
+      color: var(--muted) !important;
       font-family: monospace;
     }
     .accept-card__actions {

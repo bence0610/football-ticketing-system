@@ -1,10 +1,10 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { catchError, map, of, switchMap } from 'rxjs';
 import { SeatsApiService } from '../../shared/services/seats.api.service';
 import { SeatsActions } from './seats.actions';
 import { extractApiErrorMessage } from '../../shared/utils/api-error';
+import { isSeatTaken, lockErrorMessage } from '../../shared/utils/lock-error';
 
 @Injectable()
 export class SeatsEffects {
@@ -36,10 +36,8 @@ export class SeatsEffects {
         this.api.lockSeat(matchId, seatId).pipe(
           map((lock) => SeatsActions.lockSeatSuccess({ lock })),
           catchError((error: unknown) => {
-            const conflict = error instanceof HttpErrorResponse && error.status === 409;
-            const message = conflict
-              ? 'Ez a szék már foglalt. Válassz másikat.'
-              : this.toMessage(error, 'A szék zárolása sikertelen.');
+            const conflict = isSeatTaken(error);
+            const message = lockErrorMessage(error);
             return of(
               SeatsActions.lockSeatFailure({ error: message, conflict, seatId }),
             );

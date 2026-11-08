@@ -1,0 +1,193 @@
+// ---------------------------------------------------------------------------
+// Design tokens — the ONE place colours, type and shape are defined.
+//
+// Sass variables are the source (Sass cannot read CSS custom properties, and
+// the Angular Material palette has to be computed at build time). The `:root`
+// block published by `publish-tokens` exposes every one of them as a CSS
+// custom property, and `_theme.scss` builds the Material theme from the same
+// variables, so runtime CSS and the Material theme can never disagree.
+// ---------------------------------------------------------------------------
+
+// Brand
+$brand-deep: #4a1d6a; // primary: buttons, headers, links
+$brand-mid: #6b2d96; // hover, accents, eyebrow text
+$brand-tint: #f3edf8; // tinted panels
+$ink: #14121a; // body text
+$muted: #5b5566; // secondary text
+$surface: #ffffff;
+$page: #f7f6f9; // page background
+$border: #e7e4ec;
+$border-light: #efecf3;
+$faint: #9d96a8; // disabled text
+
+// Loyalty — RESERVED for loyalty tier UI. Never for buttons, links, focus
+// rings or decoration, otherwise the tier badge loses its meaning.
+$gold: #c9a227;
+$gold-bg: #fbf4df;
+$gold-border: #e8d79b;
+$gold-ink: #6b5310;
+
+// Seat states — differ in lightness, not only hue
+$seat-free: #2e7d4f;
+$seat-locked: #c77700;
+$seat-sold: #8a1c1c;
+$seat-pass: #1f5c8b;
+$seat-disabled: #c9c6cf;
+
+// Status chips (text on background)
+$chip-paid: #2e7d4f;
+$chip-paid-bg: #e7f3ec;
+$chip-pending: #8a5300;
+$chip-pending-bg: #fbf1e0;
+$chip-expired: #8a1c1c;
+$chip-expired-bg: #f7e7e6;
+$chip-used: #5b5566;
+$chip-used-bg: #efecf3;
+
+// Error block
+$error-ink: #6b1616;
+$error-bg: #f7e7e6;
+$error-edge: #8a1c1c;
+
+// Foreground / glass values for text and panels that sit on --brand-deep or
+// --ink surfaces (header, hero, footer).
+$on-ink-nav: #cfcad6; // inactive header link
+$on-brand-eyebrow: #d9bfee; // eyebrow + unit labels on the hero
+$on-brand-lead: #e4d7f0; // secondary text on the hero
+$glass: rgba(255, 255, 255, 0.1); // countdown tiles
+$glass-outline: rgba(255, 255, 255, 0.45); // outlined button on the hero
+$scrim: rgba(0, 0, 0, 0.22); // price panel on the hero
+$divider-on-brand: rgba(255, 255, 255, 0.16); // hairline on the hero
+
+// Amber: urgency (a hold about to expire) and the cart's hold note
+$amber-bg: #fbf1e0;
+$amber-edge: #f0dcb8;
+$amber-ink: #6b4100;
+$amber-icon: #c77700;
+
+// Shape
+$radius-button: 10px;
+$radius-block: 8px;
+$radius-card: 16px;
+$min-target: 44px;
+$header-height: 72px; // sticky app header; also the scroll offset below it
+
+// Type
+$font-display: ('Archivo', system-ui, sans-serif);
+$font-body: ('IBM Plex Sans', system-ui, sans-serif);
+
+@mixin publish-tokens {
+  :root {
+    --brand-deep: #{$brand-deep};
+    --brand-mid: #{$brand-mid};
+    --brand-tint: #{$brand-tint};
+    --ink: #{$ink};
+    --muted: #{$muted};
+    --surface: #{$surface};
+    --page: #{$page};
+    --border: #{$border};
+    --border-light: #{$border-light};
+    --faint: #{$faint};
+
+    --gold: #{$gold};
+    --gold-bg: #{$gold-bg};
+    --gold-border: #{$gold-border};
+    --gold-ink: #{$gold-ink};
+
+    --seat-free: #{$seat-free};
+    --seat-locked: #{$seat-locked};
+    --seat-sold: #{$seat-sold};
+    --seat-pass: #{$seat-pass};
+    --seat-disabled: #{$seat-disabled};
+
+    --chip-paid: #{$chip-paid};
+    --chip-paid-bg: #{$chip-paid-bg};
+    --chip-pending: #{$chip-pending};
+    --chip-pending-bg: #{$chip-pending-bg};
+    --chip-expired: #{$chip-expired};
+    --chip-expired-bg: #{$chip-expired-bg};
+    --chip-used: #{$chip-used};
+    --chip-used-bg: #{$chip-used-bg};
+
+    --error-ink: #{$error-ink};
+    --error-bg: #{$error-bg};
+    --error-edge: #{$error-edge};
+
+    --radius-button: #{$radius-button};
+    --radius-block: #{$radius-block};
+    --radius-card: #{$radius-card};
+    --min-target: #{$min-target};
+
+    --amber-bg: #{$amber-bg};
+    --amber-edge: #{$amber-edge};
+    --amber-ink: #{$amber-ink};
+    --amber-icon: #{$amber-icon};
+
+    --on-ink-nav: #{$on-ink-nav};
+    --on-brand-eyebrow: #{$on-brand-eyebrow};
+    --on-brand-lead: #{$on-brand-lead};
+    --glass: #{$glass};
+    --glass-outline: #{$glass-outline};
+    --scrim: #{$scrim};
+    --divider-on-brand: #{$divider-on-brand};
+    --header-h: #{$header-height};
+
+    --font-display: #{$font-display};
+    --font-body: #{$font-body};
+
+    // -----------------------------------------------------------------------
+    // Legacy `--kte-*` names. Existing pages still reference these; they are
+    // pure aliases of the tokens above so there is still a single source.
+    // Pages move to the unprefixed names as they are reworked. New code must
+    // use the unprefixed tokens.
+    // -----------------------------------------------------------------------
+    --kte-brand-deep: var(--brand-deep);
+    --kte-brand-mid: var(--brand-mid);
+    --kte-brand-tint: var(--brand-tint);
+    --kte-brand-edge: #dfd2ec;
+    --kte-ink: var(--ink);
+    --kte-muted: var(--muted);
+    --kte-faint: var(--faint);
+    --kte-surface: var(--surface);
+    --kte-page: var(--page);
+    --kte-border: var(--border);
+    --kte-line: var(--border-light);
+    --kte-gold: var(--gold);
+    --kte-gold-bg: var(--gold-bg);
+    --kte-gold-edge: var(--gold-border);
+    --kte-gold-ink: var(--gold-ink);
+    --kte-seat-free: var(--seat-free);
+    --kte-seat-locked: var(--seat-locked);
+    --kte-seat-sold: var(--seat-sold);
+    --kte-seat-pass: var(--seat-pass);
+    --kte-seat-disabled: var(--seat-disabled);
+    --kte-success: var(--chip-paid);
+    --kte-success-bg: var(--chip-paid-bg);
+    --kte-warn: var(--chip-pending);
+    --kte-warn-bg: var(--chip-pending-bg);
+    --kte-danger: var(--chip-expired);
+    --kte-danger-bg: var(--chip-expired-bg);
+    --kte-danger-ink: var(--error-ink);
+    --kte-radius-sm: var(--radius-block);
+    --kte-radius: var(--radius-button);
+    --kte-radius-lg: var(--radius-card);
+    --kte-radius-pill: 999px;
+    --kte-font-display: var(--font-display);
+    --kte-font-body: var(--font-body);
+    --kte-color-primary: var(--brand-deep);
+    --kte-color-accent: var(--brand-mid);
+    --kte-color-text: var(--ink);
+    --kte-color-bg: var(--page);
+    --kte-color-surface: var(--surface);
+    --kte-color-border: var(--border);
+    --kte-radius-md: var(--radius-button);
+    --kte-shadow-sm: 0 1px 2px rgba(20, 18, 26, 0.08);
+    --kte-shadow-md: 0 6px 18px rgba(20, 18, 26, 0.12);
+    --kte-spacing-1: 4px;
+    --kte-spacing-2: 8px;
+    --kte-spacing-3: 12px;
+    --kte-spacing-4: 16px;
+    --kte-spacing-6: 24px;
+    --kte-spacing-8: 32px;
+  }
+}

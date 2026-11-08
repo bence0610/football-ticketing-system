@@ -6,6 +6,7 @@ export const CART_FEATURE_KEY = 'cart';
 const selectCartFeature = createFeatureSelector<CartState>(CART_FEATURE_KEY);
 
 export const selectCartItems = createSelector(selectCartFeature, (state) => state.items);
+export const selectCartExpired = createSelector(selectCartFeature, (state) => state.expired);
 export const selectCartMatchId = createSelector(selectCartFeature, (state) => state.matchId);
 export const selectCartCount = createSelector(selectCartItems, (items) => items.length);
 export const selectCartIsEmpty = createSelector(selectCartItems, (items) => items.length === 0);

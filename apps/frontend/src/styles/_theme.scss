@@ -1,0 +1,97 @@
+@use '@angular/material' as mat;
+@use 'tokens' as t;
+
+// Angular Material theme, computed from the tokens — no per-component colour
+// overrides. Gold is deliberately absent: it is in no palette, so no Material
+// component can ever pick it up.
+
+$_on-light: t.$ink;
+
+$brand-palette: mat.define-palette(
+  (
+    50: t.$brand-tint,
+    100: #e2d3ee,
+    200: #cdb1e0,
+    300: #a87fc9,
+    400: #8450ae,
+    500: t.$brand-deep,
+    600: #431a60,
+    700: #3b1654,
+    800: #2f1142,
+    900: #220c31,
+    contrast: (
+      50: $_on-light, 100: $_on-light, 200: $_on-light, 300: $_on-light,
+      400: white, 500: white, 600: white, 700: white, 800: white, 900: white,
+    ),
+  ),
+  500
+);
+
+$accent-palette: mat.define-palette(
+  (
+    50: t.$brand-tint,
+    100: #e2d3ee,
+    200: #cdb1e0,
+    300: #a87fc9,
+    400: #8450ae,
+    500: t.$brand-mid,
+    600: #5f2788,
+    700: #4f1f73,
+    800: #3f185c,
+    900: #2f1142,
+    contrast: (
+      50: $_on-light, 100: $_on-light, 200: $_on-light, 300: $_on-light,
+      400: white, 500: white, 600: white, 700: white, 800: white, 900: white,
+    ),
+  ),
+  500
+);
+
+$warn-palette: mat.define-palette(
+  (
+    50: t.$chip-expired-bg,
+    100: #ecc9c7,
+    200: #dca09d,
+    300: #c77470,
+    400: #b04a46,
+    500: t.$seat-sold,
+    600: #7c1919,
+    700: #6b1616,
+    800: #5a1212,
+    900: #480e0e,
+    contrast: (
+      50: $_on-light, 100: $_on-light, 200: $_on-light, 300: $_on-light,
+      400: white, 500: white, 600: white, 700: white, 800: white, 900: white,
+    ),
+  ),
+  500
+);
+
+// Headings and prices use Archivo; body and UI use IBM Plex Sans.
+$typography: mat.define-typography-config(
+  $font-family: t.$font-body,
+  $headline-4: mat.define-typography-level(40px, 44px, 800, t.$font-display, -0.025em),
+  $headline-5: mat.define-typography-level(24px, 30px, 700, t.$font-display, -0.02em),
+  $headline-6: mat.define-typography-level(22px, 28px, 700, t.$font-display, -0.02em),
+  $subtitle-1: mat.define-typography-level(16px, 24px, 500, t.$font-body),
+  $body-1: mat.define-typography-level(16px, 1.65, 400, t.$font-body),
+  $body-2: mat.define-typography-level(14px, 1.6, 400, t.$font-body),
+  $button: mat.define-typography-level(15px, 20px, 600, t.$font-body)
+);
+
+$theme: mat.define-light-theme(
+  (
+    color: (
+      primary: $brand-palette,
+      accent: $accent-palette,
+      warn: $warn-palette,
+    ),
+    typography: $typography,
+    density: 0,
+  )
+);
+
+@mixin apply {
+  @include mat.core();
+  @include mat.all-component-themes($theme);
+}

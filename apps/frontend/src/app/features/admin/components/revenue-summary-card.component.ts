@@ -87,7 +87,7 @@ import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
       }
       .kte-summary__subtitle {
         font-size: 12px;
-        color: var(--kte-faint);
+        color: var(--muted);
       }
     `,
   ],

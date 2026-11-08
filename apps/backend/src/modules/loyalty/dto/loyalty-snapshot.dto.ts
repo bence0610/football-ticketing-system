@@ -58,6 +58,12 @@ export class LoyaltySnapshotResponseDto {
   @ApiProperty({ example: 250, required: false })
   pointsToNextTier?: number;
 
+  @ApiProperty({
+    example: 50,
+    description: 'Points earned for each ticket bought (LOYALTY_TICKET_POINTS_PER_TICKET).',
+  })
+  ticketPointsPerTicket!: number;
+
   @ApiProperty({ type: () => [LoyaltyTransactionResponseDto] })
   recentTransactions!: LoyaltyTransactionResponseDto[];
 }

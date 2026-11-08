@@ -1,7 +1,13 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { SKIP_ERROR_SNACKBAR } from '../../core/interceptors/error.interceptor';
 import { LockSeatResponse, MatchSeatsResponse } from '../models/seat.model';
+
+// Every caller of the lock endpoint (seat map, cart re-book) words a failure
+// itself via lockErrorMessage(), so the global snackbar - which would show the
+// server's raw English text - must stay out of it.
+const OWN_ERROR_MESSAGE = new HttpContext().set(SKIP_ERROR_SNACKBAR, true);
 
 @Injectable({ providedIn: 'root' })
 export class SeatsApiService {
@@ -22,6 +28,7 @@ export class SeatsApiService {
     return this.http.post<LockSeatResponse>(
       `/matches/${matchId}/seats/${seatId}/lock`,
       {},
+      { context: OWN_ERROR_MESSAGE },
     );
   }
 

@@ -59,6 +59,7 @@ export class LoyaltyController {
       tier: { ...snapshot.tier },
       nextTier: snapshot.nextTier ? { ...snapshot.nextTier } : undefined,
       pointsToNextTier: snapshot.pointsToNextTier,
+      ticketPointsPerTicket: snapshot.ticketPointsPerTicket,
       recentTransactions: snapshot.recentTransactions.map(
         (tx): LoyaltyTransactionResponseDto => ({
           id: tx.id,

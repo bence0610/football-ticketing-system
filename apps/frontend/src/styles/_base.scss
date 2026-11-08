@@ -1,0 +1,275 @@
+@use 'tokens' as t;
+
+// Global base: page, type, buttons, cards, error block, status chips and the
+// two layout constraints from the mobile probe. Colours come from the tokens;
+// Material's own button tokens are pointed at the same custom properties so
+// no component needs a per-component colour override.
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+// Nothing may be wider than the viewport. Deliberately NOT solved with
+// `overflow-x: hidden`: that would hide clipped content instead of fixing it.
+// Media scales down; layout containers must shrink (min-width: 0) rather than
+// force the page wider.
+html,
+body {
+  max-width: 100%;
+}
+
+// The sticky header covers the top --header-h of the scroll container
+// (mat-sidenav-content). scroll-padding makes anchors, scrollIntoView and
+// focus-scrolling stop *below* it, so nothing is ever hidden behind the header.
+.mat-drawer-content,
+html {
+  scroll-padding-top: calc(var(--header-h) + 8px);
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--ink);
+  background: var(--page);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  // No colour here on purpose: headings inherit from their container, so a
+  // heading on a brand-coloured surface takes that surface's light foreground.
+  font-family: var(--font-display);
+}
+
+h1 {
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+h2 {
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+label {
+  font-weight: 500;
+}
+
+// :where() keeps this at zero specificity so any component, and any surface
+// that sets its own foreground, overrides it. Material buttons are excluded.
+a:where(:not(.mat-mdc-button-base)) {
+  color: var(--brand-deep);
+}
+
+// ---------------------------------------------------------------------------
+// Buttons — Material's MDC tokens, fed from our tokens
+// ---------------------------------------------------------------------------
+:root {
+  // primary (mat-flat-button)
+  --mdc-filled-button-container-color: var(--brand-deep);
+  --mdc-filled-button-label-text-color: #fff;
+  --mdc-filled-button-container-shape: var(--radius-button);
+  --mdc-filled-button-container-height: 48px;
+  --mdc-filled-button-disabled-container-color: var(--border-light);
+  --mdc-filled-button-disabled-label-text-color: var(--faint);
+
+  // raised (mat-raised-button) follows the primary look
+  --mdc-protected-button-container-color: var(--brand-deep);
+  --mdc-protected-button-label-text-color: #fff;
+  --mdc-protected-button-container-shape: var(--radius-button);
+  --mdc-protected-button-container-height: 48px;
+  --mdc-protected-button-disabled-container-color: var(--border-light);
+  --mdc-protected-button-disabled-label-text-color: var(--faint);
+
+  // secondary (mat-stroked-button)
+  --mdc-outlined-button-outline-color: var(--brand-deep);
+  --mdc-outlined-button-outline-width: 1.5px;
+  --mdc-outlined-button-label-text-color: var(--brand-deep);
+  --mdc-outlined-button-container-shape: var(--radius-button);
+  --mdc-outlined-button-container-height: 48px;
+  --mdc-outlined-button-disabled-outline-color: var(--border-light);
+  --mdc-outlined-button-disabled-label-text-color: var(--faint);
+
+  // text (mat-button)
+  --mdc-text-button-label-text-color: var(--brand-mid);
+  --mdc-text-button-container-shape: var(--radius-button);
+  --mdc-text-button-container-height: 48px;
+  --mdc-text-button-disabled-label-text-color: var(--faint);
+
+  // checkbox / radio touch areas
+  --mdc-checkbox-state-layer-size: 44px;
+  --mdc-radio-state-layer-size: 44px;
+}
+
+.mat-mdc-button.mat-mdc-button-base,
+.mat-mdc-unelevated-button.mat-mdc-button-base,
+.mat-mdc-raised-button.mat-mdc-button-base,
+.mat-mdc-outlined-button.mat-mdc-button-base {
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: var(--radius-button);
+  min-height: var(--min-target);
+}
+
+.mat-mdc-unelevated-button.mat-mdc-button-base,
+.mat-mdc-raised-button.mat-mdc-button-base {
+  padding: 0 24px;
+}
+
+.mat-mdc-outlined-button.mat-mdc-button-base {
+  padding: 0 24px;
+}
+
+// A button on the brand-coloured toolbar must stay legible: the secondary and
+// text styles invert there.
+.mat-toolbar.mat-primary {
+  --mdc-outlined-button-outline-color: rgba(255, 255, 255, 0.7);
+  --mdc-outlined-button-label-text-color: #fff;
+  --mdc-text-button-label-text-color: #fff;
+}
+
+// ---------------------------------------------------------------------------
+// Tap targets: every interactive element at least 44px tall
+// ---------------------------------------------------------------------------
+button,
+[role='button'],
+[role='tab'],
+[role='menuitem'],
+[role='option'],
+select,
+input:not([type='hidden']):not([type='checkbox']):not([type='radio']),
+.mat-mdc-icon-button.mat-mdc-button-base,
+.mat-mdc-list-item,
+.mat-mdc-menu-item,
+.mat-mdc-tab-link,
+.mat-mdc-tab,
+.mat-mdc-chip-action,
+.mat-mdc-paginator-navigation-previous,
+.mat-mdc-paginator-navigation-next {
+  min-height: var(--min-target);
+}
+
+.mat-mdc-icon-button.mat-mdc-button-base {
+  min-width: var(--min-target);
+}
+
+// The select trigger inside a form field is the tap target; keep it 44px
+.mat-mdc-form-field .mat-mdc-select {
+  min-height: var(--min-target);
+  display: inline-flex;
+  align-items: center;
+}
+
+// Standalone links styled as controls (not inline prose links)
+a.mat-mdc-button-base,
+a.mat-mdc-list-item {
+  min-height: var(--min-target);
+}
+
+// ---------------------------------------------------------------------------
+// Cards and panels
+// ---------------------------------------------------------------------------
+.mat-mdc-card {
+  --mdc-elevated-card-container-color: var(--surface);
+  --mdc-elevated-card-container-shape: var(--radius-card);
+  --mdc-elevated-card-container-elevation: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: none;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.panel--tint {
+  background: var(--brand-tint);
+}
+
+// ---------------------------------------------------------------------------
+// Dark / brand-coloured surfaces: anything with this class gets the light
+// foreground, including Material form fields (whose labels, text and outline
+// otherwise stay dark and vanish on the surface).
+// ---------------------------------------------------------------------------
+.on-dark {
+  color: #fff;
+  --mdc-outlined-text-field-label-text-color: rgba(255, 255, 255, 0.85);
+  --mdc-outlined-text-field-hover-label-text-color: #fff;
+  --mdc-outlined-text-field-focus-label-text-color: #fff;
+  --mdc-outlined-text-field-input-text-color: #fff;
+  --mdc-outlined-text-field-caret-color: #fff;
+  --mdc-outlined-text-field-outline-color: rgba(255, 255, 255, 0.55);
+  --mdc-outlined-text-field-hover-outline-color: #fff;
+  --mdc-outlined-text-field-focus-outline-color: #fff;
+  --mat-form-field-hover-state-layer-opacity: 0;
+  --mat-form-field-disabled-input-text-placeholder-color: rgba(255, 255, 255, 0.6);
+  --mdc-outlined-text-field-input-text-placeholder-color: rgba(255, 255, 255, 0.7);
+  --mat-form-field-subscript-text-color: rgba(255, 255, 255, 0.85);
+  --mat-form-field-error-text-color: #ffb4ab;
+  --mat-form-field-select-arrow-color: #fff;
+}
+
+// ---------------------------------------------------------------------------
+// Error block
+// ---------------------------------------------------------------------------
+.error-block {
+  color: var(--error-ink);
+  background: var(--error-bg);
+  border-left: 3px solid var(--error-edge);
+  border-radius: var(--radius-block);
+  padding: 12px 16px;
+}
+
+// ---------------------------------------------------------------------------
+// Status chips (text on background)
+// ---------------------------------------------------------------------------
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+
+  &--paid {
+    color: var(--chip-paid);
+    background: var(--chip-paid-bg);
+  }
+  &--pending {
+    color: var(--chip-pending);
+    background: var(--chip-pending-bg);
+  }
+  &--expired {
+    color: var(--chip-expired);
+    background: var(--chip-expired-bg);
+  }
+  &--used {
+    color: var(--chip-used);
+    background: var(--chip-used-bg);
+  }
+}

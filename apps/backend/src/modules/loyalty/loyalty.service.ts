@@ -46,6 +46,8 @@ export interface LoyaltySnapshot {
   tier: TierDefinition;
   nextTier?: TierDefinition;
   pointsToNextTier?: number;
+  /** Points awarded per purchased ticket (LOYALTY_TICKET_POINTS_PER_TICKET). */
+  ticketPointsPerTicket: number;
   recentTransactions: LoyaltyTransaction[];
 }
 
@@ -113,6 +115,7 @@ export class LoyaltyService {
       tier: currentTier,
       nextTier,
       pointsToNextTier: nextTier ? Math.max(nextTier.minPoints - user.loyaltyPoints, 0) : undefined,
+      ticketPointsPerTicket: this.config.ticketPointsPerTicket,
       recentTransactions,
     };
   }

@@ -36,6 +36,8 @@ export interface LoyaltySnapshotResponse {
   tier: LoyaltyTierResponse;
   nextTier?: LoyaltyTierResponse;
   pointsToNextTier?: number;
+  /** Points earned per ticket bought (server config). Absent on older servers. */
+  ticketPointsPerTicket?: number;
   recentTransactions: LoyaltyTransactionResponse[];
 }
 
@@ -62,6 +64,17 @@ export const TIER_COLORS: Record<LoyaltyTier, string> = {
   silver: '#9D96A8',   // --kte-faint
   gold: '#C9A227',     // --kte-gold (reserved for loyalty tier)
   platinum: '#6B2D96', // --kte-brand-mid
+};
+
+/**
+ * Readable text colour for each tier swatch (WCAG AA). Silver and gold are
+ * light swatches, so white text on them fails; they take --kte-ink instead.
+ */
+export const TIER_TEXT_COLORS: Record<LoyaltyTier, string> = {
+  bronze: '#FFFFFF',
+  silver: '#14121A', // --kte-ink
+  gold: '#14121A', // --kte-ink
+  platinum: '#FFFFFF',
 };
 
 export const TRANSACTION_SOURCE_LABELS: Record<LoyaltyTransactionSource, string> = {

@@ -1,289 +1,307 @@
-import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatDividerModule } from '@angular/material/divider';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, RouterLink } from '@angular/router';
+import { Store } from '@ngrx/store';
+import { catchError, of, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { CartFacade } from '../../core/cart/cart.facade';
-import { CartItem } from '../../shared/models/cart.model';
-import { HufCurrencyPipe } from '../../shared/pipes/huf-currency.pipe';
-import { holdNoticeText } from '../../shared/utils/hold-duration';
-import { CountdownPipe } from '../../shared/pipes/countdown.pipe';
-
-interface CartRow extends CartItem {
-  readonly remainingMs: number;
-}
+import { LoyaltyService } from '../../core/services/loyalty.service';
+import { CheckoutStepsComponent } from '../../shared/components/checkout-steps/checkout-steps.component';
+import { MatchesApiService } from '../../shared/services/matches.api.service';
+import { lockErrorMessage } from '../../shared/utils/lock-error';
+import { MatchesActions, selectAllMatches, selectMatchesLoading } from '../../state/matches';
+import { MatchPrices, MatchPricesService } from '../home/logic/match-prices.service';
+import { upcomingHomeMatches } from '../home/logic/match-availability';
+import { CartEmptyComponent, SectorHighlight } from './components/cart-empty.component';
+import { CartExpiredCardComponent } from './components/cart-expired-card.component';
+import { CartMatchCardComponent } from './components/cart-match-card.component';
+import { CartDiscount, CartSummaryComponent } from './components/cart-summary.component';
+import { discountAmount, groupByMatch, shortestHoldMs } from './logic/cart-logic';
 
 @Component({
   selector: 'kte-cart-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule,
     RouterLink,
-    MatCardModule,
-    MatButtonModule,
     MatIconModule,
-    MatChipsModule,
-    MatDividerModule,
-    HufCurrencyPipe,
-    CountdownPipe,
+    CheckoutStepsComponent,
+    CartMatchCardComponent,
+    CartExpiredCardComponent,
+    CartSummaryComponent,
+    CartEmptyComponent,
   ],
   template: `
-    <section class="kte-cart">
-      <header class="kte-cart__header">
+    <kte-checkout-steps [current]="1"></kte-checkout-steps>
+
+    <section class="cart kte-cart">
+      <header class="cart__header">
         <h1>Kosár</h1>
-        @if (rows().length > 0) {
-          <span class="kte-cart__count">{{ rows().length }} jegy</span>
+        @if (count() > 0) {
+          <span class="cart__count kte-cart__count">{{ count() }} jegy</span>
         }
       </header>
 
-      @if (rows().length === 0) {
-        <mat-card appearance="outlined" class="kte-cart__empty">
-          <mat-card-content>
-            <mat-icon class="kte-cart__empty-icon" aria-hidden="true">shopping_cart</mat-icon>
-            <h2>A kosarad üres</h2>
-            <p>Nézegesd a stadiontérképet, és válassz magadnak helyet a következő mérkőzésre.</p>
-            <a mat-flat-button color="primary" routerLink="/stadium">
-              <mat-icon>stadium</mat-icon>
-              Stadiontérkép
+      <div class="cart__layout" [class.cart__layout--single]="count() === 0">
+        <div class="cart__main">
+          @for (group of groups(); track group.matchId) {
+            <kte-cart-match-card
+              [group]="group"
+              [venue]="venues()[group.matchId] ?? null"
+              (remove)="remove($event)"
+            ></kte-cart-match-card>
+          }
+
+          @for (item of expired(); track item.seatId) {
+            <kte-cart-expired-card
+              [item]="item"
+              [busy]="busy().has(item.seatId)"
+              (relock)="relock($event)"
+              (dismiss)="dismiss($event)"
+            ></kte-cart-expired-card>
+          }
+
+          @if (count() === 0) {
+            <kte-cart-empty
+              [match]="nextMatch()"
+              [sector]="highlight()"
+              [loading]="matchesLoading()"
+            ></kte-cart-empty>
+          } @else {
+            <a class="cart__back" [routerLink]="['/stadium']" [queryParams]="backParams()">
+              <mat-icon aria-hidden="true">arrow_back</mat-icon>
+              További helyek választása
             </a>
-          </mat-card-content>
-        </mat-card>
-      } @else {
-        <div class="kte-cart__items">
-          @for (row of rows(); track row.seatId) {
-            <mat-card appearance="outlined" class="kte-cart__row">
-              <mat-card-content>
-                <div class="kte-cart__row-info">
-                  <strong>{{ row.homeTeam }} – {{ row.awayTeam }}</strong>
-                  <span>{{ row.kickoffAt | date: "yyyy. MMM d. HH:mm" : '' : 'hu-HU' }}</span>
-                </div>
-                <div class="kte-cart__row-seat">
-                  <mat-chip-set>
-                    <mat-chip highlighted>{{ row.section }}</mat-chip>
-                  </mat-chip-set>
-                  <span>Sor {{ row.row }} · Szék {{ row.seatNumber }}</span>
-                </div>
-                <div class="kte-cart__row-meta">
-                  <span class="kte-cart__price">{{ row.price | hufCurrency }}</span>
-                  <span class="kte-cart__countdown" [class.kte-cart__countdown--warn]="row.remainingMs < 60_000">
-                    <mat-icon inline>timer</mat-icon>
-                    {{ row.remainingMs | countdown }}
-                  </span>
-                </div>
-                <div class="kte-cart__row-actions">
-                  <button mat-icon-button color="warn" type="button" (click)="remove(row.seatId)" aria-label="Eltávolítás a kosárból">
-                    <mat-icon>delete_outline</mat-icon>
-                  </button>
-                </div>
-              </mat-card-content>
-            </mat-card>
           }
         </div>
 
-        <mat-card appearance="outlined" class="kte-cart__summary">
-          <mat-card-content>
-            <div class="kte-cart__summary-row">
-              <span>Jegyek száma</span>
-              <strong>{{ rows().length }}</strong>
-            </div>
-            <mat-divider />
-            <div class="kte-cart__summary-row kte-cart__summary-row--total">
-              <span>Végösszeg</span>
-              <strong>{{ totalPrice() | hufCurrency }}</strong>
-            </div>
-            <p class="kte-cart__warning">
-              <mat-icon inline>info</mat-icon>
-              {{ holdNotice() }}
-            </p>
-            <button
-              mat-flat-button
-              color="primary"
-              type="button"
-              class="kte-cart__checkout"
-              [disabled]="rows().length === 0"
-              (click)="proceedToCheckout()"
-            >
-              <mat-icon>payments</mat-icon>
-              Tovább a pénztárhoz
-            </button>
-          </mat-card-content>
-        </mat-card>
-      }
+        @if (count() > 0) {
+          <kte-cart-summary
+            [count]="count()"
+            [subtotal]="subtotal()"
+            [discount]="discount()"
+            [total]="total()"
+            [shortestMs]="shortestMs()"
+            [points]="points()"
+            (checkout)="proceedToCheckout()"
+          ></kte-cart-summary>
+        }
+      </div>
     </section>
   `,
   styles: [
     `
-      .kte-cart {
-        display: flex;
-        flex-direction: column;
-        gap: var(--kte-spacing-4);
-        padding: var(--kte-spacing-6) var(--kte-spacing-4);
-        max-width: 880px;
-        margin: 0 auto;
+      :host {
+        display: block;
       }
-      .kte-cart__header {
+
+      .cart {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 32px 64px;
+      }
+
+      .cart__header {
         display: flex;
         align-items: baseline;
-        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
       }
-      .kte-cart__header h1 {
+
+      .cart__header h1 {
         margin: 0;
+        font-size: 36px;
       }
-      .kte-cart__count {
-        color: var(--kte-muted);
+
+      .cart__count {
+        color: var(--muted);
       }
-      .kte-cart__empty {
-        text-align: center;
-        padding: var(--kte-spacing-6);
-        border-radius: var(--kte-radius-lg);
-      }
-      .kte-cart__empty-icon {
-        font-size: 56px;
-        width: 56px;
-        height: 56px;
-        color: var(--kte-brand-deep);
-      }
-      .kte-cart__items {
+
+      .cart__layout {
         display: grid;
-        gap: var(--kte-spacing-3);
+        grid-template-columns: minmax(0, 1fr) 380px;
+        gap: 32px;
+        align-items: start;
       }
-      .kte-cart__row mat-card-content {
-        display: grid;
-        grid-template-columns: 1.4fr 1fr 1fr auto;
-        gap: var(--kte-spacing-3);
-        align-items: center;
+
+      .cart__layout--single {
+        grid-template-columns: minmax(0, 1fr);
       }
-      .kte-cart__row-info {
+
+      .cart__main {
         display: flex;
         flex-direction: column;
+        gap: 16px;
+        min-width: 0;
       }
-      .kte-cart__row-info strong {
-        font-size: 16px;
-      }
-      .kte-cart__row-info span {
-        color: var(--kte-muted);
-        font-size: 13px;
-      }
-      .kte-cart__row-seat {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        font-size: 13px;
-      }
-      .kte-cart__row-meta {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 4px;
-      }
-      .kte-cart__price {
-        font-weight: 600;
-        color: var(--kte-brand-deep);
-        font-family: var(--kte-font-display);
-      }
-      .kte-cart__countdown {
+
+      .cart__back {
+        align-self: flex-start;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        font-variant-numeric: tabular-nums;
-        font-weight: 600;
-      }
-      .kte-cart__countdown--warn {
-        color: var(--kte-danger);
-      }
-      .kte-cart__summary {
-        border-radius: var(--kte-radius-lg);
-        background: var(--kte-surface);
-        box-shadow: var(--kte-shadow-md);
-      }
-      .kte-cart__summary-row {
-        display: flex;
-        justify-content: space-between;
-        padding: var(--kte-spacing-2) 0;
-      }
-      .kte-cart__summary-row--total {
-        font-size: 20px;
-      }
-      .kte-cart__warning {
-        margin: var(--kte-spacing-3) 0 var(--kte-spacing-3);
-        color: var(--kte-muted);
-        font-size: 13px;
-        display: flex;
         gap: 6px;
-        align-items: flex-start;
+        min-height: var(--min-target);
+        font-weight: 500;
+        text-decoration: none;
+        color: var(--brand-deep);
       }
-      .kte-cart__checkout {
-        width: 100%;
-        height: 48px;
-        font-size: 16px;
+
+      .cart__back:hover {
+        text-decoration: underline;
       }
-      @media (max-width: 600px) {
-        .kte-cart__row mat-card-content {
-          grid-template-columns: 1fr;
+
+      @media (max-width: 899px) {
+        .cart__layout {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 24px;
         }
-        .kte-cart__row-meta {
-          align-items: flex-start;
+      }
+
+      @media (max-width: 599px) {
+        .cart {
+          padding: 24px 16px 48px;
+        }
+        .cart__header h1 {
+          font-size: 30px;
         }
       }
     `,
   ],
 })
-export class CartPageComponent {
+export class CartPageComponent implements OnInit {
   private readonly cart = inject(CartFacade);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly store = inject(Store);
+  private readonly loyaltyApi = inject(LoyaltyService);
+  private readonly matchesApi = inject(MatchesApiService);
+  private readonly prices = inject(MatchPricesService);
 
-  protected readonly rows = computed<readonly CartRow[]>(() => {
-    const now = this.cart.lastTickMs();
-    return this.cart.items().map((item) => ({
-      ...item,
-      remainingMs: Math.max(0, item.lockExpiresAtMs - now),
-    }));
+  // ---- cart ---------------------------------------------------------------
+  protected readonly count = computed(() => this.cart.items().length);
+  protected readonly groups = computed(() => groupByMatch(this.cart.items(), this.cart.lastTickMs()));
+  protected readonly expired = this.cart.expired;
+  protected readonly shortestMs = computed(() => shortestHoldMs(this.cart.items(), this.cart.lastTickMs()));
+  protected readonly subtotal = computed(() => this.cart.total());
+  protected readonly busy = signal<ReadonlySet<string>>(new Set());
+
+  protected readonly backParams = computed(() => {
+    const matchId = this.cart.items()[0]?.matchId ?? this.cart.expired()[0]?.matchId;
+    return matchId ? { matchId } : {};
   });
 
-  protected readonly holdNotice = computed(() =>
-    holdNoticeText(this.cart.items().find((i) => i.lockTtlSeconds)?.lockTtlSeconds),
+  // ---- loyalty (signed-in users only) ---------------------------------------
+  private readonly snapshot = toSignal(
+    toObservable(this.auth.isAuthenticated).pipe(
+      switchMap((signedIn) =>
+        signedIn ? this.loyaltyApi.getSnapshot().pipe(catchError(() => of(null))) : of(null),
+      ),
+    ),
+    { initialValue: null },
   );
 
-  protected readonly totalPrice = computed(() => this.cart.total());
+  protected readonly discount = computed<CartDiscount | null>(() => {
+    const s = this.snapshot();
+    if (!s || s.tier.discountPercent <= 0) {
+      return null;
+    }
+    return {
+      tier: s.tier.tier,
+      label: s.tier.label,
+      percent: s.tier.discountPercent,
+      amount: discountAmount(this.subtotal(), s.tier.discountPercent),
+    };
+  });
 
-  /**
-   * KTE-022: notify the user when an item drops out of the cart due to lock expiry.
-   * We watch the cart length and the per-item countdowns to detect transitions
-   * from "near-expiry" to "removed" — but a simpler signal is "lockExpiresAtMs <= now"
-   * for an item that *was* present and is no longer.
-   */
-  private previousIds = new Set<string>();
+  protected readonly total = computed(() => this.subtotal() - (this.discount()?.amount ?? 0));
+
+  /** Points per ticket come from the server (/loyalty/me); unknown for guests. */
+  protected readonly points = computed(() => {
+    const perTicket = this.snapshot()?.ticketPointsPerTicket;
+    return perTicket === undefined ? null : perTicket * this.count();
+  });
+
+  // ---- venue of each match in the cart (GET /matches/:id) --------------------
+  protected readonly venues = signal<Readonly<Record<string, string | undefined>>>({});
+  private readonly requestedVenues = new Set<string>();
+
+  // ---- empty state: next home match + a named sector ---------------------------
+  protected readonly matchesLoading = toSignal(this.store.select(selectMatchesLoading), { initialValue: false });
+  private readonly allMatches = toSignal(this.store.select(selectAllMatches), { initialValue: [] });
+  protected readonly nextMatch = computed(() => upcomingHomeMatches(this.allMatches(), Date.now())[0] ?? null);
+
+  private readonly nextMatchPrices = toSignal(
+    toObservable(this.nextMatch).pipe(
+      switchMap((m) => (m ? this.prices.forMatch(m.id) : of<MatchPrices | null>(null))),
+    ),
+    { initialValue: null },
+  );
+
+  /** Cheapest sector that still has free seats. */
+  protected readonly highlight = computed<SectorHighlight | null>(() => {
+    const sectors = this.nextMatchPrices()?.sectors ?? [];
+    const open = sectors.find((s) => s.available > 0);
+    return open
+      ? {
+          name: open.section === 'VIP' ? 'VIP' : `${open.section} szektor`,
+          free: open.available,
+          fromPrice: open.minPrice,
+        }
+      : null;
+  });
 
   constructor() {
     effect(() => {
-      const currentIds = new Set(this.cart.items().map((i) => i.seatId));
-      const dropped: string[] = [];
-      for (const prev of this.previousIds) {
-        if (!currentIds.has(prev)) {
-          dropped.push(prev);
+      const ids = this.groups().map((g) => g.matchId);
+      untracked(() => {
+        for (const id of ids) {
+          if (this.requestedVenues.has(id)) {
+            continue;
+          }
+          this.requestedVenues.add(id);
+          this.matchesApi.detail(id).subscribe({
+            next: (m) => this.venues.update((v) => ({ ...v, [id]: m.venue })),
+            error: () => this.requestedVenues.delete(id),
+          });
         }
-      }
-      if (dropped.length > 0 && this.previousIds.size > 0) {
-        this.snackBar.open(
-          `${dropped.length} szék foglalása lejárt és kikerült a kosárból.`,
-          'Bezárás',
-          { duration: 6000 },
-        );
-      }
-      this.previousIds = currentIds;
+      });
     });
+  }
+
+  ngOnInit(): void {
+    this.store.dispatch(MatchesActions.loadMatches());
   }
 
   protected async remove(seatId: string): Promise<void> {
     await this.cart.remove(seatId);
+  }
+
+  protected dismiss(seatId: string): void {
+    this.cart.dismissExpired(seatId);
+  }
+
+  /**
+   * Re-books an expired seat through the same lock call the seat map uses, and
+   * words a failure with the same message (a taken seat says so, exactly as on
+   * the map).
+   */
+  protected async relock(seatId: string): Promise<void> {
+    this.busy.update((s) => new Set(s).add(seatId));
+    try {
+      await this.cart.relock(seatId);
+      this.snackBar.open('A szék hozzáadva a kosárhoz.', 'Bezárás', { duration: 4000 });
+    } catch (error) {
+      this.snackBar.open(lockErrorMessage(error), 'Bezárás', { duration: 5000 });
+    } finally {
+      this.busy.update((s) => {
+        const next = new Set(s);
+        next.delete(seatId);
+        return next;
+      });
+    }
   }
 
   protected async proceedToCheckout(): Promise<void> {

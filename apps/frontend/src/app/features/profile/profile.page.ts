@@ -23,7 +23,7 @@ import { TicketResponse } from '../../core/models/ticket.models';
 import { SeasonPassResponse } from '../../core/models/season-pass.models';
 import { SeasonPassesService } from '../../core/services/season-passes.service';
 import { TicketsService } from '../../core/services/tickets.service';
-import { TIER_LABELS } from '../../core/models/loyalty.models';
+import { TIER_LABELS, TIER_TEXT_COLORS } from '../../core/models/loyalty.models';
 import { LoyaltyTier, UserProfile } from '../../shared/models/auth.model';
 import { WaitlistEntry } from '../../shared/models/waitlist.model';
 import { AuthApiService } from '../../shared/services/auth.api.service';
@@ -94,7 +94,8 @@ const WAITLIST_POLL_MS = 5_000;
               <mat-chip-set>
                 <mat-chip
                   [style.background-color]="tierColor()"
-                  [style.color]="'#ffffff'"
+                  [style.color]="tierTextColor()"
+                  [style.--mdc-chip-label-text-color]="tierTextColor()"
                   highlighted
                 >
                   <mat-icon>workspace_premium</mat-icon>
@@ -308,6 +309,11 @@ export class ProfilePageComponent implements OnInit {
   protected readonly tierLabel = computed(() => {
     const user = this.profile();
     return user ? TIER_LABELS[user.loyaltyTier] : '';
+  });
+
+  protected readonly tierTextColor = computed(() => {
+    const user = this.profile();
+    return user ? TIER_TEXT_COLORS[user.loyaltyTier] : '#ffffff';
   });
 
   protected readonly tierColor = computed(() => {
