@@ -306,7 +306,8 @@ describe('ChatbotContextService', () => {
       await service.getUpcomingMatchesSnapshot(); // fills the cache
       // A cache entry written before the loyalty section existed.
       for (const [k, v] of cache) {
-        const { loyalty: _drop, ...old } = JSON.parse(v);
+        const old = JSON.parse(v);
+        delete old.loyalty;
         cache.set(k, JSON.stringify(old));
       }
       const cached = await service.getUpcomingMatchesSnapshot();
