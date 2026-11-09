@@ -118,7 +118,7 @@ describe('PaymentsService', () => {
       mockSeatRepo.find.mockResolvedValue([
         { id: 's-1', priceModifier: '1.0', section: 'A', row: '1', number: '1' },
       ]);
-      mockDataSource.transaction.mockImplementation(async (fn: (em: any) => Promise<any>) =>
+      mockDataSource.transaction.mockImplementation(async (fn: (em: unknown) => Promise<unknown>) =>
         fn({ create: () => ticket, save: async () => ticket }),
       );
       mockSeatLockService.release.mockResolvedValue(true);
