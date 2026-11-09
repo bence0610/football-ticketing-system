@@ -283,14 +283,14 @@ async function buyPassAndOpenQr(
   // 2. The pass shows up on the profile, naming its holder
   await page.getByRole('link', { name: 'Bérleteim megtekintése' }).click();
   await expect(page).toHaveURL(/\/profile/);
-  await page.getByRole('tab', { name: /Bérleteim/ }).click();
+  await page.getByRole('tab', { name: /Bérletek/ }).click();
   await expect(page.getByTestId('pass-holder')).toHaveText(holder?.name ?? BUYER_NAME);
 
   // 3. Per-match QR
   await page.getByTestId('qr-btn').click();
   await expect(page.getByTestId('qr-holder')).toHaveText(holder?.name ?? BUYER_NAME);
   await expect(page.locator('img.qr')).toBeVisible();
-  const token = (await page.locator('.token-text').innerText()).trim();
+  const token = (await page.locator('img.qr').getAttribute('data-token'))?.trim() ?? '';
   expect(token.split('.')).toHaveLength(3);
   return token;
 }

@@ -1,0 +1,68 @@
+// ---------------------------------------------------------------------------
+// Self-hosted fonts. Nothing here (or anywhere in the app) may reach out to
+// fonts.googleapis.com / fonts.gstatic.com: a stylesheet <link> to a remote
+// host blocks the page's load event until that host answers.
+//
+// Only the weights the UI uses are shipped, in WOFF2 (supported by every
+// browser this Angular version targets), split into `latin` and `latin-ext`
+// so the browser downloads the extended file only when a glyph needs it
+// (Hungarian ő / ű live in latin-ext).
+//
+// Licences: Archivo and IBM Plex Sans are SIL OFL 1.1, Material Icons is
+// Apache 2.0 — the licence texts sit next to the files in ./fonts/.
+// ---------------------------------------------------------------------------
+
+$latin: 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD';
+$latin-ext: 'U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF';
+
+@mixin text-face($family, $dir, $file, $weight) {
+  @each $subset, $range in ('latin': $latin, 'latin-ext': $latin-ext) {
+    @font-face {
+      font-family: $family;
+      font-style: normal;
+      font-weight: $weight;
+      // swap: text is drawn at once in the fallback font, then re-drawn.
+      font-display: swap;
+      src: url('./fonts/#{$dir}/#{$file}-#{$subset}-#{$weight}-normal.woff2') format('woff2');
+      unicode-range: #{$range};
+    }
+  }
+}
+
+@each $weight in (600, 700, 800) {
+  @include text-face('Archivo', 'archivo', 'archivo', $weight);
+}
+@each $weight in (400, 500, 600) {
+  @include text-face('IBM Plex Sans', 'ibm-plex-sans', 'ibm-plex-sans', $weight);
+}
+
+// Icon font. `block` (not `swap`): with a fallback font the icon *names*
+// ("event_seat") would flash up as text. It is a same-origin file, so the
+// block period is a few milliseconds.
+@font-face {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./fonts/material-icons/material-icons.woff2') format('woff2');
+}
+
+// <mat-icon> adds this class and relies on it for the ligature setup; it used
+// to arrive with Google's stylesheet.
+.material-icons {
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'liga';
+}

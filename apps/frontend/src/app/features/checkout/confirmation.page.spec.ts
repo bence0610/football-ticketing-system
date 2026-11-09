@@ -135,8 +135,9 @@ describe('ConfirmationPageComponent', () => {
     });
 
     it('treats a server that does not report the field as "not sent"', async () => {
-      const { confirmationEmailSentAt: _omitted, ...legacy } = issued;
-      script = [() => of(legacy as PaymentStatusResponse)];
+      const legacy: Record<string, unknown> = { ...issued };
+      delete legacy['confirmationEmailSentAt'];
+      script = [() => of(legacy as unknown as PaymentStatusResponse)];
       await open({ payment_intent: PI });
       await settle(20);
       fixture.detectChanges();

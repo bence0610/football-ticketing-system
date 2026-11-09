@@ -1,14 +1,19 @@
-import { ChangeDetectionStrategy, Component, Inject, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  Inject,
+  inject,
+  signal,
+} from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
 import {
   MAT_DIALOG_DATA,
   MatDialogModule,
   MatDialogRef,
 } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Observable } from 'rxjs';
 import { TicketsService } from '../../../core/services/tickets.service';
 import { TicketQrResponse } from '../../../core/models/ticket.models';
@@ -23,158 +28,170 @@ export interface TicketQrDialogData {
   qrLoader$?: Observable<TicketQrResponse>;
 }
 
+/** Side of the rendered QR image, in CSS pixels. */
+export const QR_SIZE_PX = 212;
+
+/**
+ * Short, human-readable reference for a ticket: the last 8 hex digits of its
+ * id, grouped `XXXX-XXXX`. Returns undefined when there is no usable id.
+ */
+export function shortTicketCode(ticketId: string | undefined | null): string | undefined {
+  const hex = (ticketId ?? '').replace(/[^0-9a-f]/gi, '');
+  if (hex.length < 8) return undefined;
+  const tail = hex.slice(-8).toUpperCase();
+  return `${tail.slice(0, 4)}-${tail.slice(4)}`;
+}
+
+/** The slice of the Screen Wake Lock API this dialog uses. */
+interface WakeLockSentinelLike {
+  release(): Promise<void>;
+}
+interface WakeLockNavigator {
+  wakeLock?: { request(type: 'screen'): Promise<WakeLockSentinelLike> };
+}
+
 @Component({
   selector: 'kte-ticket-qr-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    CommonModule,
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressSpinnerModule,
-    MatSnackBarModule,
-  ],
+  imports: [MatDialogModule, MatButtonModule, MatProgressSpinnerModule],
   template: `
     <div class="qr-dialog">
-      <h2 mat-dialog-title>{{ data.matchTitle }}</h2>
-      <mat-dialog-content>
+      <h2 mat-dialog-title class="title">{{ data.matchTitle }}</h2>
+      <mat-dialog-content class="body">
         @if (data.holderName) {
           <p class="holder" data-testid="qr-holder">{{ data.holderName }}</p>
         }
         <p class="seat">{{ data.seatLabel }}</p>
         @if (loading()) {
-          <div class="loader">
-            <mat-spinner diameter="48"></mat-spinner>
-          </div>
+          <div class="loader"><mat-spinner diameter="48" /></div>
         } @else if (error()) {
-          <p class="error">{{ error() }}</p>
+          <p class="error" role="alert">{{ error() }}</p>
         } @else if (dataUrl()) {
-          <img class="qr" [src]="dataUrl()" alt="QR kód" />
-          <p class="hint">Mutasd be a beléptetésnél</p>
-
-          <div class="token-section">
-            <p class="token-label">Token (beléptető oldal teszteléséhez)</p>
-            <div class="token-row">
-              <span class="token-text" [title]="token()!">{{ token() }}</span>
-              <button
-                mat-icon-button
-                class="copy-btn"
-                [attr.aria-label]="'Token másolása'"
-                (click)="copyToken()"
-              >
-                <mat-icon>content_copy</mat-icon>
-              </button>
-            </div>
+          <div class="qr-frame">
+            <img
+              class="qr"
+              data-testid="qr-image"
+              [attr.data-token]="token()"
+              [src]="dataUrl()"
+              [width]="size"
+              [height]="size"
+              alt="Belépő QR-kód"
+            />
           </div>
+          @if (code(); as c) {
+            <p class="code" data-testid="qr-code">{{ c }}</p>
+            <p class="code-note">
+              Ha a kamera nem olvassa be a QR-kódot, ez a jegy azonosítója.
+            </p>
+          }
         }
       </mat-dialog-content>
       <mat-dialog-actions align="end">
-        <button mat-button (click)="dialogRef.close()">Bezárás</button>
+        <button mat-button type="button" (click)="dialogRef.close()">Bezárás</button>
       </mat-dialog-actions>
     </div>
   `,
   styles: [
     `
+      /* Pure white, full-contrast surface: the camera needs the brightest
+         possible field around the code. */
       .qr-dialog {
-        color: var(--kte-ink);
+        background: #ffffff;
+        color: #000000;
+        color-scheme: light;
+      }
+      .title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        color: #000000;
+      }
+      .body {
+        text-align: center;
+      }
+      .holder {
+        font-size: 1.1em;
+        font-weight: 600;
+        margin: 0 0 2px;
+      }
+      .seat {
+        color: #333333;
+        margin: 0 0 16px;
+      }
+      .qr-frame {
+        display: inline-block;
+        background: #ffffff;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-block);
       }
       .qr {
         display: block;
-        margin: 16px auto;
-        width: 280px;
-        height: 280px;
-        background: var(--kte-surface);
-        border: 1px solid var(--kte-border);
-        border-radius: var(--kte-radius);
-        padding: 12px;
+        background: #ffffff;
+        image-rendering: pixelated;
       }
-      .holder {
-        font-size: 1.2em;
-        font-weight: 600;
-        margin: 0 0 4px;
+      .code {
+        margin: 16px 0 4px;
+        font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        user-select: all;
       }
-      .seat {
-        color: var(--kte-muted);
-        margin: 0 0 12px;
-      }
-      .hint {
-        color: var(--kte-muted);
+      .code-note {
+        margin: 0;
         font-size: 13px;
-        text-align: center;
+        color: #333333;
       }
       .error {
-        color: var(--kte-danger);
+        color: var(--error-ink);
       }
       .loader {
         display: flex;
         justify-content: center;
         padding: 32px 0;
       }
-      .token-section {
-        margin-top: 16px;
-        border-top: 1px solid var(--kte-line);
-        padding-top: 12px;
-      }
-      .token-label {
-        color: var(--kte-muted);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin: 0 0 6px;
-      }
-      .token-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: var(--kte-page);
-        border-radius: 6px;
-        padding: 6px 8px;
-      }
-      .token-text {
-        flex: 1;
-        font-family: monospace;
-        font-size: 11px;
-        color: var(--kte-muted);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        user-select: all;
-      }
-      .copy-btn {
-        flex-shrink: 0;
-        width: 32px;
-        height: 32px;
-        line-height: 32px;
-        color: var(--kte-muted);
-      }
-      .copy-btn mat-icon {
-        font-size: 16px;
-        width: 16px;
-        height: 16px;
-        line-height: 16px;
-      }
     `,
   ],
 })
 export class TicketQrDialogComponent {
+  protected readonly size = QR_SIZE_PX;
   protected readonly loading = signal<boolean>(true);
   protected readonly error = signal<string | null>(null);
   protected readonly dataUrl = signal<string | null>(null);
+  protected readonly code = signal<string | undefined>(undefined);
+  /** Full signed token: never shown, kept on the image for the gate test flow. */
   protected readonly token = signal<string | null>(null);
 
   private readonly ticketsService = inject(TicketsService);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly document = inject(DOCUMENT);
+  private wakeLock: WakeLockSentinelLike | null = null;
+  private closed = false;
 
   constructor(
     public readonly dialogRef: MatDialogRef<TicketQrDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public readonly data: TicketQrDialogData,
+    destroyRef: DestroyRef,
   ) {
+    void this.acquireWakeLock();
+    const onVisible = (): void => {
+      // The lock is released by the browser whenever the tab is hidden.
+      if (this.document.visibilityState === 'visible') void this.acquireWakeLock();
+    };
+    this.document.addEventListener('visibilitychange', onVisible);
+    destroyRef.onDestroy(() => {
+      this.closed = true;
+      this.document.removeEventListener('visibilitychange', onVisible);
+      void this.wakeLock?.release().catch(() => undefined);
+      this.wakeLock = null;
+    });
+
     const loader$ = data.qrLoader$ ?? this.ticketsService.getQr(data.ticketId!);
     loader$.subscribe({
       next: (response) => {
         this.dataUrl.set(response.dataUrl);
         this.token.set(response.token);
+        this.code.set(shortTicketCode(response.ticketId ?? data.ticketId));
         this.loading.set(false);
       },
       error: (err: unknown) => {
@@ -188,12 +205,28 @@ export class TicketQrDialogComponent {
     });
   }
 
-  copyToken(): void {
-    const t = this.token();
-    if (!t) return;
-    navigator.clipboard.writeText(t).then(
-      () => this.snackBar.open('Token másolva a vágólapra', undefined, { duration: 2000 }),
-      () => this.snackBar.open('Másolás sikertelen – jelöld ki és másold kézzel', undefined, { duration: 3000 }),
-    );
+  /**
+   * Keeps the screen awake while the code is on show. Browsers expose no API
+   * to raise screen brightness, so the dialog instead uses a pure-white,
+   * black-on-white surface and leaves the brightness to the user's device.
+   * Unsupported browsers (or a refused request) simply skip the lock.
+   */
+  private async acquireWakeLock(): Promise<void> {
+    if (this.closed || this.wakeLock) return;
+    const nav = this.document.defaultView?.navigator as WakeLockNavigator | undefined;
+    if (!nav?.wakeLock) return;
+    try {
+      const sentinel = await nav.wakeLock.request('screen');
+      if (this.closed) {
+        void sentinel.release().catch(() => undefined);
+        return;
+      }
+      this.wakeLock = sentinel;
+      (sentinel as unknown as EventTarget).addEventListener?.('release', () => {
+        if (this.wakeLock === sentinel) this.wakeLock = null;
+      });
+    } catch {
+      // Denied (battery saver, hidden tab) — the QR still works.
+    }
   }
 }

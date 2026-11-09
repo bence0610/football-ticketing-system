@@ -16,7 +16,6 @@ import { ChatbotStore } from './state/chatbot.signals';
 describe('ChatbotPanelComponent — continuous conversation', () => {
   let fixture: ComponentFixture<ChatbotPanelComponent>;
   let http: HttpTestingController;
-  let store: ChatbotStore;
   let el: HTMLElement;
 
   beforeEach(async () => {
@@ -26,7 +25,7 @@ describe('ChatbotPanelComponent — continuous conversation', () => {
     });
     fixture = TestBed.createComponent(ChatbotPanelComponent);
     http = TestBed.inject(HttpTestingController);
-    store = TestBed.inject(ChatbotStore);
+    TestBed.inject(ChatbotStore); // instantiate the real store the panel uses
     el = fixture.nativeElement;
     fixture.detectChanges();
     // NgModel's initial writeValue is async; settle it before the test types.

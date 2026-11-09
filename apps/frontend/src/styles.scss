@@ -1,5 +1,6 @@
 // Entry point. Tokens, the Material theme and the base styles live in ./styles;
 // nothing here defines a colour.
+@use 'styles/fonts';
 @use 'styles/tokens' as t;
 @use 'styles/theme';
 @use 'styles/base';
