@@ -1,6 +1,7 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { SKIP_ERROR_SNACKBAR } from '../interceptors/error.interceptor';
 import { TicketQrResponse, TicketResponse, TicketScanResponse } from '../models/ticket.models';
 
 @Injectable({ providedIn: 'root' })
@@ -15,7 +16,15 @@ export class TicketsService {
     return this.http.get<TicketQrResponse>(`/tickets/${ticketId}/qr`);
   }
 
+  /**
+   * The gate screen turns every failure into its own full-screen verdict, so
+   * no global error toast may appear over it (it would cover the buttons).
+   */
   scan(ticketId: string, token: string): Observable<TicketScanResponse> {
-    return this.http.patch<TicketScanResponse>(`/tickets/${ticketId}/scan`, { token });
+    return this.http.patch<TicketScanResponse>(
+      `/tickets/${ticketId}/scan`,
+      { token },
+      { context: new HttpContext().set(SKIP_ERROR_SNACKBAR, true) },
+    );
   }
 }

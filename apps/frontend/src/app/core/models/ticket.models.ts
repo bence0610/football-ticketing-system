@@ -62,6 +62,8 @@ export interface TicketScanResponse {
   ticketId?: string;
   scannedAt?: string;
   message?: string;
+  /** Ticket type, so the steward sees whether it is a pass or a single ticket. */
+  source?: TicketSource;
   /** Who is entering: pass holder / borrower / ticket owner. */
   holderName?: string;
   match?: ScanMatchInfo;

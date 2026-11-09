@@ -83,9 +83,21 @@ export class TicketsService {
     ticketId: string,
     options: { token?: string; scannedByUserId?: string },
   ): Promise<TicketScanResponseDto> {
+    // A ticket's QR token is revoked the moment it admits someone, so a second
+    // scan of the same code arrives here as "revoked". That must still be told
+    // apart from a bad code: the person was admitted already and the steward
+    // has to redirect them. A revoked token never admits — it only gets to
+    // report which of the two it is.
+    let tokenRevoked = false;
     if (options.token) {
       const verification = await this.qrService.verify(options.token, 'ticket');
-      if (!verification.valid || verification.payload?.sub !== ticketId) {
+      const revokedForThisTicket =
+        !verification.valid &&
+        verification.reason === 'revoked' &&
+        verification.payload?.sub === ticketId;
+      if (revokedForThisTicket) {
+        tokenRevoked = true;
+      } else if (!verification.valid || verification.payload?.sub !== ticketId) {
         return {
           success: false,
           result: 'invalid',
@@ -105,11 +117,16 @@ export class TicketsService {
         return { success: false, result: 'invalid', message: 'ticket_not_found' };
       }
       if (ticket.status === TicketStatus.USED) {
+        // The steward has to send this person somewhere, so say who they are
+        // and which seat it was — same facts as an admitted scan.
         return {
           success: false,
           result: 'already_used',
           ticketId: ticket.id,
-          scannedAt: ticket.scannedAt?.toISOString(),
+          scannedAt: (ticket.scannedAt ?? ticket.usedAt)?.toISOString(),
+          source: ticket.source,
+          holderName: await this.resolveEnteringName(manager, ticket),
+          ...this.scanDetails(ticket),
         };
       }
       if (ticket.status === TicketStatus.EXPIRED) {
@@ -122,6 +139,9 @@ export class TicketsService {
           ticketId: ticket.id,
           message: `ticket_status_${ticket.status}`,
         };
+      }
+      if (tokenRevoked) {
+        return { success: false, result: 'invalid', ticketId: ticket.id, message: 'revoked' };
       }
       const now = new Date();
       ticket.status = TicketStatus.USED;
@@ -140,26 +160,33 @@ export class TicketsService {
         scannedAt: now.toISOString(),
         source: ticket.source,
         holderName,
-        match: ticket.match
-          ? {
-              id: ticket.match.id,
-              homeTeam: ticket.match.homeTeam,
-              awayTeam: ticket.match.awayTeam,
-              venue: ticket.match.venue,
-              kickoffAt: ticket.match.kickoffAt.toISOString(),
-            }
-          : undefined,
-        seat: ticket.seat
-          ? {
-              id: ticket.seat.id,
-              section: ticket.seat.section,
-              row: ticket.seat.row,
-              number: ticket.seat.number,
-              category: ticket.seat.category,
-            }
-          : undefined,
+        ...this.scanDetails(ticket),
       };
     });
+  }
+
+  /** Match and seat of a ticket, in the shape the gate screen shows. */
+  private scanDetails(ticket: Ticket): Pick<TicketScanResponseDto, 'match' | 'seat'> {
+    return {
+      match: ticket.match
+        ? {
+            id: ticket.match.id,
+            homeTeam: ticket.match.homeTeam,
+            awayTeam: ticket.match.awayTeam,
+            venue: ticket.match.venue,
+            kickoffAt: ticket.match.kickoffAt.toISOString(),
+          }
+        : undefined,
+      seat: ticket.seat
+        ? {
+            id: ticket.seat.id,
+            section: ticket.seat.section,
+            row: ticket.seat.row,
+            number: ticket.seat.number,
+            category: ticket.seat.category,
+          }
+        : undefined,
+    };
   }
 
   /**

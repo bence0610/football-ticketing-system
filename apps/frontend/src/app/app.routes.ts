@@ -5,6 +5,15 @@ import { gateGuard } from './core/auth/gate.guard';
 import { AppShellComponent } from './core/layout/app-shell/app-shell.component';
 
 export const APP_ROUTES: Routes = [
+  // The gate is deliberately outside AppShell: a steward's screen has no
+  // header, navigation, profile or chat bubble - nothing to press by accident.
+  // It must come before the shell route, whose wildcard child would catch it.
+  {
+    path: 'gate',
+    canActivate: [gateGuard],
+    loadComponent: () => import('./features/gate/gate.page').then((m) => m.GatePageComponent),
+    title: 'Beléptető',
+  },
   {
     path: '',
     component: AppShellComponent,
@@ -92,13 +101,6 @@ export const APP_ROUTES: Routes = [
         loadComponent: () =>
           import('./features/loans/accept-loan.page').then((m) => m.AcceptLoanPageComponent),
         title: 'Bérletkölcsön elfogadása',
-      },
-      {
-        path: 'gate',
-        canActivate: [gateGuard],
-        loadComponent: () =>
-          import('./features/gate/gate.page').then((m) => m.GatePageComponent),
-        title: 'Beléptető',
       },
       {
         path: 'admin',

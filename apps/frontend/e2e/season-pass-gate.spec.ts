@@ -216,6 +216,28 @@ async function mockBuyerApi(page: Page, backend: FakeBackend): Promise<void> {
   );
 }
 
+const SCAN_DETAILS = {
+  match: {
+    id: MATCH_ID,
+    homeTeam: 'Kecskeméti TE',
+    awayTeam: 'Újpest FC',
+    venue: 'Széktói Stadion',
+    kickoffAt: KICKOFF,
+  },
+  seat: { id: 's1', section: 'A', row: '3', number: 12, category: 'standard' },
+};
+
+/**
+ * The steward types or pastes the token into the manual field. (Headless
+ * Chromium has no camera, so the page falls back to manual entry on its own;
+ * the camera path has its own spec, gate.spec.ts.)
+ */
+async function checkByHand(gate: Page, token: string): Promise<void> {
+  await gate.getByRole('button', { name: 'Kézi bevitel' }).click();
+  await gate.getByLabel('QR token').fill(token);
+  await gate.getByRole('button', { name: 'Ellenőrzés' }).click();
+}
+
 async function mockGateApi(page: Page, backend: FakeBackend): Promise<void> {
   await page.route(`**/tickets/${TICKET_ID}/scan`, (route) => {
     const body = route.request().postDataJSON() as { token: string };
@@ -225,7 +247,15 @@ async function mockGateApi(page: Page, backend: FakeBackend): Promise<void> {
     }
     if (backend.ticketUsed) {
       return route.fulfill(
-        json({ success: false, result: 'already_used', ticketId: TICKET_ID }),
+        json({
+          success: false,
+          result: 'already_used',
+          ticketId: TICKET_ID,
+          scannedAt: new Date().toISOString(),
+          source: 'season_pass',
+          holderName: backend.holderName,
+          ...SCAN_DETAILS,
+        }),
       );
     }
     backend.ticketUsed = true;
@@ -235,15 +265,9 @@ async function mockGateApi(page: Page, backend: FakeBackend): Promise<void> {
         result: 'ok',
         ticketId: TICKET_ID,
         scannedAt: new Date().toISOString(),
+        source: 'season_pass',
         holderName: backend.holderName,
-        match: {
-          id: MATCH_ID,
-          homeTeam: 'Kecskeméti TE',
-          awayTeam: 'Újpest FC',
-          venue: 'Széktói Stadion',
-          kickoffAt: KICKOFF,
-        },
-        seat: { id: 's1', section: 'A', row: '3', number: 12, category: 'standard' },
+        ...SCAN_DETAILS,
       }),
     );
   });
@@ -311,13 +335,13 @@ test.describe('Season pass → QR → gate', () => {
       await mockGateApi(gate, backend);
 
       await gate.goto('/gate');
-      await gate.getByLabel('QR token').fill(token);
-      await gate.getByRole('button', { name: 'Ellenőrzés' }).click();
+      await checkByHand(gate, token);
 
-      await expect(gate.getByText('Belépés engedélyezve')).toBeVisible();
+      await expect(gate.getByTestId('verdict-title')).toHaveText('BELÉPHET');
       await expect(gate.getByTestId('gate-holder')).toHaveText(BUYER_NAME);
       await expect(gate.getByText('Kecskeméti TE – Újpest FC')).toBeVisible();
-      await expect(gate.getByText('Szektor: A', { exact: false })).toBeVisible();
+      await expect(gate.getByText('A szektor · 3. sor · 12. szék')).toBeVisible();
+      await expect(gate.getByText('Bérlet', { exact: true })).toBeVisible();
 
       // The steward's page sent exactly the token the buyer's dialog displayed.
       expect(backend.scanBodies).toEqual([{ ticketId: TICKET_ID, token }]);
@@ -342,21 +366,29 @@ test.describe('Season pass → QR → gate', () => {
       await mockGateApi(gate, backend);
 
       await gate.goto('/gate');
-      await gate.getByLabel('QR token').fill(token);
-      await gate.getByRole('button', { name: 'Ellenőrzés' }).click();
+      await checkByHand(gate, token);
 
-      await expect(gate.getByText('Belépés engedélyezve')).toBeVisible();
+      await expect(gate.getByTestId('verdict-title')).toHaveText('BELÉPHET');
       await expect(gate.getByTestId('gate-holder')).toHaveText(HOLDER);
       // The buyer's name must appear nowhere on the result.
-      await expect(gate.locator('.kte-gate-result')).not.toContainText(AUTH_USER.firstName);
-      await expect(gate.locator('.kte-gate-result')).not.toContainText(AUTH_USER.lastName);
+      await expect(gate.getByTestId('verdict-admitted')).not.toContainText(AUTH_USER.firstName);
+      await expect(gate.getByTestId('verdict-admitted')).not.toContainText(AUTH_USER.lastName);
 
-      // The same QR shown a second time is refused.
-      await gate.getByRole('button', { name: 'Következő jegy' }).click();
+      // "Következő" ignores a press for a moment (a stray tap must not skip a
+      // verdict), so press until the screen has actually moved on.
+      await expect(async () => {
+        await gate.getByRole('button', { name: 'Következő' }).click({ timeout: 1000 });
+        await expect(gate.getByTestId('verdict-admitted')).toHaveCount(0, { timeout: 500 });
+      }).toPass();
+
+      // The same QR shown a second time is refused as already used - amber,
+      // still naming the person so the steward can send them to the desk.
       await gate.getByLabel('QR token').fill(token);
       await gate.getByRole('button', { name: 'Ellenőrzés' }).click();
-      await expect(gate.getByText('A jegy már be lett mutatva')).toBeVisible();
-      await expect(gate.getByTestId('gate-holder')).toHaveCount(0);
+      await expect(gate.getByTestId('verdict-title')).toHaveText('MÁR FELHASZNÁLVA');
+      await expect(gate.getByTestId('verdict-used')).toBeVisible();
+      await expect(gate.getByTestId('gate-holder')).toHaveText(HOLDER);
+      await expect(gate.getByTestId('verdict-admitted')).toHaveCount(0);
     } finally {
       await gateContext.close();
     }

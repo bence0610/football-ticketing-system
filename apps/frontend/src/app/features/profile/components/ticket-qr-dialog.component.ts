@@ -17,6 +17,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Observable } from 'rxjs';
 import { TicketsService } from '../../../core/services/tickets.service';
 import { TicketQrResponse } from '../../../core/models/ticket.models';
+import { ScreenWakeLock } from '../../../shared/utils/screen-wake-lock';
 
 export interface TicketQrDialogData {
   ticketId?: string;
@@ -40,14 +41,6 @@ export function shortTicketCode(ticketId: string | undefined | null): string | u
   if (hex.length < 8) return undefined;
   const tail = hex.slice(-8).toUpperCase();
   return `${tail.slice(0, 4)}-${tail.slice(4)}`;
-}
-
-/** The slice of the Screen Wake Lock API this dialog uses. */
-interface WakeLockSentinelLike {
-  release(): Promise<void>;
-}
-interface WakeLockNavigator {
-  wakeLock?: { request(type: 'screen'): Promise<WakeLockSentinelLike> };
 }
 
 @Component({
@@ -165,26 +158,17 @@ export class TicketQrDialogComponent {
 
   private readonly ticketsService = inject(TicketsService);
   private readonly document = inject(DOCUMENT);
-  private wakeLock: WakeLockSentinelLike | null = null;
-  private closed = false;
 
   constructor(
     public readonly dialogRef: MatDialogRef<TicketQrDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public readonly data: TicketQrDialogData,
     destroyRef: DestroyRef,
   ) {
-    void this.acquireWakeLock();
-    const onVisible = (): void => {
-      // The lock is released by the browser whenever the tab is hidden.
-      if (this.document.visibilityState === 'visible') void this.acquireWakeLock();
-    };
-    this.document.addEventListener('visibilitychange', onVisible);
-    destroyRef.onDestroy(() => {
-      this.closed = true;
-      this.document.removeEventListener('visibilitychange', onVisible);
-      void this.wakeLock?.release().catch(() => undefined);
-      this.wakeLock = null;
-    });
+    // A dim phone in a dark stadium does not scan: keep the screen on. Browsers
+    // expose no brightness control, hence the plain white surface instead.
+    const wakeLock = new ScreenWakeLock(this.document);
+    wakeLock.acquire();
+    destroyRef.onDestroy(() => wakeLock.release());
 
     const loader$ = data.qrLoader$ ?? this.ticketsService.getQr(data.ticketId!);
     loader$.subscribe({
@@ -203,30 +187,5 @@ export class TicketQrDialogComponent {
         this.loading.set(false);
       },
     });
-  }
-
-  /**
-   * Keeps the screen awake while the code is on show. Browsers expose no API
-   * to raise screen brightness, so the dialog instead uses a pure-white,
-   * black-on-white surface and leaves the brightness to the user's device.
-   * Unsupported browsers (or a refused request) simply skip the lock.
-   */
-  private async acquireWakeLock(): Promise<void> {
-    if (this.closed || this.wakeLock) return;
-    const nav = this.document.defaultView?.navigator as WakeLockNavigator | undefined;
-    if (!nav?.wakeLock) return;
-    try {
-      const sentinel = await nav.wakeLock.request('screen');
-      if (this.closed) {
-        void sentinel.release().catch(() => undefined);
-        return;
-      }
-      this.wakeLock = sentinel;
-      (sentinel as unknown as EventTarget).addEventListener?.('release', () => {
-        if (this.wakeLock === sentinel) this.wakeLock = null;
-      });
-    } catch {
-      // Denied (battery saver, hidden tab) — the QR still works.
-    }
   }
 }

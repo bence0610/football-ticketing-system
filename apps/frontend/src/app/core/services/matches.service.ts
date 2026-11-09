@@ -1,6 +1,7 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { SKIP_ERROR_SNACKBAR } from '../interceptors/error.interceptor';
 
 export type MatchStatus =
   | 'scheduled'
@@ -36,8 +37,11 @@ export interface MatchResource {
 export class MatchesService {
   private readonly http = inject(HttpClient);
 
-  listAll(): Observable<MatchResource[]> {
-    return this.http.get<MatchResource[]>('/matches');
+  /** `silent`: the caller copes with a failure itself, so no global error toast. */
+  listAll(options: { silent?: boolean } = {}): Observable<MatchResource[]> {
+    return this.http.get<MatchResource[]>('/matches', {
+      context: options.silent ? new HttpContext().set(SKIP_ERROR_SNACKBAR, true) : undefined,
+    });
   }
 
   findOne(id: string): Observable<MatchResource> {
