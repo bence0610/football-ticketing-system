@@ -15,7 +15,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
     "test:ci": "ng test --watch=false --browsers=ChromeHeadless --code-coverage",
-    "lint": "ng lint",
+    "lint": "ng lint --max-warnings 0",
+    "lint:fix": "ng lint --fix",
     "e2e": "playwright test --config e2e/playwright.config.ts",
     "e2e:install": "playwright install chromium firefox",
     "e2e:report": "playwright show-report e2e/playwright-report"

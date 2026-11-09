@@ -18,6 +18,7 @@
     "lint:backend": "npm run lint --workspace=apps/backend",
     "lint:frontend": "npm run lint --workspace=apps/frontend",
     "lint:all": "npm run lint:backend && npm run lint:frontend",
+    "lint:fix": "npm run lint:fix --workspace=apps/backend && npm run lint:fix --workspace=apps/frontend",
     "test:backend": "npm run test --workspace=apps/backend",
     "test:frontend": "npm run test --workspace=apps/frontend",
     "test:all": "npm run test:backend && npm run test:frontend",
