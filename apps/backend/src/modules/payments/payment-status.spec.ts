@@ -10,7 +10,12 @@ describe('PaymentsService.getPaymentStatus', () => {
   const PI = 'pi_3abcDEF123';
   const USER = 'user-1';
 
-  function build(opts: { tickets?: unknown[]; intent?: unknown; retrieveFails?: boolean; points?: number }) {
+  function build(opts: {
+    tickets?: unknown[];
+    intent?: unknown;
+    retrieveFails?: boolean;
+    points?: number;
+  }) {
     const ticketRepository = { find: jest.fn().mockResolvedValue(opts.tickets ?? []) };
     const stripe = {
       paymentIntents: {
@@ -45,19 +50,27 @@ describe('PaymentsService.getPaymentStatus', () => {
   it('does not claim an email until every ticket of the payment is marked as sent', async () => {
     const sent = new Date('2026-11-08T19:00:05.000Z');
     const unsent = ticket('t1', '3500', 1);
-    const noneSent = await build({ tickets: [unsent, ticket('t2', '3500', 2)] }).service.getPaymentStatus(PI, USER);
+    const noneSent = await build({
+      tickets: [unsent, ticket('t2', '3500', 2)],
+    }).service.getPaymentStatus(PI, USER);
     expect(noneSent.status).toBe('issued');
     expect(noneSent.confirmationEmailSentAt).toBeNull();
 
     const partly = await build({
-      tickets: [{ ...ticket('t1', '3500', 1), confirmationEmailSentAt: sent }, ticket('t2', '3500', 2)],
+      tickets: [
+        { ...ticket('t1', '3500', 1), confirmationEmailSentAt: sent },
+        ticket('t2', '3500', 2),
+      ],
     }).service.getPaymentStatus(PI, USER);
     expect(partly.confirmationEmailSentAt).toBeNull();
 
     const all = await build({
       tickets: [
         { ...ticket('t1', '3500', 1), confirmationEmailSentAt: sent },
-        { ...ticket('t2', '3500', 2), confirmationEmailSentAt: new Date('2026-11-08T19:00:07.000Z') },
+        {
+          ...ticket('t2', '3500', 2),
+          confirmationEmailSentAt: new Date('2026-11-08T19:00:07.000Z'),
+        },
       ],
     }).service.getPaymentStatus(PI, USER);
     expect(all.confirmationEmailSentAt).toBe('2026-11-08T19:00:05.000Z');
@@ -77,14 +90,19 @@ describe('PaymentsService.getPaymentStatus', () => {
     expect(loyaltyService.pointsCreditedFor).toHaveBeenCalledWith(USER, ['ticket:t1', 'ticket:t2']);
   });
 
-  it('only looks at the caller\'s own tickets', async () => {
+  it("only looks at the caller's own tickets", async () => {
     const { service, ticketRepository } = build({ tickets: [ticket('t1', '3500', 1)] });
     await service.getPaymentStatus(PI, USER);
-    expect(ticketRepository.find.mock.calls[0][0].where).toEqual({ stripePaymentIntentId: PI, userId: USER });
+    expect(ticketRepository.find.mock.calls[0][0].where).toEqual({
+      stripePaymentIntentId: PI,
+      userId: USER,
+    });
   });
 
   it('is "processing" while Stripe has the payment but no ticket exists yet', async () => {
-    const { service } = build({ intent: { status: 'succeeded', currency: 'huf', metadata: { userId: USER } } });
+    const { service } = build({
+      intent: { status: 'succeeded', currency: 'huf', metadata: { userId: USER } },
+    });
     const status = await service.getPaymentStatus(PI, USER);
     expect(status.status).toBe('processing');
     expect(status.ticketIds).toEqual([]);
@@ -92,17 +110,25 @@ describe('PaymentsService.getPaymentStatus', () => {
   });
 
   it('is "failed" when the payment did not go through', async () => {
-    const { service } = build({ intent: { status: 'requires_payment_method', currency: 'huf', metadata: { userId: USER } } });
+    const { service } = build({
+      intent: { status: 'requires_payment_method', currency: 'huf', metadata: { userId: USER } },
+    });
     expect((await service.getPaymentStatus(PI, USER)).status).toBe('failed');
   });
 
   it("does not reveal someone else's payment", async () => {
-    const { service } = build({ intent: { status: 'succeeded', currency: 'huf', metadata: { userId: 'someone-else' } } });
+    const { service } = build({
+      intent: { status: 'succeeded', currency: 'huf', metadata: { userId: 'someone-else' } },
+    });
     await expect(service.getPaymentStatus(PI, USER)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('404s an unknown payment and 400s a malformed id', async () => {
-    await expect(build({ retrieveFails: true }).service.getPaymentStatus(PI, USER)).rejects.toBeInstanceOf(NotFoundException);
-    await expect(build({}).service.getPaymentStatus('not-an-id', USER)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      build({ retrieveFails: true }).service.getPaymentStatus(PI, USER),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(build({}).service.getPaymentStatus('not-an-id', USER)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });

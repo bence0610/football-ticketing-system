@@ -21,7 +21,9 @@ export class LoanOwnerEntered1715000000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`UPDATE \`pass_loans\` SET \`status\` = 'revoked' WHERE \`status\` = 'owner_entered'`);
+    await queryRunner.query(
+      `UPDATE \`pass_loans\` SET \`status\` = 'revoked' WHERE \`status\` = 'owner_entered'`,
+    );
     await queryRunner.query(`
       ALTER TABLE \`pass_loans\`
       MODIFY COLUMN \`status\` enum('pending','accepted','revoked','expired','used','cancelled','completed') NOT NULL DEFAULT 'pending'

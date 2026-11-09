@@ -28,7 +28,10 @@ export class PaymentStatusResponseDto {
   @ApiProperty({ type: [String] })
   ticketIds!: string[];
 
-  @ApiProperty({ example: 8312, description: 'Sum of the ticket prices actually paid (HUF). 0 until issued.' })
+  @ApiProperty({
+    example: 8312,
+    description: 'Sum of the ticket prices actually paid (HUF). 0 until issued.',
+  })
   amountPaid!: number;
 
   @ApiProperty({ example: 'huf' })
@@ -36,7 +39,8 @@ export class PaymentStatusResponseDto {
 
   @ApiProperty({
     example: 100,
-    description: 'Loyalty points credited for these tickets, read from the loyalty ledger. 0 until credited.',
+    description:
+      'Loyalty points credited for these tickets, read from the loyalty ledger. 0 until credited.',
   })
   pointsCredited!: number;
 

@@ -229,7 +229,10 @@ export class PaymentsService {
    * database and the loyalty ledger); otherwise Stripe is asked, so the page
    * can tell "still being processed" from "the payment did not go through".
    */
-  async getPaymentStatus(paymentIntentId: string, userId: string): Promise<PaymentStatusResponseDto> {
+  async getPaymentStatus(
+    paymentIntentId: string,
+    userId: string,
+  ): Promise<PaymentStatusResponseDto> {
     if (!/^pi_[A-Za-z0-9]+$/.test(paymentIntentId)) {
       throw new BadRequestException('Érvénytelen Stripe PaymentIntent azonosító.');
     }

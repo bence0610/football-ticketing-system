@@ -181,12 +181,15 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
     [PassLoanStatus.CANCELLED, 'loan_revoked', 'A meghívót visszavonták.'],
     [PassLoanStatus.EXPIRED, 'loan_expired', 'A meghívó lejárt.'],
     [PassLoanStatus.ACCEPTED, 'loan_already_accepted', 'A meghívót már elfogadták.'],
-  ])('status %s has its own code and message instead of echoing the raw state', async (status, code, message) => {
-    mockPassLoanRepo.findOne.mockResolvedValue(makeLoan(status));
-    await expect(service.previewLoan('tok-abc')).rejects.toMatchObject({
-      response: { code, message },
-    });
-  });
+  ])(
+    'status %s has its own code and message instead of echoing the raw state',
+    async (status, code, message) => {
+      mockPassLoanRepo.findOne.mockResolvedValue(makeLoan(status));
+      await expect(service.previewLoan('tok-abc')).rejects.toMatchObject({
+        response: { code, message },
+      });
+    },
+  );
 
   describe('getMatchQr validity window (server-side guard)', () => {
     const pass = {
@@ -205,16 +208,22 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
     it.each([
       ['before validFrom', '2026-07-31T18:00:00Z'],
       ['after validUntil', '2027-07-01T18:00:00Z'],
-    ])('rejects a match %s with 400 match_outside_validity and issues no QR', async (_label, kickoff) => {
-      mockMatchRepo.findOne.mockResolvedValue({ id: 'm1', kickoffAt: new Date(kickoff) });
-      await expect(service.getMatchQr('pass-1', 'm1', 'u1')).rejects.toMatchObject({
-        status: 400,
-        response: { code: 'match_outside_validity' },
-      });
-    });
+    ])(
+      'rejects a match %s with 400 match_outside_validity and issues no QR',
+      async (_label, kickoff) => {
+        mockMatchRepo.findOne.mockResolvedValue({ id: 'm1', kickoffAt: new Date(kickoff) });
+        await expect(service.getMatchQr('pass-1', 'm1', 'u1')).rejects.toMatchObject({
+          status: 400,
+          response: { code: 'match_outside_validity' },
+        });
+      },
+    );
 
     it('does not even reach the QR step for an outside match (nothing is materialised)', async () => {
-      mockMatchRepo.findOne.mockResolvedValue({ id: 'm1', kickoffAt: new Date('2028-01-01T18:00:00Z') });
+      mockMatchRepo.findOne.mockResolvedValue({
+        id: 'm1',
+        kickoffAt: new Date('2028-01-01T18:00:00Z'),
+      });
       const spy = jest.spyOn(service as never, 'materializeSeasonPassTicket');
       await expect(service.getMatchQr('pass-1', 'm1', 'u1')).rejects.toBeTruthy();
       expect(spy).not.toHaveBeenCalled();

@@ -194,7 +194,7 @@ describe('ChatbotContextService', () => {
     );
   });
 
-  it('includes each sector\'s coverage, from the same data as the seat map', async () => {
+  it("includes each sector's coverage, from the same data as the seat map", async () => {
     const snapshot = await service.getUpcomingMatchesSnapshot();
 
     for (const m of snapshot.upcomingMatches) {

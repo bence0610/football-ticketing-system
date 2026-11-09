@@ -20,7 +20,9 @@ describe('handled Stripe events', () => {
     const script = readFileSync(join(__dirname, '../../../../../scripts/stripe-listen.js'), 'utf8');
     expect(script).toContain('handled-stripe-events.ts');
     const file = readFileSync(join(__dirname, 'handled-stripe-events.ts'), 'utf8');
-    const block = file.split('// HANDLED_STRIPE_EVENTS:begin')[1].split('// HANDLED_STRIPE_EVENTS:end')[0];
+    const block = file
+      .split('// HANDLED_STRIPE_EVENTS:begin')[1]
+      .split('// HANDLED_STRIPE_EVENTS:end')[0];
     expect(quoted(block)).toEqual([...HANDLED_STRIPE_EVENTS].sort());
   });
 });

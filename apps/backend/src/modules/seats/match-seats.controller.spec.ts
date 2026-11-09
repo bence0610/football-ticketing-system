@@ -399,7 +399,7 @@ describe('MatchSeatsController – integration', () => {
       expect(summary.occupancyRatio).toBeCloseTo(0.67, 1);
     });
 
-    it('carries each sector\'s covered flag from the sectors table (VIP and B covered, A and C open)', async () => {
+    it("carries each sector's covered flag from the sectors table (VIP and B covered, A and C open)", async () => {
       setData(makeMatch(), [
         makeSeat(SEAT_ID_FREE, 'A', '1', 1),
         makeSeat('b-1', 'B', '1', 1),
@@ -410,7 +410,10 @@ describe('MatchSeatsController – integration', () => {
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       const covered = Object.fromEntries(
-        res.body.sectorSummary.map((s: { section: string; covered: boolean | null }) => [s.section, s.covered]),
+        res.body.sectorSummary.map((s: { section: string; covered: boolean | null }) => [
+          s.section,
+          s.covered,
+        ]),
       );
       expect(covered).toEqual({ A: false, B: true, C: false, VIP: true });
     });
@@ -422,7 +425,10 @@ describe('MatchSeatsController – integration', () => {
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       const bySection = Object.fromEntries(
-        res.body.sectorSummary.map((s: { section: string; covered: boolean | null }) => [s.section, s.covered]),
+        res.body.sectorSummary.map((s: { section: string; covered: boolean | null }) => [
+          s.section,
+          s.covered,
+        ]),
       );
       expect(bySection).toEqual({ B: true, X: null });
     });
@@ -627,7 +633,9 @@ describe('MatchSeatsController – integration', () => {
       setData(makeMatch());
 
       await request(app.getHttpServer())
-        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock/extend?ownerToken=${OWNER_TOKEN}&ttlSeconds=99999`)
+        .post(
+          `/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock/extend?ownerToken=${OWNER_TOKEN}&ttlSeconds=99999`,
+        )
         .expect(200);
 
       // (match, seat, token) only: no TTL is passed, the lock service applies its configured default

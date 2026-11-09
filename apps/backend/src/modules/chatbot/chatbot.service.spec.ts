@@ -266,8 +266,12 @@ describe('ChatbotService', () => {
       const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
 
       // the data the answer is built from, in the snapshot the model reads
-      expect(system[1].text).toContain('B szektor: jegyár 5000 Ft; helyek (mozgó adat): szabad 31, eladott 15, zárolt 4, összes 50; fedettség: fedett');
-      expect(system[1].text).toContain('A szektor: jegyár 7500 Ft; helyek (mozgó adat): szabad 40, eladott 60, zárolt 0, összes 100; fedettség: nem fedett');
+      expect(system[1].text).toContain(
+        'B szektor: jegyár 5000 Ft; helyek (mozgó adat): szabad 31, eladott 15, zárolt 4, összes 50; fedettség: fedett',
+      );
+      expect(system[1].text).toContain(
+        'A szektor: jegyár 7500 Ft; helyek (mozgó adat): szabad 40, eladott 60, zárolt 0, összes 100; fedettség: nem fedett',
+      );
       // a sector without data is "unknown", never "open"
       expect(system[1].text.replace(/\s/g, ' ')).toMatch(/VIP szektor: .*fedettség: nem elérhető/);
 

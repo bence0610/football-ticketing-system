@@ -61,7 +61,8 @@ const PUBLIC_ROUTES: Record<string, string> = {
   'POST auth/register': 'account creation',
   'POST auth/login': 'obtains the token',
   'POST auth/refresh': 'authenticates with the refresh token in the body',
-  'POST chatbot/message': 'guests may chat; OptionalJwtAuthGuard binds the conversation to the identity',
+  'POST chatbot/message':
+    'guests may chat; OptionalJwtAuthGuard binds the conversation to the identity',
   'GET health': 'liveness probe, returns only up/down',
   'GET loyalty/tiers': 'static tier table, same for everyone',
   'GET matches': 'public fixture list',
@@ -74,7 +75,8 @@ const PUBLIC_ROUTES: Record<string, string> = {
   'GET seats': 'static seat catalogue',
   'POST webhooks/stripe': 'authenticated by the Stripe signature, not a JWT',
   'GET season-passes/prices': 'public price list',
-  'GET season-passes/loans/preview/:token': 'invitation link; possession of the secret token is the credential',
+  'GET season-passes/loans/preview/:token':
+    'invitation link; possession of the secret token is the credential',
   'GET users/count': 'deliberately public registration counter',
   'GET weather/match/:matchId': 'public forecast',
 };
@@ -144,7 +146,8 @@ function collectRoutes(controller: Type<unknown>): RouteInfo[] {
       key: `${METHOD_NAMES[method]} ${join(base, path)}`,
       authenticated: guards.some(isRequiredJwtGuard),
       usesRolesGuard: guards.includes(RolesGuard),
-      roles: (Reflect.getMetadata(ROLES_KEY, handler) as UserRole[] | undefined) ?? classRoles ?? [],
+      roles:
+        (Reflect.getMetadata(ROLES_KEY, handler) as UserRole[] | undefined) ?? classRoles ?? [],
     });
   }
   return routes;
