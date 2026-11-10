@@ -36,6 +36,7 @@ import { extractApiErrorMessage } from '../../shared/utils/api-error';
 import { holdRemainingText, lockExpiryFromTtl } from '../../shared/utils/hold-duration';
 import { SeatsActions } from '../../state/seats';
 import { discountAmount, shortestHoldMs } from '../cart/logic/cart-logic';
+import { formatFullName } from '../../shared/utils/format-name';
 import { CheckoutSummaryComponent } from './components/checkout-summary.component';
 import { ExpiredHoldAlertComponent } from './components/expired-hold-alert.component';
 import { WeatherBannerComponent } from './components/weather-banner.component';
@@ -98,7 +99,7 @@ const MAX_RETRY_ATTEMPTS = 3;
 
                 @if (auth.user(); as user) {
                   <p class="card__buyer" data-testid="buyer">
-                    Vásárló: <strong>{{ user.lastName }} {{ user.firstName }}</strong> · {{ user.email }}
+                    Vásárló: <strong>{{ fullName(user) }}</strong> · {{ user.email }}
                   </p>
                 }
 
@@ -321,6 +322,7 @@ const MAX_RETRY_ATTEMPTS = 3;
 export class CheckoutPageComponent implements AfterViewInit, OnDestroy {
   protected readonly cart = inject(CartFacade);
   protected readonly auth = inject(AuthService);
+  protected readonly fullName = formatFullName;
   private readonly paymentsApi = inject(PaymentsApiService);
   private readonly seatsApi = inject(SeatsApiService);
   private readonly weatherApi = inject(WeatherApiService);

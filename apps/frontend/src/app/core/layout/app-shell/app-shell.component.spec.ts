@@ -34,4 +34,27 @@ describe('AppShellComponent', () => {
     expect(routes).toContain('/admin');
     expect(routes).toContain('/stadium');
   });
+
+  describe('the chat launcher', () => {
+    it('sits in the header toolbar, so it can never cover page content', () => {
+      const fixture = TestBed.createComponent(AppShellComponent);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      const widget = el.querySelector('kte-chatbot-widget');
+      expect(widget).not.toBeNull();
+      expect(widget!.closest('.kte-shell__toolbar')).not.toBeNull();
+      // ...and is not pulled out of the flow onto the page
+      const button = widget!.querySelector('button') as HTMLElement;
+      expect(getComputedStyle(button).position).not.toBe('fixed');
+      expect(getComputedStyle(widget as HTMLElement).position).not.toBe('fixed');
+    });
+
+    it('stays out of the page body and footer', () => {
+      const fixture = TestBed.createComponent(AppShellComponent);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('main kte-chatbot-widget')).toBeNull();
+      expect(el.querySelector('footer kte-chatbot-widget')).toBeNull();
+    });
+  });
 });

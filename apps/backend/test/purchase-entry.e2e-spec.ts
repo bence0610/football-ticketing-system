@@ -1727,9 +1727,9 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     });
     expect(new Set(all.map((p) => p.seatId)).size).toBe(3);
 
-    expect(passes.self.holderName).toBe('Péter Kovács');
+    expect(passes.self.holderName).toBe('Kovács Péter');
     expect(passes.self.holderUserId).toBe(buyer.userId);
-    expect(passes.partner.holderName).toBe('Anna Kovácsné');
+    expect(passes.partner.holderName).toBe('Kovácsné Anna');
     expect(passes.partner.holderUserId).toBe(partner.userId);
     expect(passes.child.holderName).toBe('Kovács Bence');
     expect(passes.child.holderUserId).toBeNull();
@@ -1769,9 +1769,9 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     // The buyer shows the QR for themself and the child (no account);
     // the partner shows their own, from their own profile.
     const cases: Array<{ token: string; pass: SeasonPass; holderName: string }> = [
-      { token: buyer.accessToken, pass: passes.self, holderName: 'Péter Kovács' },
+      { token: buyer.accessToken, pass: passes.self, holderName: 'Kovács Péter' },
       { token: buyer.accessToken, pass: passes.child, holderName: 'Kovács Bence' },
-      { token: partner.accessToken, pass: passes.partner, holderName: 'Anna Kovácsné' },
+      { token: partner.accessToken, pass: passes.partner, holderName: 'Kovácsné Anna' },
     ];
     for (const c of cases) {
       const qr = await request(server)
@@ -1794,18 +1794,18 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       .set('Authorization', `Bearer ${buyer.accessToken}`);
     expect(mine.body).toHaveLength(3);
     expect((mine.body as Array<{ holderName: string }>).map((p) => p.holderName).sort()).toEqual([
-      'Anna Kovácsné',
       'Kovács Bence',
-      'Péter Kovács',
+      'Kovács Péter',
+      'Kovácsné Anna',
     ]);
     const theirs = await request(server)
       .get('/api/season-passes/me')
       .set('Authorization', `Bearer ${partner.accessToken}`);
     expect(theirs.body).toHaveLength(1);
-    expect(theirs.body[0].holderName).toBe('Anna Kovácsné');
+    expect(theirs.body[0].holderName).toBe('Kovácsné Anna');
     expect(theirs.body[0].isHolder).toBe(true);
     expect(theirs.body[0].isBuyer).toBe(false);
-    expect(theirs.body[0].buyerName).toBe('Péter Kovács');
+    expect(theirs.body[0].buyerName).toBe('Kovács Péter');
 
     // A stranger can neither see nor use somebody else's pass.
     const stranger = await registerFan('fam-stranger');
@@ -2015,7 +2015,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     const loanScan = await scanAt(gateToken, loanTicket.id, loanQr.body.token as string);
     expect(loanScan.body.result).toBe('ok');
     expect(loanScan.body.source).toBe(TicketSource.LOAN);
-    expect(loanScan.body.holderName).toBe('Kölcsön Vevő');
+    expect(loanScan.body.holderName).toBe('Vevő Kölcsön');
     expect(loanScan.body.seat.id).toBe(passes.child.seatId);
 
     // The other holders still enter match 1, and the child's pass enters match 2.

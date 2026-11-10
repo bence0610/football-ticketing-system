@@ -40,7 +40,7 @@ export class AppShellPage {
   readonly loyaltyNavLink: Locator;
 
   // KTE-059: Chatbot widget (Iteration 5)
-  // The FAB button has aria-label="KTE AI Asszisztens megnyitása"
+  // The launcher is a round button in the header toolbar, aria-label="KTE AI Asszisztens megnyitása"
   readonly chatbotFab: Locator;
   // The CDK overlay panel rendered by ChatbotPanelComponent
   readonly chatbotPanel: Locator;

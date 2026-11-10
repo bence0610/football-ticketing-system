@@ -52,7 +52,7 @@ describe('TicketsService.scanTicket payloads', () => {
       success: false,
       result: 'already_used',
       scannedAt: scannedAt.toISOString(),
-      holderName: 'Anna Kiss',
+      holderName: 'Kiss Anna',
       source: TicketSource.SINGLE,
       seat: { section: 'B', row: '5', number: 12 },
       match: { homeTeam: 'KTE', awayTeam: 'Újpest' },
@@ -64,7 +64,7 @@ describe('TicketsService.scanTicket payloads', () => {
     expect(res).toMatchObject({
       success: true,
       result: 'ok',
-      holderName: 'Anna Kiss',
+      holderName: 'Kiss Anna',
       seat: { section: 'B' },
       match: { awayTeam: 'Újpest' },
     });
@@ -86,7 +86,7 @@ describe('TicketsService.scanTicket payloads', () => {
       expect(res).toMatchObject({
         success: false,
         result: 'already_used',
-        holderName: 'Anna Kiss',
+        holderName: 'Kiss Anna',
       });
     });
 

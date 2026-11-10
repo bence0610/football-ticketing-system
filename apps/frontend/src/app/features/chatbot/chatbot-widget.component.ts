@@ -13,10 +13,16 @@ import { ChatbotPanelComponent } from './chatbot-panel.component';
 import { ChatbotStore } from './state/chatbot.signals';
 
 /**
- * Floating chatbot launcher (orange FAB, bottom-right). Pressing it toggles
- * a CDK overlay that hosts {@link ChatbotPanelComponent}. The widget is
- * a singleton — mounted once at the app shell level — so that opening
- * state survives route changes.
+ * Chatbot launcher: a round chat bubble in the shell's header toolbar. Pressing
+ * it toggles a CDK overlay, anchored under the header, that hosts
+ * {@link ChatbotPanelComponent}. The widget is a singleton - mounted once at the
+ * app shell level - so that opening state survives route changes.
+ *
+ * It lives in the header on purpose. A launcher that floats over the page
+ * (fixed, bottom-right) covers footers, card corners and, on a phone, the submit
+ * button of whatever form is at the bottom - and no offset can make that safe,
+ * because content scrolls underneath it. In the toolbar it can never be on top
+ * of page content, at any width or scroll position.
  */
 @Component({
   selector: 'kte-chatbot-widget',
@@ -40,41 +46,36 @@ import { ChatbotStore } from './state/chatbot.signals';
   `,
   styles: [
     `
+      :host { display: inline-flex; flex-shrink: 0; }
+
       .kte-chatbot-fab {
-        position: fixed;
-        bottom: 28px;
-        right: 28px;
-        width: 56px;
-        height: 56px;
+        width: var(--min-target, 44px);
+        height: var(--min-target, 44px);
         border-radius: 50%;
         background: var(--kte-brand-mid);
-        color: var(--kte-surface);
+        color: #fff;
         border: none;
         cursor: pointer;
-        box-shadow: 0 6px 18px rgba(20, 18, 26, 0.32);
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        z-index: 1100;
-        transition: transform 0.18s ease, background 0.18s ease;
+        padding: 0;
+        transition: background 0.18s ease;
       }
       .kte-chatbot-fab:hover {
-        transform: translateY(-2px);
         background: var(--kte-brand-deep);
       }
+      .kte-chatbot-fab:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+      }
       .kte-chatbot-fab--open {
-        background: var(--kte-ink);
+        background: rgba(255, 255, 255, 0.16);
       }
       .kte-chatbot-fab mat-icon {
         font-size: 24px;
         width: 24px;
         height: 24px;
-      }
-      @media (max-width: 640px) {
-        .kte-chatbot-fab {
-          bottom: 16px;
-          right: 16px;
-        }
       }
     `,
   ],
@@ -103,11 +104,12 @@ export class ChatbotWidgetComponent implements OnDestroy {
     if (this.overlayRef) {
       return;
     }
+    // Under the header, in the right-hand gutter; the panel sizes itself to fit.
     const positionStrategy = this.overlay
       .position()
       .global()
-      .right('28px')
-      .bottom('100px');
+      .top('calc(var(--header-h, 72px) + 8px)')
+      .right('16px');
     const ref = this.overlay.create({
       positionStrategy,
       hasBackdrop: false,

@@ -14,6 +14,8 @@ import { AppModule } from '../../src/app.module';
 import { GlobalHttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 import { REDIS_CLIENT } from '../../src/redis/redis.constants';
 import { STRIPE_CLIENT } from '../../src/modules/payments/stripe.provider';
+import { EmailService } from '../../src/modules/email/email.service';
+import type { SendEmailRequest } from '../../src/modules/email/email.types';
 import { StripeStub } from './stripe-stub';
 
 export interface TestContext {
@@ -22,6 +24,10 @@ export interface TestContext {
   dataSource: DataSource;
   redis: Redis;
   stripeStub: StripeStub;
+  /** Every email the app tried to send, in order (nothing leaves the process). */
+  sentEmails: SendEmailRequest[];
+  /** Templates whose sending should fail (to prove a failed mail does not break the request). */
+  failingTemplates: Set<string>;
 }
 
 /**
@@ -35,12 +41,24 @@ export interface TestContext {
  */
 export async function createTestApp(): Promise<TestContext> {
   const stripeStub = new StripeStub();
+  const sentEmails: SendEmailRequest[] = [];
+  const failingTemplates = new Set<string>();
 
   const moduleRef: TestingModule = await Test.createTestingModule({
     imports: [AppModule],
   })
     .overrideProvider(STRIPE_CLIENT)
     .useValue(stripeStub)
+    .overrideProvider(EmailService)
+    .useValue({
+      send: (request: SendEmailRequest): Promise<void> => {
+        if (failingTemplates.has(request.template)) {
+          return Promise.reject(new Error('SMTP down (test)'));
+        }
+        sentEmails.push(request);
+        return Promise.resolve();
+      },
+    })
     .compile();
 
   const app = moduleRef.createNestApplication<NestExpressApplication>({
@@ -85,7 +103,7 @@ export async function createTestApp(): Promise<TestContext> {
   const redis = app.get<Redis>(REDIS_CLIENT);
   const httpServer = app.getHttpServer() as Server;
 
-  return { app, httpServer, dataSource, redis, stripeStub };
+  return { app, httpServer, dataSource, redis, stripeStub, sentEmails, failingTemplates };
 }
 
 export async function closeTestApp(ctx: TestContext): Promise<void> {

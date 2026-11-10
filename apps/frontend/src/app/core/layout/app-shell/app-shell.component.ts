@@ -13,6 +13,7 @@ import { filter } from 'rxjs';
 import { AuthService } from '../../auth/auth.service';
 import { CartFacade } from '../../cart/cart.facade';
 import { ChatbotWidgetComponent } from '../../../features/chatbot/chatbot-widget.component';
+import { initialsOf } from '../../../shared/utils/format-name';
 
 interface NavItem {
   readonly label: string;
@@ -74,7 +75,8 @@ export class AppShellComponent {
   // the Stripe payment element on small screens. This signal flips on
   // every navigation event.
   protected readonly currentUrl = signal<string>(this.router.url);
-  // The home, season-pass, cart and checkout pages draw their own full-width bands, so the
+  // The home, season-pass, cart, checkout and login/register pages draw their own full-width
+  // bands or split panels, so the
   // shell's padded, max-width <main> gets out of the way there.
   protected readonly bleed = computed(() => {
     const path = this.currentUrl().split(/[?#]/)[0];
@@ -84,7 +86,11 @@ export class AppShellComponent {
       path === '/season-pass' ||
       path === '/cart' ||
       path === '/checkout' ||
-      path === '/checkout/confirmation'
+      path === '/checkout/confirmation' ||
+      path === '/login' ||
+      path === '/register' ||
+      path === '/forgot-password' ||
+      path.startsWith('/reset-password/')
     );
   });
   // The payment step shows a stripped header (no nav, cart, user or login).
@@ -122,6 +128,6 @@ export class AppShellComponent {
     if (!user) {
       return '';
     }
-    return `${(user.lastName[0] ?? '').toUpperCase()}${(user.firstName[0] ?? '').toUpperCase()}`;
+    return initialsOf(user);
   }
 }

@@ -23,6 +23,8 @@ export class EmailTemplateService implements OnModuleInit {
     'tier-upgraded': 'tier-upgraded.hbs',
     'waitlist-notification': 'waitlist-notification.hbs',
     'seat-refund': 'seat-refund.hbs',
+    'password-reset': 'password-reset.hbs',
+    'password-changed': 'password-changed.hbs',
   };
 
   async onModuleInit(): Promise<void> {

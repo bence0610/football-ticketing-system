@@ -40,7 +40,7 @@ setup('authenticate and save storage state', async ({ page }) => {
   });
 
   await page.goto('/login');
-  await expect(page.locator('mat-card-title')).toContainText('Bejelentkezés');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Bejelentkezés');
 
   await page.getByLabel('E-mail').fill('test@kte.hu');
   await page.getByLabel('Jelszó', { exact: true }).fill('Teszt1234');

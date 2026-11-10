@@ -9,6 +9,8 @@ export interface MailConfig {
   from: string;
   retryDelayMs: number;
   baseUrl: string;
+  /** Where people are told to write when something looks wrong with their account. */
+  supportEmail: string;
 }
 
 export default registerAs(
@@ -26,5 +28,6 @@ export default registerAs(
       10,
     ),
     baseUrl: process.env.EMAIL_BASE_URL ?? process.env.FRONTEND_URL ?? 'http://localhost:4200',
+    supportEmail: process.env.SUPPORT_EMAIL ?? 'jegy@kte.hu',
   }),
 );

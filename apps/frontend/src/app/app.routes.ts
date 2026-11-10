@@ -66,6 +66,19 @@ export const APP_ROUTES: Routes = [
         title: 'Regisztráció',
       },
       {
+        // Reachable signed in or out: the emailed link must work in whatever session the browser has.
+        path: 'forgot-password',
+        loadComponent: () =>
+          import('./features/auth/forgot-password.page').then((m) => m.ForgotPasswordPageComponent),
+        title: 'Elfelejtett jelszó',
+      },
+      {
+        path: 'reset-password/:token',
+        loadComponent: () =>
+          import('./features/auth/reset-password.page').then((m) => m.ResetPasswordPageComponent),
+        title: 'Új jelszó beállítása',
+      },
+      {
         path: 'profile',
         canActivate: [authGuard],
         loadComponent: () =>

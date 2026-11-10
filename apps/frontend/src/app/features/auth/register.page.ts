@@ -1,223 +1,150 @@
-import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import {
-  AbstractControl,
-  FormBuilder,
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  ValidationErrors,
-  Validators,
-} from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { ErrorStateMatcher } from '@angular/material/core';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { strictEmailValidator } from '../../shared/validators/email.validator';
+import {
+  PASSWORD_MAX,
+  PASSWORD_MIN,
+  PASSWORD_PATTERN,
+  passwordChecks,
+} from '../../shared/utils/password-rules';
+import { AuthFieldComponent } from './components/auth-field.component';
+import { AuthLayoutComponent } from './components/auth-layout.component';
+import { PasswordMeterComponent } from './components/password-meter.component';
 
-class PasswordMismatchMatcher implements ErrorStateMatcher {
-  isErrorState(control: FormControl | null): boolean {
-    if (!control) return false;
-    return !!(control.touched && control.parent?.errors?.['passwordMismatch']);
-  }
-}
-
-const passwordMatchValidator = (group: AbstractControl): ValidationErrors | null => {
-  const password = group.get('password')?.value as string | undefined;
-  const confirm = group.get('passwordConfirm')?.value as string | undefined;
-  return password && confirm && password !== confirm ? { passwordMismatch: true } : null;
-};
+type FieldName = 'lastName' | 'firstName' | 'email' | 'password';
 
 @Component({
   selector: 'kte-register-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule,
     ReactiveFormsModule,
     RouterLink,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatButtonModule,
     MatIconModule,
-    MatProgressBarModule,
+    AuthLayoutComponent,
+    AuthFieldComponent,
+    PasswordMeterComponent,
   ],
   template: `
-    <section class="kte-auth-page">
-      <mat-card class="kte-auth-card" appearance="outlined">
-        @if (loading()) {
-          <mat-progress-bar mode="indeterminate" />
-        }
-        <mat-card-header>
-          <mat-card-title>Regisztráció</mat-card-title>
-          <mat-card-subtitle>Csatlakozz a KTE szurkolóihoz</mat-card-subtitle>
-        </mat-card-header>
+    <kte-auth-layout mode="register">
+      <h1 class="kte-auth-title">Fiók létrehozása</h1>
+      <p class="kte-auth-switch">
+        Van már fiókod?
+        <a routerLink="/login" [queryParams]="returnQuery">Bejelentkezés</a>
+      </p>
 
-        <mat-card-content>
-          <form [formGroup]="form" (ngSubmit)="submit()" class="kte-auth-form">
-            <div class="kte-auth-form__row">
-              <mat-form-field appearance="outline">
-                <mat-label>Vezetéknév</mat-label>
-                <input matInput formControlName="lastName" autocomplete="family-name" />
-                @if (form.controls['lastName'].touched && form.controls['lastName'].errors) {
-                  <mat-error>Min. 2 karakter szükséges.</mat-error>
-                }
-              </mat-form-field>
-
-              <mat-form-field appearance="outline">
-                <mat-label>Keresztnév</mat-label>
-                <input matInput formControlName="firstName" autocomplete="given-name" />
-                @if (form.controls['firstName'].touched && form.controls['firstName'].errors) {
-                  <mat-error>Min. 2 karakter szükséges.</mat-error>
-                }
-              </mat-form-field>
-            </div>
-
-            <mat-form-field appearance="outline">
-              <mat-label>E-mail</mat-label>
-              <input matInput type="email" formControlName="email" autocomplete="email" />
-              <mat-icon matPrefix>mail</mat-icon>
-              @if (form.controls['email'].touched && form.controls['email'].errors) {
-                <mat-error>
-                  @if (form.controls['email'].errors?.['required']) {
-                    E-mail megadása kötelező.
-                  } @else {
-                    Érvénytelen e-mail formátum.
-                  }
-                </mat-error>
-              }
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Telefonszám (opcionális)</mat-label>
-              <input matInput formControlName="phoneNumber" autocomplete="tel" />
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Jelszó</mat-label>
-              <input
-                matInput
-                [type]="showPassword() ? 'text' : 'password'"
-                formControlName="password"
-                autocomplete="new-password"
-              />
-              <button
-                mat-icon-button
-                matSuffix
-                type="button"
-                (click)="togglePassword()"
-                [attr.aria-label]="showPassword() ? 'Jelszó elrejtése' : 'Jelszó megjelenítése'"
-              >
-                <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
-              </button>
-              <mat-hint>Min. 8 karakter, legalább egy betű és egy szám.</mat-hint>
-              @if (form.controls['password'].touched && form.controls['password'].errors) {
-                <mat-error>
-                  @if (form.controls['password'].errors?.['minlength']) {
-                    A jelszónak legalább 8 karakteresnek kell lennie.
-                  } @else if (form.controls['password'].errors?.['pattern']) {
-                    Tartalmazzon legalább egy betűt és egy számot.
-                  } @else {
-                    A jelszó megadása kötelező.
-                  }
-                </mat-error>
-              }
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Jelszó megerősítése</mat-label>
-              <input
-                matInput
-                [type]="showPassword() ? 'text' : 'password'"
-                formControlName="passwordConfirm"
-                autocomplete="new-password"
-                [errorStateMatcher]="passwordMismatchMatcher"
-              />
-              @if (form.errors?.['passwordMismatch'] && form.controls['passwordConfirm'].touched) {
-                <mat-error>A két jelszó nem egyezik.</mat-error>
-              }
-            </mat-form-field>
-
-            @if (errorMessage(); as error) {
-              <p class="kte-auth-form__error" role="alert">{{ error }}</p>
+      <form [formGroup]="form" (ngSubmit)="submit()" class="kte-auth-form" novalidate>
+        <div class="kte-auth-form__row">
+          <kte-auth-field label="Vezetéknév" inputId="reg-last" [invalid]="showError('lastName')">
+            <input
+              id="reg-last"
+              formControlName="lastName"
+              autocomplete="family-name"
+              [attr.aria-invalid]="showError('lastName')"
+              [attr.aria-describedby]="showError('lastName') ? 'reg-last-err' : null"
+            />
+            @if (showError('lastName')) {
+              <p msg id="reg-last-err" role="alert">{{ nameError('lastName') }}</p>
             }
+          </kte-auth-field>
+          <kte-auth-field label="Keresztnév" inputId="reg-first" [invalid]="showError('firstName')">
+            <input
+              id="reg-first"
+              formControlName="firstName"
+              autocomplete="given-name"
+              [attr.aria-invalid]="showError('firstName')"
+              [attr.aria-describedby]="showError('firstName') ? 'reg-first-err' : null"
+            />
+            @if (showError('firstName')) {
+              <p msg id="reg-first-err" role="alert">{{ nameError('firstName') }}</p>
+            }
+          </kte-auth-field>
+        </div>
 
+        <kte-auth-field
+          label="E-mail"
+          icon="mail"
+          inputId="reg-email"
+          [invalid]="showError('email') || emailTaken()"
+        >
+          <input
+            id="reg-email"
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+            inputmode="email"
+            [attr.aria-invalid]="showError('email') || emailTaken()"
+            [attr.aria-describedby]="'reg-email-msg'"
+          />
+          <div msg id="reg-email-msg">
+            @if (emailTaken()) {
+              <p role="alert" data-testid="email-taken">
+                Ehhez az e-mail-címhez már tartozik fiók.
+                <a routerLink="/login" [queryParams]="returnQuery">Jelentkezz be</a>
+              </p>
+            } @else if (showError('email')) {
+              <p role="alert">{{ emailError() }}</p>
+            } @else {
+              <p>Ide küldjük a visszaigazolásokat és a QR-kódokat.</p>
+            }
+          </div>
+        </kte-auth-field>
+
+        <div>
+          <kte-auth-field
+            label="Jelszó"
+            icon="lock"
+            inputId="reg-password"
+            [invalid]="showError('password')"
+          >
+            <input
+              id="reg-password"
+              formControlName="password"
+              autocomplete="new-password"
+              [type]="showPassword() ? 'text' : 'password'"
+              [attr.aria-invalid]="showError('password')"
+              aria-describedby="reg-password-rule reg-password-err"
+            />
             <button
-              mat-flat-button
-              color="primary"
-              type="submit"
-              class="kte-auth-form__submit"
-              [disabled]="loading() || form.invalid"
+              trailing
+              type="button"
+              class="kte-field__toggle"
+              (click)="showPassword.set(!showPassword())"
+              [attr.aria-label]="showPassword() ? 'Jelszó elrejtése' : 'Jelszó megjelenítése'"
+              [attr.aria-pressed]="showPassword()"
             >
-              Fiók létrehozása
+              <mat-icon aria-hidden="true">{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
             </button>
-          </form>
-        </mat-card-content>
+            <div msg id="reg-password-err">
+              @if (showError('password')) {
+                <p role="alert">{{ passwordError() }}</p>
+              }
+            </div>
+          </kte-auth-field>
 
-        <mat-card-actions class="kte-auth-card__actions">
-          <span>Már van fiókod?</span>
-          <a mat-button color="primary" routerLink="/login" [queryParams]="returnQuery">
-            Bejelentkezés
-          </a>
-        </mat-card-actions>
-      </mat-card>
-    </section>
-  `,
-  styles: [
-    `
-      .kte-auth-page {
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        padding: var(--kte-spacing-8) var(--kte-spacing-4);
-      }
-      .kte-auth-card {
-        width: 100%;
-        max-width: 480px;
-        border-radius: var(--kte-radius-lg);
-        box-shadow: var(--kte-shadow-md);
-      }
-      .kte-auth-form {
-        display: flex;
-        flex-direction: column;
-        gap: var(--kte-spacing-3);
-      }
-      .kte-auth-form__row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: var(--kte-spacing-3);
-      }
-      .kte-auth-form__error {
-        margin: 0;
-        padding: var(--kte-spacing-3) var(--kte-spacing-4);
-        background: var(--kte-danger-bg);
-        color: var(--kte-danger);
-        border-radius: var(--kte-radius);
-        font-size: 14px;
-      }
-      .kte-auth-form__submit {
-        height: 48px;
-        font-size: 16px;
-      }
-      .kte-auth-card__actions {
-        justify-content: flex-end;
-        gap: var(--kte-spacing-2);
-        padding: var(--kte-spacing-3) var(--kte-spacing-4) var(--kte-spacing-4);
-      }
-      @media (max-width: 480px) {
-        .kte-auth-form__row {
-          grid-template-columns: 1fr;
+          <kte-password-meter [password]="passwordValue()" ruleId="reg-password-rule" />
+        </div>
+
+        @if (errorMessage(); as error) {
+          <p class="error-block kte-auth-error" role="alert" data-testid="register-error">{{ error }}</p>
         }
-      }
-    `,
-  ],
+
+        <button type="submit" class="kte-auth-submit" [disabled]="loading()" [attr.aria-busy]="loading()">
+          @if (loading()) {
+            <span class="kte-auth-spinner" aria-hidden="true"></span>
+            Fiók létrehozása…
+          } @else {
+            Fiók létrehozása
+          }
+        </button>
+      </form>
+    </kte-auth-layout>
+  `,
 })
 export class RegisterPageComponent {
   private readonly fb = inject(FormBuilder);
@@ -227,70 +154,97 @@ export class RegisterPageComponent {
 
   protected readonly loading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
+  protected readonly emailTaken = signal(false);
   protected readonly showPassword = signal(false);
-  protected readonly passwordMismatchMatcher = new PasswordMismatchMatcher();
 
-  protected readonly form: FormGroup = this.fb.nonNullable.group(
-    {
-      firstName: this.fb.nonNullable.control('', [Validators.required, Validators.minLength(2)]),
-      lastName: this.fb.nonNullable.control('', [Validators.required, Validators.minLength(2)]),
-      email: this.fb.nonNullable.control('', [Validators.required, strictEmailValidator]),
-      phoneNumber: this.fb.nonNullable.control(''),
-      password: this.fb.nonNullable.control('', [
+  // The same limits the server's RegisterDto enforces (names 2-100, email <= 255,
+  // password as in shared/utils/password-rules.ts).
+  protected readonly form = this.fb.nonNullable.group({
+    lastName: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
+    firstName: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
+    email: ['', [Validators.required, strictEmailValidator, Validators.maxLength(255)]],
+    password: [
+      '',
+      [
         Validators.required,
-        Validators.minLength(8),
-        Validators.pattern(/(?=.*[A-Za-z])(?=.*\d).+/),
-      ]),
-      passwordConfirm: this.fb.nonNullable.control('', [Validators.required]),
-    },
-    { validators: passwordMatchValidator },
-  );
+        Validators.minLength(PASSWORD_MIN),
+        Validators.maxLength(PASSWORD_MAX),
+        Validators.pattern(PASSWORD_PATTERN),
+      ],
+    ],
+  });
+
+  protected readonly passwordValue = toSignal(this.form.controls.password.valueChanges, {
+    initialValue: '',
+  });
+
+  constructor() {
+    // A different address is a different question: forget "already registered".
+    this.form.controls.email.valueChanges.subscribe(() => this.emailTaken.set(false));
+  }
 
   protected get returnQuery(): Record<string, string> {
     const value = this.route.snapshot.queryParamMap.get('returnUrl');
     return value ? { returnUrl: value } : {};
   }
 
-  protected togglePassword(): void {
-    this.showPassword.update((value) => !value);
+  /** A field's error shows once it has been left (or after a submit), never while typing in it. */
+  protected showError(name: FieldName): boolean {
+    const c = this.form.controls[name];
+    return c.touched && c.invalid;
+  }
+
+  protected nameError(name: 'lastName' | 'firstName'): string {
+    const errors = this.form.controls[name].errors;
+    if (errors?.['required']) return 'Add meg a nevedet.';
+    if (errors?.['maxlength']) return 'Legfeljebb 100 karakter lehet.';
+    return 'Legalább 2 karakter kell.';
+  }
+
+  protected emailError(): string {
+    const errors = this.form.controls.email.errors;
+    if (errors?.['required']) return 'Add meg az e-mail-címedet.';
+    if (errors?.['maxlength']) return 'Legfeljebb 255 karakter lehet.';
+    return 'Ez nem érvényes e-mail-cím (pl. nev@pelda.hu).';
+  }
+
+  protected passwordError(): string {
+    const value = this.form.controls.password.value;
+    if (!value) return 'Adj meg egy jelszót.';
+    const c = passwordChecks(value);
+    if (!c.longEnough) return `Legalább ${PASSWORD_MIN} karakter kell.`;
+    if (!c.notTooLong) return `Legfeljebb ${PASSWORD_MAX} karakter lehet.`;
+    if (!c.hasLetter) return 'Kell bele legalább egy betű (a–z).';
+    return 'Kell bele legalább egy szám.';
   }
 
   protected submit(): void {
+    if (this.loading()) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      document.querySelector<HTMLInputElement>('kte-register-page input.ng-invalid')?.focus();
       return;
     }
     this.loading.set(true);
     this.errorMessage.set(null);
-
-    const value = this.form.getRawValue() as {
-      firstName: string;
-      lastName: string;
-      email: string;
-      phoneNumber: string;
-      password: string;
-      passwordConfirm: string;
-    };
-
-    this.auth
-      .register({
-        email: value.email,
-        password: value.password,
-        firstName: value.firstName,
-        lastName: value.lastName,
-        phoneNumber: value.phoneNumber || undefined,
-      })
-      .subscribe({
-        next: () => {
-          const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '/';
-          void this.router.navigateByUrl(returnUrl);
-        },
-        error: (err: unknown) => {
-          this.loading.set(false);
-          this.errorMessage.set(extractErrorMessage(err, 'A regisztráció sikertelen.'));
-        },
-        complete: () => this.loading.set(false),
-      });
+    this.emailTaken.set(false);
+    const { email, password, firstName, lastName } = this.form.getRawValue();
+    this.auth.register({ email, password, firstName, lastName }).subscribe({
+      next: () => {
+        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '/';
+        void this.router.navigateByUrl(returnUrl);
+      },
+      error: (err: unknown) => {
+        this.loading.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 409) {
+          // The only conflict registration reports is an address that already has an account.
+          this.emailTaken.set(true);
+          document.getElementById('reg-email')?.focus();
+          return;
+        }
+        this.errorMessage.set(extractErrorMessage(err, 'A regisztráció sikertelen.'));
+      },
+    });
   }
 }
 
@@ -299,12 +253,8 @@ function extractErrorMessage(err: unknown, fallback: string): string {
     const body = err.error;
     if (body && typeof body === 'object' && 'message' in body) {
       const value = (body as { message: unknown }).message;
-      if (typeof value === 'string') {
-        return value;
-      }
-      if (Array.isArray(value) && typeof value[0] === 'string') {
-        return value[0];
-      }
+      if (typeof value === 'string') return value;
+      if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
     }
   }
   return fallback;

@@ -5,6 +5,7 @@
 @use 'styles/theme';
 @use 'styles/base';
 @use 'styles/tier';
+@use 'styles/auth';
 
 @include t.publish-tokens;
 @include theme.apply;

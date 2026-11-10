@@ -26,6 +26,7 @@ import {
  * the per-test cleanup budget.
  */
 const DATA_TABLES: readonly string[] = [
+  'password_reset_tokens',
   'loyalty_transactions',
   'pass_loans',
   'tickets',

@@ -29,6 +29,7 @@ import { LoyaltyService } from '../../core/services/loyalty.service';
 import { MatchResource, MatchesService } from '../../core/services/matches.service';
 import { SeasonPassesService } from '../../core/services/season-passes.service';
 import { TicketsService } from '../../core/services/tickets.service';
+import { formatFullName } from '../../shared/utils/format-name';
 import { withArticle } from '../../shared/utils/hungarian-article';
 import { HufCurrencyPipe } from '../../shared/pipes/huf-currency.pipe';
 import { UserProfile } from '../../shared/models/auth.model';
@@ -364,7 +365,7 @@ export function untilLabel(kickoffIso: string, now: number): string {
               <dl class="acct">
                 <div>
                   <dt>Név</dt>
-                  <dd>{{ user.lastName }} {{ user.firstName }}</dd>
+                  <dd>{{ fullName(user) }}</dd>
                 </div>
                 <div>
                   <dt>E-mail</dt>
@@ -672,6 +673,8 @@ export class ProfilePageComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
+
+  protected readonly fullName = formatFullName;
 
   protected readonly loading = signal(true);
   protected readonly loadingPasses = signal(true);

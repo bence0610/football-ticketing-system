@@ -1,0 +1,174 @@
+// Shared styles of the auth pages (login, register, forgot/reset password): the
+// field, the form furniture, the notice and error blocks. They are global because
+// some states of those pages (a refused reset link, "link sent") contain no
+// field at all, and a component's own styles are only loaded once it is used.
+
+kte-auth-field { display: block; }
+
+.kte-field__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: color 0.12s;
+}
+.kte-field__box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 6px 0 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.kte-field__icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+  color: var(--muted);
+}
+.kte-field__box input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 16px; /* 16px keeps iOS from zooming the page on focus */
+  color: var(--ink);
+}
+.kte-field__box input::placeholder { color: var(--faint); }
+
+/* 1.5px + a 0.5px ring = a 2px border, with no layout shift */
+.kte-field__box:focus-within {
+  border-color: var(--brand-mid);
+  box-shadow: 0 0 0 0.5px var(--brand-mid);
+}
+.kte-field__box:focus-within .kte-field__icon { color: var(--brand-mid); }
+.kte-field:focus-within .kte-field__label { color: var(--brand-mid); }
+
+.kte-field--invalid .kte-field__box { border-color: var(--error-edge); }
+.kte-field--invalid .kte-field__box:focus-within { box-shadow: 0 0 0 0.5px var(--error-edge); }
+
+.kte-field__msg { min-height: 0; }
+.kte-field__msg p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.kte-field__msg p[role='alert'] { color: var(--error-ink); }
+.kte-field__msg a { color: var(--brand-deep); font-weight: 600; }
+
+.kte-field__toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.kte-field__toggle:hover { background: var(--border-light); color: var(--ink); }
+.kte-field__toggle:focus-visible { outline: 2px solid var(--brand-mid); outline-offset: -2px; }
+
+/* The standard error block of the auth forms (server message). */
+.kte-auth-error {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  border-left-color: var(--seat-sold);
+}
+
+/* A positive notice, e.g. "your password was changed". */
+.kte-auth-notice {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--chip-paid);
+  background: var(--chip-paid-bg);
+  border-left: 3px solid var(--chip-paid);
+  border-radius: var(--radius-block);
+}
+.kte-auth-forgot {
+  align-self: flex-end;
+  margin-top: -6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand-deep);
+}
+.kte-auth-lead { margin: 12px 0 0; font-size: 15px; line-height: 1.55; color: var(--muted); }
+.kte-auth-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
+.kte-auth-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 52px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--brand-deep);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.kte-auth-secondary:hover { border-color: var(--brand-mid); }
+
+.kte-auth-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.kte-auth-switch { margin: 8px 0 0; font-size: 15px; color: var(--muted); }
+.kte-auth-switch a { color: var(--brand-deep); font-weight: 600; }
+.kte-auth-form { display: flex; flex-direction: column; gap: 18px; margin-top: 28px; }
+.kte-auth-form__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.kte-auth-submit {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 52px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--brand-deep);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+}
+.kte-auth-submit:hover:not(:disabled) { background: var(--brand-mid); }
+.kte-auth-submit:disabled { opacity: 0.7; cursor: default; }
+.kte-auth-submit:focus-visible { outline: 3px solid var(--brand-mid); outline-offset: 2px; }
+.kte-auth-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: kte-auth-spin 0.7s linear infinite;
+}
+@keyframes kte-auth-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .kte-auth-spinner { animation-duration: 2s; }
+}

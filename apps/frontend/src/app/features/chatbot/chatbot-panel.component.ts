@@ -115,9 +115,10 @@ import { ChatbotStore } from './state/chatbot.signals';
       .kte-chatbot-panel {
         display: flex;
         flex-direction: column;
-        width: 360px;
-        height: 520px;
-        max-height: calc(100vh - 32px);
+        /* Sits under the header (72px + 8px gap) with a 16px gutter on every side. */
+        width: min(360px, calc(100vw - 32px));
+        height: 520px; /* shrinks to the space under the header on short screens */
+        max-height: calc(100dvh - var(--header-h, 72px) - 24px);
         background: var(--kte-ink);
         color: var(--kte-surface);
         border-radius: var(--kte-radius-lg);
@@ -243,14 +244,6 @@ import { ChatbotStore } from './state/chatbot.signals';
       }
       .kte-chatbot-panel__input:disabled {
         opacity: 0.6;
-      }
-      @media (max-width: 640px) {
-        .kte-chatbot-panel {
-          width: 100vw;
-          height: 100vh;
-          max-height: 100vh;
-          border-radius: 0;
-        }
       }
     `,
   ],

@@ -9,8 +9,8 @@ import { AUTH_RESPONSE, AUTH_USER } from './fixtures/api-mocks';
  * Covered scenarios:
  *  Login page:
  *   1. Renders heading, email, password fields and submit button
- *   2. Submit button is disabled when form is empty
- *   3. Shows inline validation errors on untouched submit attempt
+ *   2. Submitting an empty form calls nothing and shows the errors at the fields
+ *   3. A field error appears once the field is left
  *   4. Password visibility toggle works
  *   5. Successful login navigates to '/' and shows user menu in toolbar
  *   6. Successful login from /login?returnUrl=/cart redirects to /cart
@@ -18,12 +18,16 @@ import { AUTH_RESPONSE, AUTH_USER } from './fixtures/api-mocks';
  *   8. Link to /register is visible
  *
  *  Registration page:
- *   9.  Renders all required fields
- *  10.  Password mismatch shows validation error
- *  11.  Short password shows minlength validation error
+ *   9.  Renders all required fields (no confirm field, no terms)
+ *  10.  The strength meter follows the server's password rule
+ *  11.  Short password shows its error at the field once it is left
  *  12.  Successful registration navigates to '/'
- *  13.  Duplicate email (409) shows API error message
+ *  13.  Duplicate email (409) is said at the email field, with a link to login
  *  14.  Link back to /login is visible
+ *
+ *  Password reset:
+ *  - login links to it; the same answer for any address; set a new password from the
+ *    emailed link; expired / used links are refused with a way to ask again
  *
  *  Route guards:
  *  15.  Navigating to /login while authenticated redirects to '/'
@@ -133,32 +137,33 @@ test.describe('Login Page – /login', () => {
     await expect(auth.loginSubmitButton).toBeVisible();
   });
 
-  test('should disable the submit button when the form is untouched and empty', async ({
+  test('should call nothing and show the errors at the fields when submitting an empty form', async ({
     page,
   }) => {
+    let called = false;
+    await page.route('**/auth/login', (route) => {
+      called = true;
+      return route.fulfill({ status: 500, body: '' });
+    });
     const auth = new AuthPage(page);
     await auth.gotoLogin();
 
-    // Angular marks the form as invalid from the start but the button uses
-    // [disabled]="form.invalid" — the button should not be clickable.
-    await expect(auth.loginSubmitButton).toBeDisabled();
+    await expect(auth.loginSubmitButton).toBeEnabled();
+    await auth.loginSubmitButton.click();
+
+    await expect(auth.fieldErrors).toHaveCount(2);
+    expect(called).toBe(false);
   });
 
-  test('should show field-level validation errors when submitting an empty form', async ({
-    page,
-  }) => {
+  test('should show a field error only once the field has been left', async ({ page }) => {
     const auth = new AuthPage(page);
     await auth.gotoLogin();
 
-    // Force Angular to mark fields as touched by clicking submit after enabling it
-    // by typing then clearing the email field.
-    await auth.emailField.fill('x');
-    await auth.emailField.clear();
-    await auth.passwordField.fill('x');
-    await auth.passwordField.clear();
+    await auth.emailField.fill('nem-email');
+    await expect(auth.fieldErrors).toHaveCount(0); // still typing in it
 
-    // mat-error elements should now be visible
-    await expect(page.locator('mat-error').first()).toBeVisible();
+    await auth.passwordField.focus(); // leave the email field
+    await expect(auth.fieldErrors.first()).toContainText('nem érvényes e-mail');
   });
 
   test('should toggle password visibility when the eye-icon button is clicked', async ({
@@ -262,45 +267,44 @@ test.describe('Registration Page – /register', () => {
     const auth = new AuthPage(page);
     await auth.gotoRegister();
 
-    await expect(auth.cardTitle).toContainText('Regisztráció');
+    await expect(auth.cardTitle).toContainText('Fiók létrehozása');
     await expect(auth.lastNameField).toBeVisible();
     await expect(auth.firstNameField).toBeVisible();
     await expect(auth.emailField).toBeVisible();
     await expect(auth.passwordField).toBeVisible();
-    await expect(auth.passwordConfirmField).toBeVisible();
     await expect(auth.registerSubmitButton).toBeVisible();
+    // Nothing to tick or link to: there are no terms pages
+    await expect(page.getByRole('checkbox')).toHaveCount(0);
   });
 
-  test('should show a password mismatch error when passwords do not match', async ({ page }) => {
+  test('should describe, and follow, the rule the server enforces for the password', async ({
+    page,
+  }) => {
     const auth = new AuthPage(page);
     await auth.gotoRegister();
 
-    await auth.lastNameField.fill('Teszt');
-    await auth.firstNameField.fill('Elek');
-    await auth.emailField.fill('elek@kte.hu');
-    await auth.passwordField.fill('Valami12');
-    await auth.passwordConfirmField.fill('Masvalami99');
+    await expect(page.getByTestId('password-rule')).toContainText(
+      'Legalább 8 karakter, benne legalább egy betű (a–z) és egy szám.',
+    );
 
-    // The submit button is disabled while the form is invalid, so it cannot be
-    // clicked to trigger validation; leaving the field marks it touched.
-    await auth.passwordConfirmField.blur();
+    // Long enough but no digit: the server rejects it, so the meter must not look fine.
+    await auth.passwordField.fill('abcdefghijklmnop');
+    await expect(page.getByTestId('strength')).toHaveAttribute('data-level', 'rejected');
 
-    await expect(page.locator('mat-error', { hasText: /két jelszó nem egyezik/i })).toBeVisible();
+    await auth.passwordField.fill('Jelszo123');
+    await expect(page.getByTestId('strength')).toHaveAttribute('data-level', 'accepted');
   });
 
-  test('should show minlength error when password is shorter than 8 characters', async ({
+  test('should show the minimum-length error at the password field once it is left', async ({
     page,
   }) => {
     const auth = new AuthPage(page);
     await auth.gotoRegister();
 
     await auth.passwordField.fill('Ab1');
-    // Blur the field to trigger touched state
-    await auth.emailField.click();
+    await auth.emailField.click(); // leave the password field
 
-    await expect(
-      page.locator('mat-error', { hasText: /legalább 8 karakteresnek/i }),
-    ).toBeVisible();
+    await expect(auth.fieldErrors.filter({ hasText: /legalább 8 karakter/i })).toBeVisible();
   });
 
   test('should navigate to "/" after a successful registration', async ({ page }) => {
@@ -314,13 +318,14 @@ test.describe('Registration Page – /register', () => {
       firstName: 'Elek',
       email: 'elek@kte.hu',
       password: 'Teszt1234',
-      passwordConfirm: 'Teszt1234',
     });
 
     await expect(page).toHaveURL('/');
   });
 
-  test('should show API error message when the email is already registered', async ({ page }) => {
+  test('should say at the email field that the address is taken, and link to login', async ({
+    page,
+  }) => {
     await mockRegisterConflict(page);
 
     const auth = new AuthPage(page);
@@ -331,11 +336,15 @@ test.describe('Registration Page – /register', () => {
       firstName: 'Elek',
       email: 'existing@kte.hu',
       password: 'Teszt1234',
-      passwordConfirm: 'Teszt1234',
     });
 
-    await expect(auth.errorMessage).toBeVisible();
-    await expect(auth.errorMessage).toContainText('Ez az e-mail cím már regisztrált.');
+    await expect(auth.emailTaken).toBeVisible();
+    await expect(auth.emailTaken).toContainText('már tartozik fiók');
+    await expect(auth.emailTaken.getByRole('link', { name: 'Jelentkezz be' })).toHaveAttribute(
+      'href',
+      /\/login/,
+    );
+    await expect(auth.errorMessage).toHaveCount(0); // not at the top of the page
   });
 
   test('should display link back to the login page', async ({ page }) => {
@@ -344,6 +353,107 @@ test.describe('Registration Page – /register', () => {
 
     await expect(auth.loginLink).toBeVisible();
     await expect(auth.loginLink).toHaveAttribute('href', /\/login/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Password reset
+// ---------------------------------------------------------------------------
+
+test.describe('Password reset', () => {
+  const ANSWER =
+    'Ha ez az e-mail-cím regisztrálva van, elküldtük a jelszó-visszaállító linket. A link 1 óra múlva lejár.';
+
+  test.beforeEach(async ({ page }) => {
+    await mockRefreshFail(page);
+  });
+
+  test('the login page links to it, and the link leads there', async ({ page }) => {
+    const auth = new AuthPage(page);
+    await auth.gotoLogin();
+    await page.getByTestId('forgot-link').click();
+    await expect(page).toHaveURL(/\/forgot-password$/);
+    await expect(auth.cardTitle).toContainText('Elfelejtett jelszó');
+  });
+
+  test('requesting a link shows the same answer for any address', async ({ page }) => {
+    const sent: string[] = [];
+    await page.route('**/auth/password-reset/request', (route) => {
+      sent.push((route.request().postDataJSON() as { email: string }).email);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: ANSWER }),
+      });
+    });
+
+    for (const address of ['van@kte.hu', 'nincs@kte.hu']) {
+      await page.goto('/forgot-password');
+      await page.getByLabel('E-mail').fill(address);
+      await page.getByRole('button', { name: 'Link küldése' }).click();
+      await expect(page.getByTestId('reset-requested')).toContainText(ANSWER);
+    }
+    expect(sent).toEqual(['van@kte.hu', 'nincs@kte.hu']);
+  });
+
+  test('the emailed link sets a new password and returns to login with a notice', async ({
+    page,
+  }) => {
+    await page.route('**/auth/password-reset/tok-good-token-1234567890', (route) =>
+      route.fulfill({ status: 204, body: '' }),
+    );
+    let confirmBody: { token: string; password: string } | null = null;
+    await page.route('**/auth/password-reset/confirm', (route) => {
+      confirmBody = route.request().postDataJSON() as { token: string; password: string };
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'A jelszavad megváltozott. Jelentkezz be az új jelszóval.' }),
+      });
+    });
+
+    await page.goto('/reset-password/tok-good-token-1234567890');
+    await page.getByLabel('Új jelszó', { exact: true }).fill('abcdefgh'); // no digit
+    await expect(page.getByTestId('strength')).toHaveAttribute('data-level', 'rejected');
+    await page.getByLabel('Új jelszó', { exact: true }).fill('Jelszo1234');
+    await expect(page.getByTestId('strength')).toHaveAttribute('data-level', 'accepted');
+    await page.getByRole('button', { name: 'Új jelszó mentése' }).click();
+
+    await expect(page).toHaveURL(/\/login\?reset=1/);
+    await expect(page.getByTestId('login-reset-done')).toContainText('A jelszavad megváltozott');
+    expect(confirmBody).toEqual({ token: 'tok-good-token-1234567890', password: 'Jelszo1234' });
+  });
+
+  for (const [code, message] of [
+    ['reset_token_expired', 'A visszaállító link lejárt. Kérj új linket.'],
+    ['reset_token_used', 'Ezt a visszaállító linket már felhasználták, vagy közben újat kértél.'],
+  ] as const) {
+    test(`a ${code} link says so and offers a new one`, async ({ page }) => {
+      await page.route('**/auth/password-reset/tok-bad-token-1234567890', (route) =>
+        route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({ statusCode: 400, code, message }),
+        }),
+      );
+      await page.goto('/reset-password/tok-bad-token-1234567890');
+
+      await expect(page.getByTestId('reset-refused')).toContainText(message);
+      await expect(page.getByLabel('Új jelszó', { exact: true })).toHaveCount(0);
+      await page.getByTestId('request-new').click();
+      await expect(page).toHaveURL(/\/forgot-password$/);
+    });
+  }
+
+  test('the reset page works while signed in too (the link opens in any session)', async ({
+    page,
+  }) => {
+    await mockRefreshSuccess(page);
+    await page.route('**/auth/password-reset/tok-good-token-1234567890', (route) =>
+      route.fulfill({ status: 204, body: '' }),
+    );
+    await page.goto('/reset-password/tok-good-token-1234567890');
+    await expect(page.getByLabel('Új jelszó', { exact: true })).toBeVisible();
   });
 });
 

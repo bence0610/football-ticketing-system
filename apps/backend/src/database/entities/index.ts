@@ -9,3 +9,4 @@ export * from './season-pass-price.entity';
 export * from './pass-loan.entity';
 export * from './loyalty-transaction.entity';
 export * from './waitlist.entity';
+export * from './password-reset-token.entity';

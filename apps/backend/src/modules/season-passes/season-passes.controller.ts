@@ -23,6 +23,7 @@ import type { Request } from 'express';
 import { SeasonPassesService } from './season-passes.service';
 import { CancelLoanDto, CreateLoanDto } from './dto/create-loan.dto';
 import { PurchaseSeasonPassDto } from './dto/purchase-season-pass.dto';
+import { formatFullName } from '../../common/format-name';
 import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-response.dto';
 import { SeasonOverviewDto } from './dto/season-overview.dto';
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
@@ -53,9 +54,7 @@ function loanToDto(loan: PassLoan): PassLoanResponseDto {
     status: loan.status,
     borrowerEmail: loan.borrowerEmail,
     borrowerUserId: loan.borrowerUserId,
-    borrowerName: loan.borrower
-      ? `${loan.borrower.firstName} ${loan.borrower.lastName}`.trim() || undefined
-      : undefined,
+    borrowerName: loan.borrower ? formatFullName(loan.borrower) || undefined : undefined,
     matchId: loan.matchId,
     matchTitle: loan.match ? `${loan.match.homeTeam} - ${loan.match.awayTeam}` : undefined,
     kickoffAt: loan.match ? loan.match.kickoffAt.toISOString() : undefined,
@@ -122,10 +121,7 @@ export class SeasonPassesController {
         holderName: pass.holderName,
         isBuyer: pass.userId === userId,
         isHolder: pass.holderUserId === userId,
-        buyerName:
-          pass.userId !== userId && pass.user
-            ? `${pass.user.firstName} ${pass.user.lastName}`.trim()
-            : undefined,
+        buyerName: pass.userId !== userId && pass.user ? formatFullName(pass.user) : undefined,
         status: pass.status,
         seasonLabel: pass.seasonLabel,
         validFrom: pass.validFrom.toISOString(),

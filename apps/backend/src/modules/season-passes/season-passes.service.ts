@@ -56,6 +56,7 @@ import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-respon
 import { SeasonOverviewDto } from './dto/season-overview.dto';
 import { isWithinValidity, validityWindow } from './season-pass-validity';
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
+import { formatFullName } from '../../common/format-name';
 import { IncomingLoanDto, LoanPreviewDto } from './dto/season-pass-response.dto';
 
 const ACTIVE_SEASON_LABEL = '2026/2027';
@@ -95,8 +96,7 @@ interface PassHolder {
   userId: string | null;
 }
 
-const fullName = (u: { firstName: string; lastName: string }): string =>
-  `${u.firstName} ${u.lastName}`.trim();
+const fullName = formatFullName;
 
 class NoFreeSeatError extends Error {}
 
@@ -1201,7 +1201,7 @@ export class SeasonPassesService {
       seatSection: seat?.section ?? '–',
       seatRow: seat?.row ?? '–',
       seatNumber: seat?.number ?? 0,
-      lenderName: `${lender.firstName} ${lender.lastName}`,
+      lenderName: formatFullName(lender),
       expiresAt: loan.expiresAt.toISOString(),
     };
   }
@@ -1399,7 +1399,7 @@ export class SeasonPassesService {
       template: 'loan-invitation',
       context: {
         recipientName: loan.borrowerEmail.split('@')[0],
-        lenderName: `${lender.firstName} ${lender.lastName}`,
+        lenderName: formatFullName(lender),
         matchTitle: matchSummary.title,
         matchVenue: matchSummary.venue,
         matchKickoffLabel: matchSummary.kickoffLabel,
@@ -1442,7 +1442,7 @@ export class SeasonPassesService {
       template: 'loan-confirmation',
       context: {
         recipientName: borrower.firstName,
-        borrowerName: `${borrower.firstName} ${borrower.lastName}`,
+        borrowerName: formatFullName(borrower),
         matchTitle: matchSummary.title,
         matchVenue: matchSummary.venue,
         matchKickoffLabel: matchSummary.kickoffLabel,
@@ -1461,7 +1461,7 @@ export class SeasonPassesService {
       template: 'loan-confirmation',
       context: {
         recipientName: loan.lender.firstName,
-        borrowerName: `${borrower.firstName} ${borrower.lastName}`,
+        borrowerName: formatFullName(borrower),
         matchTitle: matchSummary.title,
         matchVenue: matchSummary.venue,
         matchKickoffLabel: matchSummary.kickoffLabel,

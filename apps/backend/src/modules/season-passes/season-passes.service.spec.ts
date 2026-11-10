@@ -119,7 +119,7 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
     expect(result.seatSection).toBe('B');
     expect(result.seatRow).toBe('3');
     expect(result.seatNumber).toBe(12);
-    expect(result.lenderName).toBe('Test Owner');
+    expect(result.lenderName).toBe('Owner Test');
     expect(result.expiresAt).toBe(FUTURE.toISOString());
   });
 

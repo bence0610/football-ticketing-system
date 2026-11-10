@@ -18,6 +18,7 @@ import {
   TicketStatus,
   User,
 } from '../../database/entities';
+import { formatFullName } from '../../common/format-name';
 import { QrService } from '../qr/qr.service';
 import { TicketScanResponseDto } from './dto/scan-ticket.dto';
 import { WaitlistNotificationService } from '../waitlist/waitlist-notification.service';
@@ -237,7 +238,7 @@ export class TicketsService {
       where: { id: ticket.userId },
       select: ['id', 'firstName', 'lastName'],
     });
-    return user ? `${user.firstName} ${user.lastName}`.trim() : undefined;
+    return user ? formatFullName(user) || undefined : undefined;
   }
 
   /**

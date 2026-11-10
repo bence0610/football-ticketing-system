@@ -1,188 +1,216 @@
-import { CommonModule } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import {
-  FormBuilder,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Store } from '@ngrx/store';
 import { AuthService } from '../../core/auth/auth.service';
+import { MatchesActions, selectAllMatches } from '../../state/matches';
 import { strictEmailValidator } from '../../shared/validators/email.validator';
+import { availabilityOf, upcomingHomeMatches } from '../home/logic/match-availability';
+import { AuthFieldComponent } from './components/auth-field.component';
+import { AuthLayoutComponent } from './components/auth-layout.component';
 
 @Component({
   selector: 'kte-login-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule,
+    DatePipe,
     ReactiveFormsModule,
     RouterLink,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatButtonModule,
     MatIconModule,
-    MatProgressBarModule,
+    AuthLayoutComponent,
+    AuthFieldComponent,
   ],
   template: `
-    <section class="kte-auth-page">
-      <mat-card class="kte-auth-card" appearance="outlined">
-        @if (loading()) {
-          <mat-progress-bar mode="indeterminate" />
+    <kte-auth-layout mode="login">
+      @if (nextMatch(); as m) {
+        <div brandExtra class="next" data-testid="login-next-match">
+          <span class="next__eyebrow">Következő hazai mérkőzés</span>
+          <strong class="next__fixture">{{ m.homeTeam }} – {{ m.awayTeam }}</strong>
+          <span class="next__meta">
+            {{ m.kickoffAt | date: 'yyyy. MMMM d., HH:mm' : '' : 'hu-HU' }} · {{ m.venue }}
+          </span>
+          <span class="next__chip">{{ availability(m) }}</span>
+        </div>
+      }
+
+      <h1 class="kte-auth-title">Bejelentkezés</h1>
+      <p class="kte-auth-switch">
+        Nincs még fiókod?
+        <a routerLink="/register" [queryParams]="returnQuery">Regisztráció</a>
+      </p>
+
+      @if (justReset) {
+        <p class="kte-auth-notice" role="status" data-testid="login-reset-done" style="margin-top: 20px">
+          A jelszavad megváltozott. Jelentkezz be az új jelszóval.
+        </p>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="kte-auth-form" novalidate>
+        <kte-auth-field
+          label="E-mail"
+          icon="mail"
+          inputId="login-email"
+          [invalid]="showError('email')"
+        >
+          <input
+            id="login-email"
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+            inputmode="email"
+            [attr.aria-invalid]="showError('email')"
+            [attr.aria-describedby]="showError('email') ? 'login-email-err' : null"
+          />
+          @if (showError('email')) {
+            <p msg id="login-email-err" role="alert">
+              @if (form.controls.email.errors?.['required']) {
+                Add meg az e-mail-címedet.
+              } @else {
+                Ez nem érvényes e-mail-cím (pl. nev&#64;pelda.hu).
+              }
+            </p>
+          }
+        </kte-auth-field>
+
+        <kte-auth-field
+          label="Jelszó"
+          icon="lock"
+          inputId="login-password"
+          [invalid]="showError('password')"
+        >
+          <input
+            id="login-password"
+            formControlName="password"
+            autocomplete="current-password"
+            [type]="showPassword() ? 'text' : 'password'"
+            [attr.aria-invalid]="showError('password')"
+            [attr.aria-describedby]="showError('password') ? 'login-password-err' : null"
+          />
+          <button
+            trailing
+            type="button"
+            class="kte-field__toggle"
+            (click)="showPassword.set(!showPassword())"
+            [attr.aria-label]="showPassword() ? 'Jelszó elrejtése' : 'Jelszó megjelenítése'"
+            [attr.aria-pressed]="showPassword()"
+          >
+            <mat-icon aria-hidden="true">{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          @if (showError('password')) {
+            <p msg id="login-password-err" role="alert">Add meg a jelszavadat.</p>
+          }
+        </kte-auth-field>
+
+        <a class="kte-auth-forgot" routerLink="/forgot-password" data-testid="forgot-link">Elfelejtett jelszó?</a>
+
+        @if (errorMessage(); as error) {
+          <p class="error-block kte-auth-error" role="alert" data-testid="login-error">{{ error }}</p>
         }
-        <mat-card-header>
-          <mat-card-title>Bejelentkezés</mat-card-title>
-          <mat-card-subtitle>Üdv újra a KTE Jegyportálban</mat-card-subtitle>
-        </mat-card-header>
 
-        <mat-card-content>
-          <form [formGroup]="form" (ngSubmit)="submit()" class="kte-auth-form">
-            <mat-form-field appearance="outline">
-              <mat-label>E-mail</mat-label>
-              <input matInput type="email" formControlName="email" autocomplete="email" />
-              <mat-icon matPrefix>mail</mat-icon>
-              @if (form.controls.email.touched && form.controls.email.errors) {
-                <mat-error>
-                  @if (form.controls.email.errors?.['required']) {
-                    E-mail megadása kötelező.
-                  } @else {
-                    Érvénytelen e-mail formátum.
-                  }
-                </mat-error>
-              }
-            </mat-form-field>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Jelszó</mat-label>
-              <input
-                matInput
-                [type]="showPassword() ? 'text' : 'password'"
-                formControlName="password"
-                autocomplete="current-password"
-              />
-              <button
-                mat-icon-button
-                matSuffix
-                type="button"
-                (click)="togglePassword()"
-                [attr.aria-label]="showPassword() ? 'Jelszó elrejtése' : 'Jelszó megjelenítése'"
-              >
-                <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
-              </button>
-              @if (form.controls.password.touched && form.controls.password.errors) {
-                <mat-error>
-                  @if (form.controls.password.errors?.['required']) {
-                    A jelszó megadása kötelező.
-                  } @else {
-                    A jelszónak legalább 8 karakteresnek kell lennie.
-                  }
-                </mat-error>
-              }
-            </mat-form-field>
-
-            @if (errorMessage(); as error) {
-              <p class="kte-auth-form__error" role="alert">{{ error }}</p>
-            }
-
-            <button
-              mat-flat-button
-              color="primary"
-              type="submit"
-              class="kte-auth-form__submit"
-              [disabled]="loading() || form.invalid"
-            >
-              Bejelentkezés
-            </button>
-          </form>
-        </mat-card-content>
-
-        <mat-card-actions class="kte-auth-card__actions">
-          <span>Még nincs fiókod?</span>
-          <a mat-button color="primary" routerLink="/register" [queryParams]="returnQuery">
-            Regisztráció
-          </a>
-        </mat-card-actions>
-      </mat-card>
-    </section>
+        <button type="submit" class="kte-auth-submit" [disabled]="loading()" [attr.aria-busy]="loading()">
+          @if (loading()) {
+            <span class="kte-auth-spinner" aria-hidden="true"></span>
+            Bejelentkezés…
+          } @else {
+            Bejelentkezés
+          }
+        </button>
+      </form>
+    </kte-auth-layout>
   `,
   styles: [
     `
-      .kte-auth-page {
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        padding: var(--kte-spacing-8) var(--kte-spacing-4);
-        min-height: 100%;
-      }
-      .kte-auth-card {
-        width: 100%;
-        max-width: 420px;
-        border-radius: var(--kte-radius-lg);
-        box-shadow: var(--kte-shadow-md);
-      }
-      .kte-auth-form {
+      .next {
         display: flex;
         flex-direction: column;
-        gap: var(--kte-spacing-3);
+        gap: 4px;
+        padding: 16px 18px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.18);
       }
-      .kte-auth-form__error {
-        margin: 0;
-        padding: var(--kte-spacing-3) var(--kte-spacing-4);
-        background: var(--kte-danger-bg);
-        color: var(--kte-danger);
-        border-radius: var(--kte-radius);
-        font-size: 14px;
+      .next__eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--on-brand-eyebrow, rgba(255, 255, 255, 0.75));
       }
-      .kte-auth-form__submit {
-        height: 48px;
-        font-size: 16px;
-      }
-      .kte-auth-card__actions {
-        justify-content: flex-end;
-        gap: var(--kte-spacing-2);
-        padding: var(--kte-spacing-3) var(--kte-spacing-4) var(--kte-spacing-4);
+      .next__fixture { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+      .next__meta { font-size: 14px; color: rgba(255, 255, 255, 0.85); }
+      .next__chip {
+        align-self: flex-start;
+        margin-top: 4px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.16);
       }
     `,
   ],
 })
-export class LoginPageComponent {
+export class LoginPageComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly store = inject(Store);
 
   protected readonly loading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly showPassword = signal(false);
 
-  protected readonly form: FormGroup<{
-    email: import('@angular/forms').FormControl<string>;
-    password: import('@angular/forms').FormControl<string>;
-  }> = this.fb.nonNullable.group({
-    email: this.fb.nonNullable.control('', [Validators.required, strictEmailValidator]),
-    password: this.fb.nonNullable.control('', [Validators.required, Validators.minLength(8)]),
+  /** The next home match from the real match list; none means no panel at all. */
+  private readonly all = toSignal(this.store.select(selectAllMatches), { initialValue: [] });
+  protected readonly nextMatch = computed(() => upcomingHomeMatches(this.all(), Date.now())[0] ?? null);
+  protected readonly availability = (m: Parameters<typeof availabilityOf>[0]): string =>
+    availabilityOf(m).label;
+
+  protected readonly form = this.fb.nonNullable.group({
+    email: ['', [Validators.required, strictEmailValidator]],
+    // The server decides what a valid password is; login only needs one typed.
+    password: ['', [Validators.required]],
   });
+
+  /** Arrived from the set-new-password page: say the password was changed. */
+  protected get justReset(): boolean {
+    return this.route.snapshot.queryParamMap.get('reset') === '1';
+  }
 
   protected get returnQuery(): Record<string, string> {
     const value = this.route.snapshot.queryParamMap.get('returnUrl');
     return value ? { returnUrl: value } : {};
   }
 
-  protected togglePassword(): void {
-    this.showPassword.update((value) => !value);
+  ngOnInit(): void {
+    this.store.dispatch(MatchesActions.loadMatches());
+  }
+
+  /** A field's error shows once it has been left (or after a submit), never while typing in it. */
+  protected showError(name: 'email' | 'password'): boolean {
+    const c = this.form.controls[name];
+    return c.touched && c.invalid;
   }
 
   protected submit(): void {
+    if (this.loading()) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      document
+        .querySelector<HTMLInputElement>('kte-login-page input.ng-invalid')
+        ?.focus();
       return;
     }
     this.loading.set(true);
@@ -197,7 +225,6 @@ export class LoginPageComponent {
         this.loading.set(false);
         this.errorMessage.set(extractErrorMessage(err, 'Hibás e-mail vagy jelszó.'));
       },
-      complete: () => this.loading.set(false),
     });
   }
 }
@@ -207,12 +234,8 @@ function extractErrorMessage(err: unknown, fallback: string): string {
     const body = err.error;
     if (body && typeof body === 'object' && 'message' in body) {
       const value = (body as { message: unknown }).message;
-      if (typeof value === 'string') {
-        return value;
-      }
-      if (Array.isArray(value) && typeof value[0] === 'string') {
-        return value[0];
-      }
+      if (typeof value === 'string') return value;
+      if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
     }
   }
   return fallback;

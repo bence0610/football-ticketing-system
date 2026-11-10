@@ -88,6 +88,10 @@
 
           <span class="kte-shell__spacer"></span>
 
+          @if (showChatbot()) {
+            <kte-chatbot-widget />
+          }
+
           <a
             mat-icon-button
             class="kte-shell__cart"
@@ -140,6 +144,3 @@
   </mat-sidenav-content>
 </mat-sidenav-container>
 
-@if (showChatbot()) {
-  <kte-chatbot-widget />
-}

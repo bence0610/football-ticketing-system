@@ -70,7 +70,7 @@ describe('SeasonPassesService.listIncomingLoans', () => {
     expect(inv).toEqual({
       id: 'id-tok-1',
       invitationToken: 'tok-1',
-      lenderName: 'Béla Kovács',
+      lenderName: 'Kovács Béla',
       matchTitle: 'KTE - Újpest',
       kickoffAt: '2026-11-15T17:00:00.000Z',
       seatSection: 'B',

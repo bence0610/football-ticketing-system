@@ -134,7 +134,7 @@ export class LoanPreviewDto {
   @ApiProperty({ description: 'Szék száma', type: Number })
   seatNumber!: number;
 
-  @ApiProperty({ description: 'A kölcsönadó neve (keresztnév + vezetéknév)' })
+  @ApiProperty({ description: 'A kölcsönadó neve (vezetéknév + keresztnév)' })
   lenderName!: string;
 
   @ApiProperty({ description: 'Meghívó érvényessége (ISO 8601)' })

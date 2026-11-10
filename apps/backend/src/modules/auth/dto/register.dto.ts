@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsAccountPassword } from './password.decorator';
 
 export class RegisterDto {
   @ApiProperty({ example: 'fan@kte.hu' })
@@ -11,24 +12,19 @@ export class RegisterDto {
     example: 'StrongPass123',
     description: 'Min. 8 karakter, legalább egy szám és egy betű.',
   })
-  @IsString({ message: 'A jelszó szöveg típusú érték legyen.' })
-  @MinLength(8, { message: 'A jelszónak legalább 8 karakteresnek kell lennie.' })
-  @MaxLength(72, { message: 'A jelszó legfeljebb 72 karakter lehet.' })
-  @Matches(/(?=.*[A-Za-z])(?=.*\d).+/, {
-    message: 'A jelszó tartalmazzon legalább egy betűt és egy számot.',
-  })
+  @IsAccountPassword()
   password!: string;
 
-  @ApiProperty({ example: 'Kovács' })
-  @IsString({ message: 'A vezetéknév szöveg típusú érték legyen.' })
-  @MinLength(2, { message: 'A vezetéknévnek legalább 2 karakteresnek kell lennie.' })
-  @MaxLength(100, { message: 'A vezetéknév legfeljebb 100 karakter lehet.' })
-  firstName!: string;
-
-  @ApiProperty({ example: 'Béla' })
+  @ApiProperty({ example: 'Béla', description: 'Keresztnév' })
   @IsString({ message: 'A keresztnév szöveg típusú érték legyen.' })
   @MinLength(2, { message: 'A keresztnévnek legalább 2 karakteresnek kell lennie.' })
   @MaxLength(100, { message: 'A keresztnév legfeljebb 100 karakter lehet.' })
+  firstName!: string;
+
+  @ApiProperty({ example: 'Kovács', description: 'Vezetéknév' })
+  @IsString({ message: 'A vezetéknév szöveg típusú érték legyen.' })
+  @MinLength(2, { message: 'A vezetéknévnek legalább 2 karakteresnek kell lennie.' })
+  @MaxLength(100, { message: 'A vezetéknév legfeljebb 100 karakter lehet.' })
   lastName!: string;
 
   @ApiProperty({ example: '+36301234567', required: false })

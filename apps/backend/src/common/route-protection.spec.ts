@@ -6,6 +6,7 @@ import { RequestMethod, type Type } from '@nestjs/common';
 import { UserRole } from '../database/entities';
 import { AdminController } from '../modules/admin/admin.controller';
 import { AuthController } from '../modules/auth/auth.controller';
+import { PasswordResetController } from '../modules/auth/password-reset.controller';
 import { ROLES_KEY } from '../modules/auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../modules/auth/guards/optional-jwt-auth.guard';
@@ -41,6 +42,7 @@ import { WeatherController } from '../modules/weather/weather.controller';
 const CONTROLLERS: Type<unknown>[] = [
   AdminController,
   AuthController,
+  PasswordResetController,
   ChatbotController,
   HealthController,
   LoyaltyController,
@@ -61,6 +63,12 @@ const PUBLIC_ROUTES: Record<string, string> = {
   'POST auth/register': 'account creation',
   'POST auth/login': 'obtains the token',
   'POST auth/refresh': 'authenticates with the refresh token in the body',
+  'POST auth/password-reset/request':
+    'asks for a reset link by email; answers the same for every address and is rate limited',
+  'GET auth/password-reset/:token':
+    'checks an emailed reset link; the secret one-time token is the credential',
+  'POST auth/password-reset/confirm':
+    'sets the new password; authorised by the secret one-time token from the email',
   'POST chatbot/message':
     'guests may chat; OptionalJwtAuthGuard binds the conversation to the identity',
   'GET health': 'liveness probe, returns only up/down',

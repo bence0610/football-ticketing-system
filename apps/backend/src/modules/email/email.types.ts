@@ -10,7 +10,9 @@ export type EmailTemplateName =
   | 'loan-cancelled'
   | 'tier-upgraded'
   | 'waitlist-notification'
-  | 'seat-refund';
+  | 'seat-refund'
+  | 'password-reset'
+  | 'password-changed';
 
 export interface TicketConfirmationContext {
   recipientName: string;
@@ -84,6 +86,22 @@ export interface SeatRefundContext {
   refundLabel: string;
 }
 
+export interface PasswordResetContext {
+  recipientName: string;
+  resetUrl: string;
+  /** "60 perc" / "1 óra", for the sentence about how long the link works. */
+  validForLabel: string;
+}
+
+export interface PasswordChangedContext {
+  recipientName: string;
+  /** When the password was changed, in the stadium timezone. */
+  changedAtLabel: string;
+  /** "Chrome, Windows · 84.2.51.x" - only what is known; absent when nothing is. */
+  clientLabel?: string;
+  supportEmail: string;
+}
+
 export type EmailContextMap = {
   'ticket-confirmation': TicketConfirmationContext;
   'loan-invitation': LoanInvitationContext;
@@ -92,6 +110,8 @@ export type EmailContextMap = {
   'tier-upgraded': TierUpgradedContext;
   'waitlist-notification': WaitlistNotificationContext;
   'seat-refund': SeatRefundContext;
+  'password-reset': PasswordResetContext;
+  'password-changed': PasswordChangedContext;
 };
 
 export interface SendEmailRequest<T extends EmailTemplateName = EmailTemplateName> {

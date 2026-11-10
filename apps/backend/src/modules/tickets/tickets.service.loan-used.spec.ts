@@ -50,7 +50,7 @@ describe('TicketsService.scanTicket and the loan outcome', () => {
   it('scanning a borrowed entry marks the accepted loan USED', async () => {
     const { service, loanUpdate } = setup(ticket(TicketSource.LOAN));
     const res = await service.scanTicket(TICKET_ID, {});
-    expect(res).toMatchObject({ success: true, result: 'ok', holderName: 'Béla Nagy' });
+    expect(res).toMatchObject({ success: true, result: 'ok', holderName: 'Nagy Béla' });
     expect(loanUpdate).toHaveBeenCalledWith(
       { seasonPassId: 'pass-1', matchId: 'm1', status: PassLoanStatus.ACCEPTED },
       { status: PassLoanStatus.USED },

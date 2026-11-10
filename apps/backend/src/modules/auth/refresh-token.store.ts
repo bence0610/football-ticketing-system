@@ -32,14 +32,20 @@ export class RefreshTokenStore {
   }
 
   async revokeAll(userId: string): Promise<void> {
-    const pattern = RedisKeys.refreshToken(userId, '*');
+    // The client adds `keyPrefix` to every command's keys - but SCAN's MATCH is
+    // not a key argument, and the keys it returns carry the prefix already. So
+    // the pattern needs the prefix added, and the returned keys need it taken
+    // off again before DEL adds it back (otherwise nothing matches, or the wrong
+    // keys are deleted).
+    const prefix = this.redis.options.keyPrefix ?? '';
+    const pattern = `${prefix}${RedisKeys.refreshToken(userId, '*')}`;
     const stream = this.redis.scanStream({ match: pattern, count: 100 });
     const pipeline = this.redis.pipeline();
     let queued = 0;
     for await (const keys of stream) {
       const arr = keys as string[];
       for (const k of arr) {
-        pipeline.del(k);
+        pipeline.del(prefix && k.startsWith(prefix) ? k.slice(prefix.length) : k);
         queued += 1;
       }
     }

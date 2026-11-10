@@ -52,6 +52,26 @@ export class AuthApiService {
     );
   }
 
+  /** Always answers the same, whether or not the address has an account. */
+  requestPasswordReset(email: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>('/auth/password-reset/request', { email }, {
+      context: FORM_CONTEXT,
+    });
+  }
+
+  /** Is the emailed link still usable? Nothing is consumed. Errors carry the server's `code`. */
+  checkPasswordResetToken(token: string): Observable<void> {
+    return this.http.get<void>(`/auth/password-reset/${encodeURIComponent(token)}`, {
+      context: FORM_CONTEXT,
+    });
+  }
+
+  resetPassword(token: string, password: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>('/auth/password-reset/confirm', { token, password }, {
+      context: FORM_CONTEXT,
+    });
+  }
+
   me(): Observable<UserProfile> {
     return this.http.get<UserProfile>('/users/me', WITH_CREDENTIALS);
   }
