@@ -49,6 +49,14 @@ export interface SeasonPassResponse {
   seasonLabel: string;
   validFrom: string;
   validUntil: string;
+  /**
+   * The pass's coverage as instants, computed by the server in the stadium's
+   * timezone: a match is covered when `coversFrom <= kickoff < coversBefore`.
+   * `validUntil` is a bare date (UTC midnight) and must not be compared to a
+   * kickoff directly: that would drop the whole last day.
+   */
+  coversFrom: string;
+  coversBefore: string;
   seatLabel?: string;
   section?: string;
   purchasedAt?: string;
@@ -74,6 +82,36 @@ export interface SeasonPassPrice {
   price: number;
   currency: string;
   seasonLabel: string;
+  /**
+   * The fields below describe the sector's availability and the single-match
+   * alternative. They are optional on purpose: the page must still work, and
+   * must not guess, when the API does not supply them.
+   */
+  /** Seats that can still be issued as a pass (same rule as the purchase). */
+  freeSeats?: number;
+  totalSeats?: number;
+  /** Active passes sold for the season in this sector. */
+  passesSold?: number;
+  /** `null` = unknown. */
+  isCovered?: boolean | null;
+  /** Home matches still to be played that the pass is valid for. */
+  upcomingHomeMatches?: number;
+  /** The same seat bought match by match for those fixtures; `null` = not derivable. */
+  singleMatchTotal?: number | null;
+}
+
+export interface SeasonHomeMatch {
+  id: string;
+  awayTeam: string;
+  kickoffAt: string;
+  status: string;
+}
+
+export interface SeasonOverview {
+  seasonLabel: string;
+  /** Loyalty points awarded for buying a pass. */
+  loyaltyPoints: number;
+  homeMatches: SeasonHomeMatch[];
 }
 
 export interface PurchaseSeasonPassPayload {

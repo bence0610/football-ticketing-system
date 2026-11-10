@@ -14,12 +14,22 @@ import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import Stripe from 'stripe';
 import { createHash } from 'crypto';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import {
+  And,
+  DataSource,
+  EntityManager,
+  In,
+  LessThan,
+  MoreThanOrEqual,
+  Not,
+  Repository,
+} from 'typeorm';
 import { nanoid } from 'nanoid';
 import {
   LoyaltyTransactionSource,
   LoyaltyTransactionType,
   Match,
+  MatchStatus,
   PassLoan,
   PassLoanStatus,
   SeasonPass,
@@ -30,16 +40,20 @@ import {
   TicketStatus,
   User,
 } from '../../database/entities';
-import { CronConfig, LoyaltyConfig, MailConfig, StripeConfig } from '../../config';
+import { AppConfig, CronConfig, LoyaltyConfig, MailConfig, StripeConfig } from '../../config';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { EmailService } from '../email/email.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { isHomeMatch } from '../matches/match-home';
 import { QrService } from '../qr/qr.service';
 import { STRIPE_CLIENT } from '../payments/stripe.provider';
+import { seatUnitPrice } from '../seats/seat-pricing';
 import { TicketRendererService } from '../tickets/ticket-renderer.service';
 import { CancelLoanDto, CreateLoanDto } from './dto/create-loan.dto';
 import { PurchaseSeasonPassDto } from './dto/purchase-season-pass.dto';
 import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-response.dto';
+import { SeasonOverviewDto } from './dto/season-overview.dto';
+import { isWithinValidity, validityWindow } from './season-pass-validity';
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
 import { LoanPreviewDto } from './dto/season-pass-response.dto';
 
@@ -85,6 +99,23 @@ const fullName = (u: { firstName: string; lastName: string }): string =>
 
 class NoFreeSeatError extends Error {}
 
+/**
+ * The one definition of "this seat can still be issued as a season pass" for a
+ * season (one `?` = the season label, alias `s` = seats). Purchase picks its
+ * seat with it and the price list counts free seats with it, so the number the
+ * page shows is the number the purchase honours.
+ */
+const SEAT_FREE_FOR_PASS_SQL =
+  'NOT EXISTS (SELECT 1 FROM season_passes sp WHERE sp.seat_id = s.id AND sp.season_label = ?) ' +
+  "AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.seat_id = s.id AND t.status IN ('pending_payment', 'paid', 'used'))";
+
+interface SectorSeatStats {
+  total: number;
+  free: number;
+  /** Set only when every active seat of the sector carries the same price modifier. */
+  uniformModifier: number | null;
+}
+
 @Injectable()
 export class SeasonPassesService {
   private readonly logger = new Logger(SeasonPassesService.name);
@@ -92,6 +123,7 @@ export class SeasonPassesService {
   private readonly cronConfig: CronConfig;
   private readonly loyaltyConfig: LoyaltyConfig;
   private readonly stripeCurrency: string;
+  private readonly homeTeamName: string;
 
   constructor(
     @InjectRepository(SeasonPass) private readonly seasonPassRepository: Repository<SeasonPass>,
@@ -113,26 +145,145 @@ export class SeasonPassesService {
     this.cronConfig = this.configService.getOrThrow<CronConfig>('cron');
     this.loyaltyConfig = this.configService.getOrThrow<LoyaltyConfig>('loyalty');
     this.stripeCurrency = this.configService.getOrThrow<StripeConfig>('stripe').currency;
+    this.homeTeamName = this.configService.getOrThrow<AppConfig>('app').homeTeamName;
   }
 
   /**
    * Returns the per-section season pass price list for the currently
-   * active season (`2026/2027`). Public read endpoint — no auth.
+   * active season (`2026/2027`), with what the buyer needs to weigh it:
+   * free seats, passes sold, and what the same seat would cost match by match.
+   * Public read endpoint — no auth.
    */
   async listPrices(): Promise<SeasonPassPriceDto[]> {
     const prices = await this.seasonPassPriceRepository.find({
       where: { seasonLabel: ACTIVE_SEASON_LABEL, isActive: true },
       order: { price: 'DESC' },
     });
-    return prices.map((row) => ({
-      sectionId: row.section,
-      sectionName: row.sectionLabel,
-      price: row.price,
-      currency: row.currency,
-      seasonLabel: row.seasonLabel,
-      validFrom: row.validFrom.toISOString().slice(0, 10),
-      validUntil: row.validUntil.toISOString().slice(0, 10),
-    }));
+    if (prices.length === 0) {
+      return [];
+    }
+
+    const [fixtures, stats, sold, covered] = await Promise.all([
+      this.findSeasonHomeMatches(prices),
+      this.loadSectorSeatStats(ACTIVE_SEASON_LABEL),
+      this.loadPassesSoldBySector(ACTIVE_SEASON_LABEL),
+      this.loadSectorCoverage(),
+    ]);
+    const now = Date.now();
+    const upcoming = fixtures.filter((m) => m.kickoffAt.getTime() > now);
+
+    return prices.map((row) => {
+      const sector = stats.get(row.section);
+      // A pass seat is priced per seat (base price x modifier). Only when every
+      // seat of the sector shares one modifier is "what this seat costs per
+      // match" a single well-defined number; otherwise we say nothing.
+      const singleMatchTotal =
+        sector?.uniformModifier != null && upcoming.length > 0
+          ? upcoming.reduce(
+              (sum, m) => sum + seatUnitPrice(Number(m.basePrice), sector.uniformModifier!),
+              0,
+            )
+          : null;
+      return {
+        sectionId: row.section,
+        sectionName: row.sectionLabel,
+        price: row.price,
+        currency: row.currency,
+        seasonLabel: row.seasonLabel,
+        validFrom: row.validFrom.toISOString().slice(0, 10),
+        validUntil: row.validUntil.toISOString().slice(0, 10),
+        freeSeats: sector?.free ?? 0,
+        totalSeats: sector?.total ?? 0,
+        passesSold: sold.get(row.section) ?? 0,
+        isCovered: covered.get(row.section) ?? null,
+        upcomingHomeMatches: upcoming.length,
+        singleMatchTotal,
+      };
+    });
+  }
+
+  /** The season's home fixtures plus the loyalty reward, for the purchase page. */
+  async getSeasonOverview(): Promise<SeasonOverviewDto> {
+    const prices = await this.seasonPassPriceRepository.find({
+      where: { seasonLabel: ACTIVE_SEASON_LABEL, isActive: true },
+    });
+    const fixtures = await this.findSeasonHomeMatches(prices);
+    return {
+      seasonLabel: ACTIVE_SEASON_LABEL,
+      loyaltyPoints: this.loyaltyConfig.seasonPassPoints,
+      homeMatches: fixtures.map((m) => ({
+        id: m.id,
+        awayTeam: m.awayTeam,
+        kickoffAt: m.kickoffAt.toISOString(),
+        status: m.status,
+      })),
+    };
+  }
+
+  /**
+   * Home matches a pass of this season is valid for: ours as the home side,
+   * eligible for passes, not cancelled, inside the validity window (the same
+   * window `getMatchQr` enforces). Oldest first.
+   */
+  private async findSeasonHomeMatches(prices: SeasonPassPrice[]): Promise<Match[]> {
+    if (prices.length === 0) {
+      return [];
+    }
+    const windows = prices.map((p) => validityWindow(p.validFrom, p.validUntil));
+    const from = new Date(Math.min(...windows.map((w) => w.startsAt.getTime())));
+    const before = new Date(Math.max(...windows.map((w) => w.endsBefore.getTime())));
+    const matches = await this.matchRepository.find({
+      where: {
+        isSeasonPassEligible: true,
+        status: Not(MatchStatus.CANCELLED),
+        // The last day is covered in full, so the upper bound is exclusive.
+        kickoffAt: And(MoreThanOrEqual(from), LessThan(before)),
+      },
+      order: { kickoffAt: 'ASC' },
+    });
+    return matches.filter((m) => isHomeMatch(m, this.homeTeamName));
+  }
+
+  private async loadSectorSeatStats(seasonLabel: string): Promise<Map<string, SectorSeatStats>> {
+    const rows: Array<{
+      section: string;
+      total: string;
+      free: string;
+      minMod: string;
+      maxMod: string;
+    }> = await this.dataSource.query(
+      'SELECT s.section AS section, COUNT(*) AS total, ' +
+        `SUM(CASE WHEN ${SEAT_FREE_FOR_PASS_SQL} THEN 1 ELSE 0 END) AS free, ` +
+        'MIN(s.price_modifier) AS minMod, MAX(s.price_modifier) AS maxMod ' +
+        'FROM seats s WHERE s.is_active = 1 GROUP BY s.section',
+      [seasonLabel],
+    );
+    return new Map(
+      rows.map((r) => [
+        r.section,
+        {
+          total: Number(r.total),
+          free: Number(r.free),
+          uniformModifier: Number(r.minMod) === Number(r.maxMod) ? Number(r.minMod) : null,
+        },
+      ]),
+    );
+  }
+
+  private async loadPassesSoldBySector(seasonLabel: string): Promise<Map<string, number>> {
+    const rows: Array<{ section: string; sold: string }> = await this.dataSource.query(
+      'SELECT s.section AS section, COUNT(*) AS sold FROM season_passes sp ' +
+        'JOIN seats s ON s.id = sp.seat_id ' +
+        'WHERE sp.season_label = ? AND sp.status = ? GROUP BY s.section',
+      [seasonLabel, SeasonPassStatus.ACTIVE],
+    );
+    return new Map(rows.map((r) => [r.section, Number(r.sold)]));
+  }
+
+  private async loadSectorCoverage(): Promise<Map<string, boolean>> {
+    const rows: Array<{ code: string; covered: number | string | boolean }> =
+      await this.dataSource.query('SELECT code, is_covered AS covered FROM sectors');
+    return new Map(rows.map((r) => [r.code, Number(r.covered) === 1]));
   }
 
   /**
@@ -443,8 +594,7 @@ export class SeasonPassesService {
     const rows: Array<{ id: string }> = await manager.query(
       'SELECT s.id FROM seats s ' +
         'WHERE s.section = ? AND s.is_active = 1 ' +
-        'AND NOT EXISTS (SELECT 1 FROM season_passes sp WHERE sp.seat_id = s.id AND sp.season_label = ?) ' +
-        "AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.seat_id = s.id AND t.status IN ('pending_payment', 'paid', 'used')) " +
+        `AND ${SEAT_FREE_FOR_PASS_SQL} ` +
         'ORDER BY s.`row`, s.`number` LIMIT 1',
       [section, seasonLabel],
     );
@@ -635,8 +785,7 @@ export class SeasonPassesService {
       throw new NotFoundException('Match not found');
     }
 
-    const kickoff = match.kickoffAt.getTime();
-    if (kickoff < pass.validFrom.getTime() || kickoff > pass.validUntil.getTime()) {
+    if (!isWithinValidity(match.kickoffAt, pass.validFrom, pass.validUntil)) {
       throw new BadRequestException({
         statusCode: 400,
         message: 'Ez a mérkőzés nem esik a bérlet érvényességi idejébe.',

@@ -284,7 +284,7 @@ export class ChatbotService {
     const fmt = (n: number) => `${n.toLocaleString('hu-HU')} Ft`;
     const prices = sp.prices.map((p) => `  - ${p.sectionName}: ${fmt(p.price)}`).join('\n');
     return [
-      `Bérletek (${sp.seasonLabel} szezon, érvényes ${sp.validFrom} és ${sp.validUntil} között):`,
+      `Bérletek (${sp.seasonLabel} szezon, érvényes ${sp.validFrom} első napjától ${sp.validUntil} utolsó napjának végéig; az első és az utolsó napon játszott mérkőzés is lefedett, a napokat a stadion időzónájában, Europe/Budapest szerint számítjuk):`,
       prices,
       '  A bérlet a választott szektorban fix helyet ad az érvényességi időszakba eső mérkőzésekre; minden mérkőzéshez a profil oldalon érhető el a belépő QR-kód.',
       '  Egy fiók szezononként egy bérlet birtokosa lehet. Megvehető másnak is (családtag, gyerek): ilyenkor a vásárláskor meg kell adni a birtokos nevét, vagy ha van fiókja, az e-mail-címét.',

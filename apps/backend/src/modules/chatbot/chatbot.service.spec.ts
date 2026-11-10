@@ -322,7 +322,10 @@ describe('ChatbotService', () => {
       const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
       const text = system[1].text.replace(/\s/g, ' ');
       expect(text).toContain('VIP szektor: 45 000 Ft');
-      expect(text).toContain('2026-08-01 és 2027-06-30');
+      // The window is stated as inclusive of both days, read in the stadium's timezone.
+      expect(text).toContain('2026-08-01 első napjától 2027-06-30 utolsó napjának végéig');
+      expect(text).toContain('az első és az utolsó napon játszott mérkőzés is lefedett');
+      expect(text).toContain('Europe/Budapest');
       expect(text).toContain('5 percig tartjuk fenn');
       expect(text).toContain('legfeljebb 6 jegy');
       expect(text).toContain('A meghívó 72 óráig érvényes');

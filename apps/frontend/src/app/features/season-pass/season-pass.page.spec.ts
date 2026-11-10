@@ -3,6 +3,8 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from "@angular/common/http/testing";
+import { registerLocaleData } from "@angular/common";
+import localeHu from "@angular/common/locales/hu";
 import { signal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatSnackBar } from "@angular/material/snack-bar";
@@ -10,9 +12,14 @@ import { provideNoopAnimations } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
 import { AuthService } from "../../core/auth/auth.service";
 import { errorInterceptor } from "../../core/interceptors/error.interceptor";
-import type { SeasonPassPrice } from "../../core/models/season-pass.models";
+import type {
+  SeasonOverview,
+  SeasonPassPrice,
+} from "../../core/models/season-pass.models";
 import { StripeService } from "../../core/stripe/stripe.service";
 import { SeasonPassPageComponent } from "./season-pass.page";
+
+registerLocaleData(localeHu);
 
 const PRICE: SeasonPassPrice = {
   sectionId: "sec-b",
@@ -20,6 +27,12 @@ const PRICE: SeasonPassPrice = {
   price: 30000,
   currency: "HUF",
   seasonLabel: "2026/2027",
+};
+
+const SEASON: SeasonOverview = {
+  seasonLabel: "2026/2027",
+  loyaltyPoints: 500,
+  homeMatches: [],
 };
 
 /**
@@ -51,6 +64,7 @@ describe("SeasonPassPageComponent — purchase failure presentation", () => {
     httpMock
       .expectOne((r) => r.url.endsWith("/season-passes/prices"))
       .flush([PRICE]);
+    httpMock.expectOne((r) => r.url.endsWith("/season-passes/season")).flush(SEASON);
     fixture.detectChanges();
   });
 

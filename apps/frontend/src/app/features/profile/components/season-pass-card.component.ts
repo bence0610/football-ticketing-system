@@ -383,13 +383,13 @@ export class SeasonPassCardComponent implements OnInit, OnChanges {
     matches: MatchResource[],
   ): MatchRow[] {
     const now = Date.now();
-    const validFrom = new Date(pass.validFrom).getTime();
-    const validUntil = new Date(pass.validUntil).getTime();
+    const coversFrom = new Date(pass.coversFrom).getTime();
+    const coversBefore = new Date(pass.coversBefore).getTime();
     return matches
       .filter((m) => {
         if (!m.isSeasonPassEligible) return false;
         const t = new Date(m.kickoffAt).getTime();
-        return t >= validFrom && t <= validUntil;
+        return t >= coversFrom && t < coversBefore;
       })
       .sort((a, b) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime())
       .map((match) => {

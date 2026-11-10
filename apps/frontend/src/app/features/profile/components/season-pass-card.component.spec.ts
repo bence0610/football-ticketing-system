@@ -41,6 +41,10 @@ const basePass: SeasonPassResponse = {
   seasonLabel: '2026/2027',
   validFrom: '2026-08-01T00:00:00Z',
   validUntil: '2027-06-30T00:00:00Z',
+  // The server's reading of the two dates in Europe/Budapest (CEST, UTC+2):
+  // 1 Aug 00:00 local .. 1 Jul 00:00 local (the last day is covered in full).
+  coversFrom: '2026-07-31T22:00:00Z',
+  coversBefore: '2027-06-30T22:00:00Z',
   seatLabel: 'B / 5. sor / 12. szék',
   section: 'B',
   purchasedAt: '2026-07-01T10:00:00Z',
@@ -139,6 +143,23 @@ describe('SeasonPassCardComponent — five match-row states', () => {
     await fixture.whenStable(); // flush signal scheduler microtasks
     fixture.detectChanges(); // re-render with settled signal values
     return fixture;
+  }
+
+  // Boundaries of the coverage window (Europe/Budapest, CEST = UTC+2).
+  // The pass is valid 2026-08-01 .. 2027-06-30; both days are covered in full.
+  const boundaryCases: Array<[string, string, boolean]> = [
+    ['first day, just after midnight (00:30 local)', '2026-07-31T22:30:00Z', true],
+    ['the evening before the first day (23:59 local)', '2026-07-31T21:59:00Z', false],
+    ['final day, 02:00 local (the old UTC-midnight cut-off)', '2027-06-30T00:00:00Z', true],
+    ['final day, late evening (23:30 local)', '2027-06-30T21:30:00Z', true],
+    ['the day after the final day (00:00 local)', '2027-06-30T22:00:00Z', false],
+  ];
+  for (const [label, kickoff, covered] of boundaryCases) {
+    it(`match list: ${label} is ${covered ? 'listed' : 'not listed'}`, async () => {
+      const fixture = await createFixture([], [], kickoff);
+      const rows = (fixture.nativeElement as HTMLElement).querySelectorAll('.match-row');
+      expect(rows.length).toBe(covered ? 1 : 0);
+    });
   }
 
   it('state 1 (mine_upcoming): QR button and Átadás button visible, no nincs-QR text', async () => {

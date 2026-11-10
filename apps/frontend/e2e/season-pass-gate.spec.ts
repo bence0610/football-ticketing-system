@@ -192,6 +192,8 @@ async function mockBuyerApi(page: Page, backend: FakeBackend): Promise<void> {
           seasonLabel: '2026/2027',
           validFrom: new Date(Date.now() - 30 * 86_400_000).toISOString(),
           validUntil: new Date(Date.now() + 300 * 86_400_000).toISOString(),
+          coversFrom: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+          coversBefore: new Date(Date.now() + 301 * 86_400_000).toISOString(),
           seatLabel: 'A szektor, 3. sor, 12. szék',
           section: 'A',
           purchasedAt: new Date().toISOString(),

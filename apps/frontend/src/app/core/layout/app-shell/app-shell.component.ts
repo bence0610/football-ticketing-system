@@ -74,13 +74,14 @@ export class AppShellComponent {
   // the Stripe payment element on small screens. This signal flips on
   // every navigation event.
   protected readonly currentUrl = signal<string>(this.router.url);
-  // The home, cart and checkout pages draw their own full-width bands, so the shell's padded,
-  // max-width <main> gets out of the way there.
+  // The home, season-pass, cart and checkout pages draw their own full-width bands, so the
+  // shell's padded, max-width <main> gets out of the way there.
   protected readonly bleed = computed(() => {
     const path = this.currentUrl().split(/[?#]/)[0];
     return (
       path === '/' ||
       path === '' ||
+      path === '/season-pass' ||
       path === '/cart' ||
       path === '/checkout' ||
       path === '/checkout/confirmation'

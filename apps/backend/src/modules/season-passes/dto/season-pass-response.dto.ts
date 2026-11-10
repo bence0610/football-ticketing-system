@@ -55,6 +55,20 @@ export class SeasonPassResponseDto {
   @ApiProperty({ type: String })
   validUntil!: string;
 
+  @ApiProperty({
+    type: String,
+    description:
+      'Az első lefedett pillanat (a validFrom nap kezdete a stadion időzónájában). Ezzel kell a mérkőzések kezdését összevetni.',
+  })
+  coversFrom!: string;
+
+  @ApiProperty({
+    type: String,
+    description:
+      'Az első NEM lefedett pillanat (a validUntil utáni nap kezdete a stadion időzónájában, kizáró határ): az utolsó nap egésze érvényes.',
+  })
+  coversBefore!: string;
+
   @ApiProperty({ description: 'A birtokos (a széken ülő személy) neve.' })
   holderName!: string;
 

@@ -97,6 +97,7 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
                 loyalty: { seasonPassPoints: 500 },
                 mail: { retryDelayMs: 0, baseUrl: 'http://localhost:4200' },
                 cron: { loanInvitationTtlHours: 72 },
+                app: { homeTeamName: 'KTE FC' },
               };
               if (key in cfg) return cfg[key];
               throw new Error(`Unexpected config key: ${key}`);
@@ -199,7 +200,8 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
       status: 'active',
       seatId: 'seat-1',
       validFrom: new Date('2026-08-01T00:00:00Z'),
-      validUntil: new Date('2027-06-30T23:59:59Z'),
+      // As the DATE column delivers it: UTC midnight of the last day.
+      validUntil: new Date('2027-06-30T00:00:00Z'),
       holderName: 'Holder',
     };
 
@@ -207,6 +209,8 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
 
     it.each([
       ['before validFrom', '2026-07-31T18:00:00Z'],
+      ['the last instant before the first day (23:59 local)', '2026-07-31T21:59:59Z'],
+      ['the first instant after the last day (00:00 local)', '2027-06-30T22:00:00Z'],
       ['after validUntil', '2027-07-01T18:00:00Z'],
     ])(
       'rejects a match %s with 400 match_outside_validity and issues no QR',
@@ -218,6 +222,22 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
         });
       },
     );
+
+    it.each([
+      ['first day just after local midnight', '2026-07-31T22:00:00Z'],
+      ['first day', '2026-08-01T12:00:00Z'],
+      ['final day at UTC midnight', '2027-06-30T00:00:00Z'],
+      ['final day, late evening (23:30 local)', '2027-06-30T21:30:00Z'],
+    ])('lets a match on the %s through the validity check', async (_label, kickoff) => {
+      mockMatchRepo.findOne.mockResolvedValue({ id: 'm1', kickoffAt: new Date(kickoff) });
+      jest
+        .spyOn(service as never, 'materializeSeasonPassTicket')
+        .mockRejectedValue(new Error('reached ticket materialisation') as never);
+      // Past the guard = the sentinel error, not match_outside_validity.
+      await expect(service.getMatchQr('pass-1', 'm1', 'u1')).rejects.toThrow(
+        'reached ticket materialisation',
+      );
+    });
 
     it('does not even reach the QR step for an outside match (nothing is materialised)', async () => {
       mockMatchRepo.findOne.mockResolvedValue({

@@ -24,6 +24,7 @@ import { SeasonPassesService } from './season-passes.service';
 import { CancelLoanDto, CreateLoanDto } from './dto/create-loan.dto';
 import { PurchaseSeasonPassDto } from './dto/purchase-season-pass.dto';
 import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-response.dto';
+import { SeasonOverviewDto } from './dto/season-overview.dto';
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
 import {
   PassLoanResponseDto,
@@ -31,6 +32,7 @@ import {
   LoanPreviewDto,
 } from './dto/season-pass-response.dto';
 import { PassLoan } from '../../database/entities';
+import { validityWindow } from './season-pass-validity';
 
 interface AuthenticatedRequest extends Request {
   user?: { sub: string; userId?: string; id?: string; role?: string };
@@ -75,6 +77,15 @@ export class SeasonPassesController {
     return this.seasonPassesService.listPrices();
   }
 
+  @Get('season')
+  @ApiOperation({
+    summary: 'Az aktív szezon hazai mérkőzései és a bérletvásárlás hűségpontja',
+  })
+  @ApiOkResponse({ type: SeasonOverviewDto })
+  async getSeasonOverview(): Promise<SeasonOverviewDto> {
+    return this.seasonPassesService.getSeasonOverview();
+  }
+
   @Post('purchase')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
@@ -100,26 +111,31 @@ export class SeasonPassesController {
   async listMine(@Req() req: AuthenticatedRequest): Promise<SeasonPassResponseDto[]> {
     const userId = extractUserId(req);
     const items = await this.seasonPassesService.listForUser(userId);
-    return items.map(({ pass, loans, seat }) => ({
-      id: pass.id,
-      holderName: pass.holderName,
-      isBuyer: pass.userId === userId,
-      isHolder: pass.holderUserId === userId,
-      buyerName:
-        pass.userId !== userId && pass.user
-          ? `${pass.user.firstName} ${pass.user.lastName}`.trim()
-          : undefined,
-      status: pass.status,
-      seasonLabel: pass.seasonLabel,
-      validFrom: pass.validFrom.toISOString(),
-      validUntil: pass.validUntil.toISOString(),
-      seatLabel: seat,
-      section: pass.seat?.section,
-      purchasedAt: pass.createdAt.toISOString(),
-      pricePaid: pass.pricePaid,
-      currency: pass.currency,
-      loans: loans.map(loanToDto),
-    }));
+    return items.map(({ pass, loans, seat }) => {
+      const window = validityWindow(pass.validFrom, pass.validUntil);
+      return {
+        id: pass.id,
+        holderName: pass.holderName,
+        isBuyer: pass.userId === userId,
+        isHolder: pass.holderUserId === userId,
+        buyerName:
+          pass.userId !== userId && pass.user
+            ? `${pass.user.firstName} ${pass.user.lastName}`.trim()
+            : undefined,
+        status: pass.status,
+        seasonLabel: pass.seasonLabel,
+        validFrom: pass.validFrom.toISOString(),
+        validUntil: pass.validUntil.toISOString(),
+        coversFrom: window.startsAt.toISOString(),
+        coversBefore: window.endsBefore.toISOString(),
+        seatLabel: seat,
+        section: pass.seat?.section,
+        purchasedAt: pass.createdAt.toISOString(),
+        pricePaid: pass.pricePaid,
+        currency: pass.currency,
+        loans: loans.map(loanToDto),
+      };
+    });
   }
 
   @Get('my')

@@ -742,10 +742,10 @@ export class ProfilePageComponent implements OnInit {
     const pass = this.sidebarPass();
     const matches = this.matches();
     if (!pass || matches.length === 0) return null;
-    const until = new Date(pass.validUntil).getTime();
+    const before = new Date(pass.coversBefore).getTime();
     return matches.filter((m) => {
       const t = new Date(m.kickoffAt).getTime();
-      return m.isSeasonPassEligible && t > this.now && t <= until && m.status !== 'cancelled';
+      return m.isSeasonPassEligible && t > this.now && t < before && m.status !== 'cancelled';
     }).length;
   });
 
@@ -815,8 +815,8 @@ export class ProfilePageComponent implements OnInit {
       this.passes().find(
         (p) =>
           p.status === 'active' &&
-          new Date(p.validFrom).getTime() <= kickoff &&
-          kickoff <= new Date(p.validUntil).getTime() &&
+          new Date(p.coversFrom).getTime() <= kickoff &&
+          kickoff < new Date(p.coversBefore).getTime() &&
           !p.loans.some(
             (l) => l.matchId === t.match.id && (l.status === 'accepted' || l.status === 'pending'),
           ),

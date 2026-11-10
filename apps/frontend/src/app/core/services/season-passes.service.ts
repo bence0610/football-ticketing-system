@@ -7,6 +7,7 @@ import {
   PassLoanResponse,
   PurchaseSeasonPassPayload,
   PurchaseSeasonPassResponse,
+  SeasonOverview,
   SeasonPassPrice,
   SeasonPassResponse,
 } from '../models/season-pass.models';
@@ -35,6 +36,16 @@ export class SeasonPassesService {
 
   listPrices(): Observable<SeasonPassPrice[]> {
     return this.http.get<SeasonPassPrice[]>('/season-passes/prices');
+  }
+
+  /**
+   * Fixtures and loyalty reward of the season. The page copes with its absence
+   * (it simply shows less), so a failure raises no global toast.
+   */
+  getSeasonOverview(): Observable<SeasonOverview> {
+    return this.http.get<SeasonOverview>('/season-passes/season', {
+      context: new HttpContext().set(SKIP_ERROR_SNACKBAR, true),
+    });
   }
 
   purchase(payload: PurchaseSeasonPassPayload): Observable<PurchaseSeasonPassResponse> {

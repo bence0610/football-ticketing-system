@@ -75,6 +75,7 @@ const PUBLIC_ROUTES: Record<string, string> = {
   'GET seats': 'static seat catalogue',
   'POST webhooks/stripe': 'authenticated by the Stripe signature, not a JWT',
   'GET season-passes/prices': 'public price list',
+  'GET season-passes/season': 'public home fixture list and loyalty reward of the season',
   'GET season-passes/loans/preview/:token':
     'invitation link; possession of the secret token is the credential',
   'GET users/count': 'deliberately public registration counter',
