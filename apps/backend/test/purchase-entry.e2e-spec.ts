@@ -815,12 +815,35 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       .send({ token: qrResp.body.token });
     expect(scanResp.body.success).toBe(true);
 
-    // Owner tries to cancel AFTER the borrower entered
+    // The scan itself is what makes the loan USED
+    const scannedLoan = await ctx.dataSource
+      .getRepository(PassLoan)
+      .findOneByOrFail({ id: loanId });
+    expect(scannedLoan.status).toBe(PassLoanStatus.USED);
+
+    // Owner tries to cancel AFTER the borrower entered: there is nothing left to
+    // withdraw, so it is refused - with a code and a message that say why.
     const cancelResp = await request(server)
       .delete(`/api/season-passes/${pass.id}/loans/${loanId}`)
       .set('Authorization', `Bearer ${owner.accessToken}`)
       .send({ reason: 'Post-entry cancel attempt' });
-    expect(cancelResp.status).toBe(200);
+    expect(cancelResp.status).toBe(409);
+    expect(cancelResp.body.code).toBe('loan_already_used');
+    expect(cancelResp.body.message).toContain('már belépett');
+
+    // ...and the refusal changed nothing: the loan is still "lent and used".
+    const afterCancel = await ctx.dataSource
+      .getRepository(PassLoan)
+      .findOneByOrFail({ id: loanId });
+    expect(afterCancel.status).toBe(PassLoanStatus.USED);
+    expect(afterCancel.cancelledAt).toBeNull();
+
+    // The borrower cannot enter a second time with the same entry
+    const rescan = await request(server)
+      .patch(`/api/tickets/${loanTicket.id}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token: qrResp.body.token });
+    expect(rescan.body.success).toBe(false);
 
     // Owner trying to get a QR must be blocked — a USED LOAN Ticket still
     // occupies the (match, seat) slot

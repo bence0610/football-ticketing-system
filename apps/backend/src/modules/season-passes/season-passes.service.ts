@@ -1206,6 +1206,16 @@ export class SeasonPassesService {
     };
   }
 
+  /** Nothing is left to withdraw once the borrowed entry has been scanned at the gate. */
+  private loanAlreadyUsedError(): ConflictException {
+    return new ConflictException({
+      statusCode: 409,
+      message:
+        'A kölcsönvevő már belépett erre a mérkőzésre, ezért a kölcsönzés nem vonható vissza.',
+      code: 'loan_already_used',
+    });
+  }
+
   async cancelLoan(
     passId: string,
     loanId: string,
@@ -1232,8 +1242,31 @@ export class SeasonPassesService {
       if (!mayManage) {
         throw new ForbiddenException('Only the buyer or holder of the pass can cancel a loan');
       }
+      if (loan.status === PassLoanStatus.USED) {
+        throw this.loanAlreadyUsedError();
+      }
       if (loan.status !== PassLoanStatus.PENDING && loan.status !== PassLoanStatus.ACCEPTED) {
-        throw new BadRequestException(`Loan in state ${loan.status} cannot be cancelled`);
+        throw new BadRequestException({
+          statusCode: 400,
+          message: 'Ez a kölcsönzés már nem vonható vissza.',
+          code: 'loan_not_cancellable',
+        });
+      }
+      // Loans accepted before the borrower's scan was recorded on the loan still
+      // read ACCEPTED: the scanned LOAN ticket is the truth, and a scan that
+      // lands between the read above and the write below is caught here too.
+      if (loan.status === PassLoanStatus.ACCEPTED && loan.seasonPass?.seatId) {
+        const entered = await manager.getRepository(Ticket).findOne({
+          where: {
+            matchId: loan.matchId,
+            seatId: loan.seasonPass.seatId,
+            source: TicketSource.LOAN,
+            status: TicketStatus.USED,
+          },
+        });
+        if (entered) {
+          throw this.loanAlreadyUsedError();
+        }
       }
       const now = new Date();
       const wasAccepted = loan.status === PassLoanStatus.ACCEPTED;
