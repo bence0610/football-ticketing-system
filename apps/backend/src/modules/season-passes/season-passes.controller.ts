@@ -27,6 +27,7 @@ import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-respon
 import { SeasonOverviewDto } from './dto/season-overview.dto';
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
 import {
+  IncomingLoanDto,
   PassLoanResponseDto,
   SeasonPassResponseDto,
   LoanPreviewDto,
@@ -52,6 +53,9 @@ function loanToDto(loan: PassLoan): PassLoanResponseDto {
     status: loan.status,
     borrowerEmail: loan.borrowerEmail,
     borrowerUserId: loan.borrowerUserId,
+    borrowerName: loan.borrower
+      ? `${loan.borrower.firstName} ${loan.borrower.lastName}`.trim() || undefined
+      : undefined,
     matchId: loan.matchId,
     matchTitle: loan.match ? `${loan.match.homeTeam} - ${loan.match.awayTeam}` : undefined,
     kickoffAt: loan.match ? loan.match.kickoffAt.toISOString() : undefined,
@@ -175,13 +179,19 @@ export class SeasonPassesController {
     return loanToDto(loan);
   }
 
-  /**
-   * Lazily materialises the pass holder's SEASON_PASS Ticket for the given
-   * match (if it does not yet exist) and returns a gate-ready QR token.
-   *
-   * Blocked if an active loan exists for this (pass, match) — in that
-   * case the right of entry belongs to the borrower, not the holder.
-   */
+  @Get('loans/incoming')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'A bejelentkezett felhasználónak szóló, még elfogadható kölcsönmeghívók',
+    description:
+      'Azok a függő, le nem járt meghívók, amelyeket a felhasználó e-mail-címére (vagy fiókjára) küldtek. Az e-mail nélkül is megtalálhatók.',
+  })
+  @ApiOkResponse({ type: [IncomingLoanDto] })
+  async listIncomingLoans(@Req() req: AuthenticatedRequest): Promise<IncomingLoanDto[]> {
+    return this.seasonPassesService.listIncomingLoans(extractUserId(req));
+  }
+
   @Get('loans/preview/:token')
   @ApiOperation({ summary: 'Meghívó előnézete — autentikáció nélkül elérhető' })
   @ApiOkResponse({ type: LoanPreviewDto })
@@ -189,6 +199,13 @@ export class SeasonPassesController {
     return this.seasonPassesService.previewLoan(token);
   }
 
+  /**
+   * Lazily materialises the pass holder's SEASON_PASS Ticket for the given
+   * match (if it does not yet exist) and returns a gate-ready QR token.
+   *
+   * Blocked if an active loan exists for this (pass, match) — in that
+   * case the right of entry belongs to the borrower, not the holder.
+   */
   @Get(':passId/qr/:matchId')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()

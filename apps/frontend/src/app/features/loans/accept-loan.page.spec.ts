@@ -38,7 +38,7 @@ const stubPreview: LoanPreview = {
   seatRow: '3',
   seatNumber: 12,
   lenderName: 'Kovács Béla',
-  expiresAt: '2026-11-01T12:00:00.000Z',
+  expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 60_000).toISOString(),
 };
 
 const stubLoan: PassLoanResponse = {
@@ -174,5 +174,81 @@ describe('AcceptLoanPageComponent', () => {
     const fresh = TestBed.createComponent(AcceptLoanPageComponent);
     fresh.detectChanges();
     expect(fresh.nativeElement.textContent).toContain('A helyet már használták');
+  });
+
+  // ── content the design asks for ──────────────────────────────────────
+
+  it('explains it is for one match and that the QR appears in their own account', () => {
+    const text: string = fixture.nativeElement.textContent;
+    expect(text).toContain('egyetlen mérkőzésre');
+    expect(text).toContain('saját fiókodban');
+  });
+
+  it('shows the time left to accept, in amber', () => {
+    const left: HTMLElement = fixture.nativeElement.querySelector('[data-testid="invitation-left"]');
+    expect(left.textContent).toContain('még 2 nap');
+    expect(left.classList).toContain('amber');
+  });
+
+  it('tells them accepting only invalidates the owner entry for that match', () => {
+    const note: string = fixture.nativeElement.querySelector('[data-testid="accept-note"]').textContent;
+    expect(note).toContain('erre az egy mérkőzésre');
+    expect(note).toContain('következő meccsen újra működik');
+  });
+
+  it('success: a button to the QR and a note that it is for this match only', () => {
+    serviceSpy.acceptLoan.and.returnValue(of(stubLoan));
+    (fixture.nativeElement.querySelector('[data-testid="accept-button"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('[data-testid="open-qr"]')!.getAttribute('href')).toBe('/profile');
+    expect(el.textContent).toContain('csak erre az egy mérkőzésre');
+    expect(el.textContent).toContain('értesítünk');
+  });
+
+  // ── the three refusals look and act differently ─────────────────────
+
+  function refuse(code: string, status = 400): HTMLElement {
+    serviceSpy.previewLoan.and.returnValue(throwError(() => loanError(code, status)));
+    const fresh = TestBed.createComponent(AcceptLoanPageComponent);
+    fresh.detectChanges();
+    return fresh.nativeElement;
+  }
+
+  it('expired: amber, asks for a new invitation, offers no purchase', () => {
+    const el = refuse('loan_expired');
+    expect(el.querySelector('.card--amber')).not.toBeNull();
+    expect(el.querySelector('.card--red')).toBeNull();
+    expect(el.textContent).toContain('új meghívót');
+    expect(el.textContent).not.toContain('Másik hely vásárlása');
+  });
+
+  it('revoked: red, offers buying another seat', () => {
+    const el = refuse('loan_revoked');
+    expect(el.querySelector('.card--red')).not.toBeNull();
+    expect(el.querySelector('a[href="/stadium"]')!.textContent).toContain('Másik hely vásárlása');
+  });
+
+  it('seat already used: red, says one seat admits one person, offers buying another seat', () => {
+    const el = refuse('seat_already_used', 409);
+    expect(el.querySelector('.card--red')).not.toBeNull();
+    expect(el.textContent).toContain('egyetlen embert léptet be');
+    expect(el.querySelector('a[href="/stadium"]')!.textContent).toContain('Másik hely vásárlása');
+  });
+
+  it('an already-accepted invitation is not reported as a server outage', () => {
+    const el = refuse('loan_already_accepted');
+    expect(el.textContent).toContain('már elfogadták');
+    expect(el.textContent).not.toContain('A szerver nem érhető el');
+  });
+
+  it('an unknown invitation (404) says so and does not offer a retry', () => {
+    serviceSpy.previewLoan.and.returnValue(
+      throwError(() => new HttpErrorResponse({ error: { message: 'x' }, status: 404 })),
+    );
+    const fresh = TestBed.createComponent(AcceptLoanPageComponent);
+    fresh.detectChanges();
+    expect(fresh.nativeElement.textContent).toContain('Nem találjuk ezt a meghívót');
+    expect(fresh.nativeElement.textContent).not.toContain('Újra próbálom');
   });
 });

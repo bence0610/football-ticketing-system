@@ -33,12 +33,16 @@ import {
   LoanInitiationDialogResult,
 } from './loan-initiation-dialog/loan-initiation-dialog.component';
 import { extractApiErrorMessage } from '../../../shared/utils/api-error';
+import { timeLeft } from '../../../shared/utils/loan-format';
 
 type MatchRowState =
   | 'mine_upcoming'
   | 'loaned_accepted'
   | 'invitation_pending'
   | 'used_by_me'
+  /** Played, and the borrowed entry really was scanned. */
+  | 'loaned_used'
+  /** Played, lent and accepted, but the borrowed entry was never scanned. */
   | 'loaned_completed'
   | 'mine_past';
 
@@ -49,9 +53,15 @@ interface MatchRow {
   isPast: boolean;
   state: MatchRowState;
   activeLoan?: PassLoanResponse;
-  completedLoan?: PassLoanResponse;
+  /** The loan that decided a played row (used or completed). */
+  playedLoan?: PassLoanResponse;
   /** Scan time as HH:mm, only when it is a real, formattable time. */
   scannedTime?: string;
+}
+
+/** Who the entry was lent to: their name when they have an account, else the invited address. */
+export function borrowerLabel(loan: PassLoanResponse): string {
+  return loan.borrowerName?.trim() || loan.borrowerEmail;
 }
 
 /**
@@ -138,16 +148,64 @@ export function scanTimeLabel(value: string | undefined | null): string | undefi
             <p class="empty">Nincs bérlethez tartozó mérkőzés.</p>
           } @else {
             @for (row of matchRows(); track row.matchId) {
-              <div class="match-row" [class.is-past]="row.isPast">
+              <div class="match-row" [class.is-past]="row.isPast" [attr.data-state]="row.state">
+                <div class="date-tile" aria-hidden="true">
+                  <span class="date-tile__mon">{{ row.kickoffAt | date: 'MMM' : '' : 'hu-HU' }}</span>
+                  <span class="date-tile__day">{{ row.kickoffAt | date: 'd' : '' : 'hu-HU' }}</span>
+                </div>
+
                 <div class="match-info">
                   <div class="match-title">{{ row.matchTitle }}</div>
                   <div class="match-meta">
-                    {{ row.kickoffAt | date: 'yyyy. MMM d. HH:mm' : '' : 'hu-HU' }}
+                    {{ row.kickoffAt | date: 'EEEE, HH:mm' : '' : 'hu-HU' }}
                   </div>
+
+                  @switch (row.state) {
+                    @case ('mine_upcoming') {
+                      <div class="state-line" data-testid="mine-text">a te belépőd</div>
+                    }
+                    @case ('loaned_accepted') {
+                      <div class="state-line" data-testid="loaned-accepted-text">
+                        Átadva: <span class="who">{{ borrowerLabel(row.activeLoan!) }}</span>
+                      </div>
+                      <div class="state-line state-line--rule">
+                        <span class="no-qr-text" data-testid="no-qr-text">nincs QR-od</span>
+                        <span class="rule" data-testid="no-qr-rule">
+                          egy helyhez egy mérkőzésen egy érvényes belépő tartozik
+                        </span>
+                      </div>
+                    }
+                    @case ('invitation_pending') {
+                      <div class="state-line state-line--amber" data-testid="invitation-text">
+                        Meghívó kiküldve: {{ row.activeLoan!.borrowerEmail }}
+                      </div>
+                      <div class="state-line state-line--amber" data-testid="invitation-left">
+                        {{ pendingLeft(row.activeLoan!) }}
+                      </div>
+                    }
+                    @case ('used_by_me') {
+                      <div class="state-line" data-testid="used-text">
+                        Felhasználva@if (row.scannedTime) { — beolvasva {{ row.scannedTime }}-kor}
+                      </div>
+                    }
+                    @case ('loaned_used') {
+                      <div class="state-line" data-testid="loaned-used-text">
+                        Átadva: <span class="who">{{ borrowerLabel(row.playedLoan!) }}</span> · belépett
+                      </div>
+                    }
+                    @case ('loaned_completed') {
+                      <div class="state-line" data-testid="loaned-past-text">
+                        Átadva: <span class="who">{{ borrowerLabel(row.playedLoan!) }}</span> · a belépőt nem olvasták be
+                      </div>
+                    }
+                    @case ('mine_past') {
+                      <div class="state-line" data-testid="past-text">nem lett beolvasva</div>
+                    }
+                  }
                 </div>
 
-                <div class="match-state">
-                  @if (row.state === 'mine_upcoming') {
+                @if (row.state === 'mine_upcoming') {
+                  <div class="match-actions">
                     <button
                       mat-flat-button
                       color="primary"
@@ -165,13 +223,9 @@ export function scanTimeLabel(value: string | undefined | null): string | undefi
                     >
                       <mat-icon>swap_horiz</mat-icon> Átadás
                     </button>
-                  } @else if (row.state === 'loaned_accepted') {
-                    <div class="state-stacked">
-                      <span class="state-primary" data-testid="loaned-accepted-text">
-                        Átadva — {{ row.activeLoan!.borrowerEmail }}
-                      </span>
-                      <span class="no-qr-text" data-testid="no-qr-text">nincs QR-od</span>
-                    </div>
+                  </div>
+                } @else if (row.state === 'loaned_accepted' || row.state === 'invitation_pending') {
+                  <div class="match-actions">
                     <button
                       mat-stroked-button
                       color="warn"
@@ -179,36 +233,10 @@ export function scanTimeLabel(value: string | undefined | null): string | undefi
                       data-testid="revoke-btn"
                       (click)="onCancelLoan(row.activeLoan!)"
                     >
-                      <mat-icon>cancel</mat-icon> Visszavonás
+                      Visszavonás
                     </button>
-                  } @else if (row.state === 'invitation_pending') {
-                    <div class="state-stacked">
-                      <span class="state-primary" data-testid="invitation-text">
-                        Meghívó kiküldve — {{ row.activeLoan!.borrowerEmail }}
-                      </span>
-                      <span class="validity-text">
-                        Érvényes: {{ row.activeLoan!.expiresAt | date: 'MMM d. HH:mm' : '' : 'hu-HU' }}-ig
-                      </span>
-                    </div>
-                    <button
-                      mat-stroked-button
-                      color="warn"
-                      class="revoke-btn"
-                      data-testid="revoke-btn"
-                      (click)="onCancelLoan(row.activeLoan!)"
-                    >
-                      <mat-icon>cancel</mat-icon> Visszavonás
-                    </button>
-                  } @else if (row.state === 'used_by_me') {
-                    <span class="state-primary dimmed-label" data-testid="used-text">
-                      Felhasználva@if (row.scannedTime) { — beolvasva {{ row.scannedTime }}-kor}
-                    </span>
-                  } @else if (row.state === 'loaned_completed') {
-                    <span class="state-primary dimmed-label" data-testid="loaned-past-text">
-                      Átadva volt — {{ row.completedLoan!.borrowerEmail }} léptetett be
-                    </span>
-                  }
-                </div>
+                  </div>
+                }
               </div>
             }
           }
@@ -236,6 +264,8 @@ export function scanTimeLabel(value: string | undefined | null): string | undefi
       .label { color: var(--kte-muted); }
 
       .section-badge {
+        display: inline-block;
+        white-space: nowrap;
         margin-left: 8px;
         padding: 2px 8px;
         font-size: 12px;
@@ -264,66 +294,67 @@ export function scanTimeLabel(value: string | undefined | null): string | undefi
       .empty { color: var(--muted); font-size: 13px; }
 
       .match-row {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: 46px minmax(0, 1fr) auto;
+        align-items: start;
         gap: 12px;
         padding: 12px 0;
         border-bottom: 1px solid var(--kte-line);
       }
-
       .match-row:last-child { border-bottom: none; }
+      /* Played rows are dimmed, but what actually happened stays at full contrast. */
+      .match-row.is-past .date-tile,
+      .match-row.is-past .match-title { opacity: 0.6; }
 
-      .match-row.is-past { opacity: 0.55; }
+      .date-tile {
+        width: 46px;
+        height: 46px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--kte-brand-tint);
+        color: var(--kte-brand-deep);
+        border-radius: var(--radius-block);
+        line-height: 1.1;
+      }
+      .date-tile__mon { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .date-tile__day { font-family: var(--kte-font-display); font-size: 18px; font-weight: 700; }
+      .is-past .date-tile { background: var(--kte-line); color: var(--kte-muted); }
 
-      .match-info { flex: 1; min-width: 0; }
-
+      .match-info { min-width: 0; }
       .match-title {
         font-family: var(--kte-font-display);
         font-weight: 600;
         font-size: 14px;
         color: var(--kte-ink);
+        overflow-wrap: anywhere;
       }
+      .match-meta { font-size: 12px; color: var(--kte-muted); margin-top: 2px; }
 
-      .match-meta {
-        font-size: 12px;
-        color: var(--kte-muted);
-        margin-top: 2px;
-      }
+      .state-line { margin-top: 4px; font-size: 13px; color: var(--kte-ink); overflow-wrap: anywhere; }
+      .state-line--amber { color: var(--amber-ink); font-weight: 600; }
+      .who { color: var(--seat-pass); font-weight: 600; }
+      .state-line--rule { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
+      .no-qr-text { font-weight: 600; }
+      .rule { font-size: 12px; color: var(--kte-muted); }
 
-      .match-state {
+      .match-actions {
         display: flex;
-        align-items: center;
         gap: 8px;
         flex-wrap: wrap;
         justify-content: flex-end;
       }
+      .match-actions button { min-height: 40px; }
 
-      .state-stacked {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 2px;
+      @media (max-width: 480px) {
+        .match-row { grid-template-columns: 46px minmax(0, 1fr); }
+        .match-actions {
+          grid-column: 1 / -1;
+          justify-content: stretch;
+        }
+        .match-actions button { flex: 1 1 0; }
       }
-
-      .state-primary {
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--kte-ink);
-      }
-
-      .no-qr-text {
-        font-size: 12px;
-        color: var(--kte-muted);
-        font-style: italic;
-      }
-
-      .validity-text {
-        font-size: 12px;
-        color: var(--kte-muted);
-      }
-
-      .dimmed-label { color: var(--kte-muted); }
 
       .qr-btn {
         font-family: var(--kte-font-display);
@@ -395,15 +426,11 @@ export class SeasonPassCardComponent implements OnInit, OnChanges {
       .map((match) => {
         const isPast = new Date(match.kickoffAt).getTime() < now;
 
-        const activeLoan = pass.loans.find(
-          (l) =>
-            l.matchId === match.id &&
-            (l.status === 'accepted' || l.status === 'pending'),
-        );
-
-        const completedLoan = pass.loans.find(
-          (l) => l.matchId === match.id && l.status === 'completed',
-        );
+        const forMatch = pass.loans.filter((l) => l.matchId === match.id);
+        const activeLoan = forMatch.find((l) => l.status === 'accepted' || l.status === 'pending');
+        // USED = the borrowed entry was scanned; COMPLETED = lent and accepted, never scanned.
+        const usedLoan = forMatch.find((l) => l.status === 'used');
+        const completedLoan = forMatch.find((l) => l.status === 'completed');
 
         const ownerTicket = tickets.find(
           (t) => t.match.id === match.id && t.source === 'season_pass',
@@ -414,6 +441,8 @@ export class SeasonPassCardComponent implements OnInit, OnChanges {
           state = 'loaned_accepted';
         } else if (activeLoan?.status === 'pending') {
           state = 'invitation_pending';
+        } else if (usedLoan) {
+          state = 'loaned_used';
         } else if (ownerTicket?.status === 'used') {
           state = 'used_by_me';
         } else if (completedLoan) {
@@ -431,10 +460,18 @@ export class SeasonPassCardComponent implements OnInit, OnChanges {
           isPast,
           state,
           activeLoan,
-          completedLoan,
+          playedLoan: usedLoan ?? completedLoan,
           scannedTime: scanTimeLabel(ownerTicket?.scannedAt ?? ownerTicket?.usedAt),
         };
       });
+  }
+
+  protected readonly borrowerLabel = borrowerLabel;
+
+  /** "még 2 nap, hogy elfogadja" - or the plain fact that the time is up. */
+  protected pendingLeft(loan: PassLoanResponse): string {
+    const left = timeLeft(loan.expiresAt);
+    return left ? `még ${left}, hogy elfogadja` : 'az elfogadási idő lejárt';
   }
 
   protected openMatchQr(row: MatchRow): void {

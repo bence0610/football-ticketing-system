@@ -23,7 +23,7 @@ import {
   TIER_LABELS,
   TRANSACTION_SOURCE_LABELS,
 } from '../../core/models/loyalty.models';
-import { SeasonPassResponse } from '../../core/models/season-pass.models';
+import { IncomingLoan, SeasonPassResponse } from '../../core/models/season-pass.models';
 import { TICKET_STATUS_LABELS, TicketResponse } from '../../core/models/ticket.models';
 import { LoyaltyService } from '../../core/services/loyalty.service';
 import { MatchResource, MatchesService } from '../../core/services/matches.service';
@@ -40,6 +40,7 @@ import {
   LoanInitiationDialogData,
   LoanInitiationDialogResult,
 } from './components/loan-initiation-dialog/loan-initiation-dialog.component';
+import { LoanInvitationBannerComponent } from './components/loan-invitation-banner.component';
 import { SeasonPassCardComponent } from './components/season-pass-card.component';
 import {
   TicketRowComponent,
@@ -76,6 +77,7 @@ export function untilLabel(kickoffIso: string, now: number): string {
     MatIconModule,
     MatProgressSpinnerModule,
     HufCurrencyPipe,
+    LoanInvitationBannerComponent,
     SeasonPassCardComponent,
     TicketRowComponent,
     WaitlistCardComponent,
@@ -89,6 +91,7 @@ export function untilLabel(kickoffIso: string, now: number): string {
         </div>
       } @else {
         @if (profile(); as user) {
+        <kte-loan-invitation-banner class="invitations" [invitations]="incomingLoans()" />
         <div class="layout">
           <div class="main">
             <!-- ───── Next match ───── -->
@@ -400,6 +403,8 @@ export function untilLabel(kickoffIso: string, now: number): string {
       }
       .loader--sm { padding: 16px; }
 
+      .invitations { margin-bottom: 20px; }
+
       .layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 340px;
@@ -640,8 +645,11 @@ export function untilLabel(kickoffIso: string, now: number): string {
       @media (max-width: 860px) {
         .layout { grid-template-columns: minmax(0, 1fr); }
       }
+      @media (max-width: 599px) {
+        .page { padding-inline: 0; }
+      }
       @media (max-width: 480px) {
-        .page { padding: 16px 16px 40px; }
+        .page { padding: 16px 0 40px; }
         .next__head { flex-direction: column; }
         .next__body { grid-template-columns: 1fr; justify-items: center; }
         .facts { width: 100%; }
@@ -672,6 +680,8 @@ export class ProfilePageComponent implements OnInit {
   protected readonly passes = signal<readonly SeasonPassResponse[]>([]);
   protected readonly waitlistEntries = signal<readonly WaitlistEntry[]>([]);
   protected readonly snapshot = signal<LoyaltySnapshotResponse | null>(null);
+  /** Invitations to borrow a seat that are still waiting for this user. */
+  protected readonly incomingLoans = signal<readonly IncomingLoan[]>([]);
   private readonly matches = signal<readonly MatchResource[]>([]);
   protected readonly activeTab = signal<TabId>('active');
 
@@ -764,6 +774,10 @@ export class ProfilePageComponent implements OnInit {
     }
     this.reloadPasses();
     this.reloadWaitlist();
+    this.passesApi
+      .listIncomingLoans()
+      .pipe(catchError(() => of<IncomingLoan[]>([])), takeUntilDestroyed(this.destroyRef))
+      .subscribe((list) => this.incomingLoans.set(list));
     this.loyaltyService
       .getSnapshot()
       .pipe(catchError(() => of(null)), takeUntilDestroyed(this.destroyRef))

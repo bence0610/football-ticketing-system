@@ -82,7 +82,7 @@ function makeTicket(override: Partial<TicketResponse>): TicketResponse {
   };
 }
 
-describe('SeasonPassCardComponent — five match-row states', () => {
+describe('SeasonPassCardComponent — match-row states', () => {
   let matchesServiceSpy: jasmine.SpyObj<MatchesService>;
   let seasonPassesServiceSpy: jasmine.SpyObj<SeasonPassesService>;
 
@@ -203,18 +203,76 @@ describe('SeasonPassCardComponent — five match-row states', () => {
     expect(el.querySelector('[data-testid="revoke-btn"]')).toBeNull();
   });
 
-  it('state 5 (loaned_completed): "Átadva volt" text, no QR button, no Visszavonás', async () => {
+  it('state 5 (loaned_completed): lent but never scanned says so, and does not claim they came', async () => {
     const fixture = await createFixture(
-      [makeLoan({ status: 'completed' })],
+      [makeLoan({ status: 'completed', borrowerName: 'Nagy Béla' })],
       [],
       new Date(PAST_MS).toISOString(),
     );
     const el: HTMLElement = fixture.nativeElement;
 
-    expect(el.querySelector('[data-testid="loaned-past-text"]')).not.toBeNull();
-    expect(el.textContent).toContain('Átadva volt');
+    const text = el.querySelector('[data-testid="loaned-past-text"]')!.textContent!;
+    expect(text).toContain('Nagy Béla');
+    expect(text).toContain('nem olvasták be');
+    expect(text).not.toContain('belépett');
     expect(el.querySelector('[data-testid="qr-btn"]')).toBeNull();
     expect(el.querySelector('[data-testid="revoke-btn"]')).toBeNull();
+  });
+
+  it('state 6 (loaned_used): a scanned borrowed entry says the borrower came in', async () => {
+    const fixture = await createFixture(
+      [makeLoan({ status: 'used', borrowerName: 'Nagy Béla' })],
+      [],
+      new Date(PAST_MS).toISOString(),
+    );
+    const el: HTMLElement = fixture.nativeElement;
+
+    const text = el.querySelector('[data-testid="loaned-used-text"]')!.textContent!;
+    expect(text).toContain('Nagy Béla');
+    expect(text).toContain('belépett');
+    expect(text).not.toContain('nem olvasták be');
+    expect(el.querySelector('[data-testid="loaned-past-text"]')).toBeNull();
+    expect(el.querySelector('[data-testid="revoke-btn"]')).toBeNull();
+  });
+
+  describe('per-match row content', () => {
+    it('mine: "a te belépőd", a date tile, QR and Átadás', async () => {
+      const el: HTMLElement = (await createFixture([], [])).nativeElement;
+      expect(el.querySelector('[data-testid="mine-text"]')!.textContent).toContain('a te belépőd');
+      expect(el.querySelector('.date-tile')).not.toBeNull();
+      expect(el.querySelector('[data-testid="loan-btn"]')!.textContent).toContain('Átadás');
+    });
+
+    it('lent: the borrower name, "nincs QR-od" as a rule, and Visszavonás', async () => {
+      const fixture = await createFixture(
+        [makeLoan({ status: 'accepted', borrowerName: 'Nagy Béla' })],
+        [],
+      );
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.who')!.textContent).toContain('Nagy Béla');
+      expect(el.querySelector('[data-testid="no-qr-text"]')!.textContent!.trim()).toBe('nincs QR-od');
+      expect(el.querySelector('[data-testid="no-qr-rule"]')!.textContent).toContain('egy érvényes belépő');
+      expect(el.querySelector('[data-testid="revoke-btn"]')!.textContent).toContain('Visszavonás');
+    });
+
+    it('lent to someone without a name: falls back to the invited address', async () => {
+      const el: HTMLElement = (await createFixture([makeLoan({ status: 'accepted' })], [])).nativeElement;
+      expect(el.querySelector('.who')!.textContent).toContain('friend@test.hu');
+    });
+
+    it('invitation sent: the address, the time left and Visszavonás, in amber', async () => {
+      const el: HTMLElement = (await createFixture([makeLoan({ status: 'pending' })], [])).nativeElement;
+      expect(el.querySelector('[data-testid="invitation-text"]')!.textContent).toContain('friend@test.hu');
+      expect(el.querySelector('[data-testid="invitation-left"]')!.textContent).toMatch(/még \d+ (nap|óra|perc)/);
+      expect(el.querySelector('.state-line--amber')).not.toBeNull();
+    });
+
+    it('played and never touched: dimmed, says it was not scanned', async () => {
+      const fixture = await createFixture([], [], new Date(PAST_MS).toISOString());
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.match-row.is-past')).not.toBeNull();
+      expect(el.querySelector('[data-testid="past-text"]')!.textContent).toContain('nem lett beolvasva');
+    });
   });
 
   describe('scan time in the "Felhasználva" line', () => {

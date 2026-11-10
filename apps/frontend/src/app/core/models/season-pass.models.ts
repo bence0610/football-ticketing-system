@@ -14,6 +14,8 @@ export interface PassLoanResponse {
   status: PassLoanStatus;
   borrowerEmail: string;
   borrowerUserId?: string;
+  /** The borrower's name when they have an account; otherwise only the email is known. */
+  borrowerName?: string;
   matchId: string;
   matchTitle?: string;
   kickoffAt?: string;
@@ -32,6 +34,19 @@ export interface LoanPreview {
   seatRow: string;
   seatNumber: number;
   lenderName: string;
+  expiresAt: string;
+}
+
+/** A pending, still-acceptable invitation addressed to the signed-in user. */
+export interface IncomingLoan {
+  id: string;
+  invitationToken: string;
+  lenderName: string;
+  matchTitle: string;
+  kickoffAt: string;
+  seatSection: string;
+  seatRow: string;
+  seatNumber: number;
   expiresAt: string;
 }
 

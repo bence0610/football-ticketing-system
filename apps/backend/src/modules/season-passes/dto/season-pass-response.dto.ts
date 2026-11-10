@@ -14,6 +14,12 @@ export class PassLoanResponseDto {
   @ApiProperty({ required: false })
   borrowerUserId?: string;
 
+  @ApiProperty({
+    required: false,
+    description: 'A kölcsönvevő neve, ha van fiókja; nélküle csak az e-mail-cím ismert.',
+  })
+  borrowerName?: string;
+
   @ApiProperty()
   matchId!: string;
 
@@ -132,5 +138,37 @@ export class LoanPreviewDto {
   lenderName!: string;
 
   @ApiProperty({ description: 'Meghívó érvényessége (ISO 8601)' })
+  expiresAt!: string;
+}
+
+export class IncomingLoanDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({
+    description:
+      'A meghívó titkos kódja: az /loans/accept/:token oldalra visz. Csak a címzettnek adjuk ki.',
+  })
+  invitationToken!: string;
+
+  @ApiProperty({ description: 'A kölcsönadó neve' })
+  lenderName!: string;
+
+  @ApiProperty({ description: 'Mérkőzés neve (hazai – vendég)' })
+  matchTitle!: string;
+
+  @ApiProperty({ type: String })
+  kickoffAt!: string;
+
+  @ApiProperty({ description: 'Szektor azonosítója' })
+  seatSection!: string;
+
+  @ApiProperty({ description: 'Sor száma / jele' })
+  seatRow!: string;
+
+  @ApiProperty({ type: Number })
+  seatNumber!: number;
+
+  @ApiProperty({ type: String, description: 'Eddig fogadható el (ISO 8601)' })
   expiresAt!: string;
 }

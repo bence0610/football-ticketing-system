@@ -9,7 +9,15 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { SeasonPass, Ticket, TicketSource, TicketStatus, User } from '../../database/entities';
+import {
+  PassLoan,
+  PassLoanStatus,
+  SeasonPass,
+  Ticket,
+  TicketSource,
+  TicketStatus,
+  User,
+} from '../../database/entities';
 import { QrService } from '../qr/qr.service';
 import { TicketScanResponseDto } from './dto/scan-ticket.dto';
 import { WaitlistNotificationService } from '../waitlist/waitlist-notification.service';
@@ -152,6 +160,7 @@ export class TicketsService {
       if (ticket.qrJti) {
         await this.qrService.revoke(ticket.qrJti);
       }
+      await this.markLoanUsed(manager, ticket);
       const holderName = await this.resolveEnteringName(manager, ticket);
       return {
         success: true,
@@ -163,6 +172,24 @@ export class TicketsService {
         ...this.scanDetails(ticket),
       };
     });
+  }
+
+  /**
+   * A borrowed entry that was actually scanned: the loan becomes USED. That is
+   * the only thing that distinguishes "lent and used" from "lent, but they did
+   * not come" (COMPLETED, set later by the sweeper). This is bookkeeping after
+   * the admission decision - it never feeds back into it.
+   */
+  private async markLoanUsed(manager: EntityManager, ticket: Ticket): Promise<void> {
+    if (ticket.source !== TicketSource.LOAN || !ticket.seasonPassId) return;
+    await manager.getRepository(PassLoan).update(
+      {
+        seasonPassId: ticket.seasonPassId,
+        matchId: ticket.matchId,
+        status: PassLoanStatus.ACCEPTED,
+      },
+      { status: PassLoanStatus.USED },
+    );
   }
 
   /** Match and seat of a ticket, in the shape the gate screen shows. */

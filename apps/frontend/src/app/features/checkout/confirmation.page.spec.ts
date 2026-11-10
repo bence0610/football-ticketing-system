@@ -59,6 +59,16 @@ describe('ConfirmationPageComponent', () => {
   const text = () => el().textContent ?? '';
   const settle = (ms = 30) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+  /** Moves the mocked clock forward 1 ms at a time, letting pending promises settle in between. */
+  async function advance(ms: number): Promise<void> {
+    for (let i = 0; i < ms; i++) {
+      jasmine.clock().tick(1);
+      for (let j = 0; j < 5; j++) {
+        await Promise.resolve();
+      }
+    }
+  }
+
   async function open(query: Record<string, string>, policy: ConfirmationPolling = fast): Promise<void> {
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
@@ -94,7 +104,10 @@ describe('ConfirmationPageComponent', () => {
     script = [() => of(issued)];
   });
 
-  afterEach(() => fixture?.destroy());
+  afterEach(() => {
+    fixture?.destroy();
+    jasmine.clock().uninstall();
+  });
 
   it('without a payment id there is nothing to confirm', async () => {
     await open({});
@@ -198,19 +211,28 @@ describe('ConfirmationPageComponent', () => {
   });
 
   it('shows the way to support when it takes too long, and keeps waiting', async () => {
-    script = [() => of(processing)];
-    await open({ payment_intent: PI });
-    await settle(10);
-    fixture.detectChanges();
-    expect(el().querySelector('[data-testid="confirm-support"]')).toBeNull();
+    // The page measures "too long" against the wall clock (slowAfterMs = 40). With real
+    // timers, a stall of ~30 ms between two awaits flips it before the first assertion,
+    // so this test runs on a mocked clock: time moves only when the test moves it.
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date('2026-11-09T19:00:00Z'));
+    try {
+      script = [() => of(processing)];
+      await open({ payment_intent: PI });
+      await advance(10);
+      fixture.detectChanges();
+      expect(el().querySelector('[data-testid="confirm-support"]')).toBeNull();
 
-    await settle(80);
-    fixture.detectChanges();
-    const support = el().querySelector('[data-testid="confirm-support"]')!;
-    expect(support).not.toBeNull();
-    expect(support.querySelector('a')?.getAttribute('href')).toContain('mailto:');
-    expect(support.querySelector('a')?.getAttribute('href')).toContain(PI);
-    expect(text()).toContain('Feldolgozás alatt'); // still the same calm state
+      await advance(80);
+      fixture.detectChanges();
+      const support = el().querySelector('[data-testid="confirm-support"]')!;
+      expect(support).not.toBeNull();
+      expect(support.querySelector('a')?.getAttribute('href')).toContain('mailto:');
+      expect(support.querySelector('a')?.getAttribute('href')).toContain(PI);
+      expect(text()).toContain('Feldolgozás alatt'); // still the same calm state
+    } finally {
+      jasmine.clock().uninstall();
+    }
   });
 
   it('asks the server once to finalise a payment that is still waiting (idempotent, verified with Stripe)', async () => {

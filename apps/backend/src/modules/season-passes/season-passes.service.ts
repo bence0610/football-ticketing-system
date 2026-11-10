@@ -20,6 +20,7 @@ import {
   EntityManager,
   In,
   LessThan,
+  MoreThan,
   MoreThanOrEqual,
   Not,
   Repository,
@@ -55,7 +56,7 @@ import { PurchaseSeasonPassResponseDto } from './dto/purchase-season-pass-respon
 import { SeasonOverviewDto } from './dto/season-overview.dto';
 import { isWithinValidity, validityWindow } from './season-pass-validity';
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
-import { LoanPreviewDto } from './dto/season-pass-response.dto';
+import { IncomingLoanDto, LoanPreviewDto } from './dto/season-pass-response.dto';
 
 const ACTIVE_SEASON_LABEL = '2026/2027';
 
@@ -724,7 +725,7 @@ export class SeasonPassesService {
     }
     const loans = await this.passLoanRepository.find({
       where: { seasonPassId: In(passes.map((p) => p.id)) },
-      relations: ['match'],
+      relations: ['match', 'borrower'],
       order: { createdAt: 'DESC' },
     });
     return passes.map((pass) => ({
@@ -917,7 +918,7 @@ export class SeasonPassesService {
       where: {
         seasonPassId: passId,
         matchId: dto.matchId,
-        status: In([PassLoanStatus.PENDING, PassLoanStatus.ACCEPTED]),
+        status: In([PassLoanStatus.PENDING, PassLoanStatus.ACCEPTED, PassLoanStatus.USED]),
       },
     });
     if (existing) {
@@ -1123,6 +1124,44 @@ export class SeasonPassesService {
   }
 
   /**
+   * Pending, still-acceptable invitations addressed to this user — by the email
+   * the invitation was sent to, or by account when the borrower already had one.
+   * It is what lets the person find an invitation without the email (which may
+   * have landed in spam) before it expires. Soonest-to-expire first.
+   */
+  async listIncomingLoans(userId: string): Promise<IncomingLoanDto[]> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('A felhasználó nem található.');
+    }
+    const loans = await this.passLoanRepository.find({
+      where: [
+        {
+          status: PassLoanStatus.PENDING,
+          expiresAt: MoreThan(new Date()),
+          borrowerEmail: user.email.toLowerCase(),
+        },
+        { status: PassLoanStatus.PENDING, expiresAt: MoreThan(new Date()), borrowerUserId: userId },
+      ],
+      relations: ['match', 'seasonPass', 'seasonPass.seat', 'lender'],
+      order: { expiresAt: 'ASC' },
+    });
+    return loans
+      .filter((l) => l.match && l.lender)
+      .map((l) => ({
+        id: l.id,
+        invitationToken: l.invitationToken,
+        lenderName: fullName(l.lender!),
+        matchTitle: `${l.match!.homeTeam} - ${l.match!.awayTeam}`,
+        kickoffAt: l.match!.kickoffAt.toISOString(),
+        seatSection: l.seasonPass?.seat?.section ?? '–',
+        seatRow: l.seasonPass?.seat?.row ?? '–',
+        seatNumber: l.seasonPass?.seat?.number ?? 0,
+        expiresAt: l.expiresAt.toISOString(),
+      }));
+  }
+
+  /**
    * Returns the minimum data a borrower needs to see BEFORE accepting.
    * No auth required — the token is the only credential.
    *
@@ -1254,9 +1293,24 @@ export class SeasonPassesService {
    * match. The ExpireTicketsJob will expire the PAID ticket itself.
    */
   async completeLoan(loan: PassLoan): Promise<void> {
-    if (loan.status !== PassLoanStatus.ACCEPTED) {
+    if (loan.status === PassLoanStatus.USED) {
+      // The borrower entered, so the status stays USED - "lent and used". The
+      // lender is still rewarded once; completedAt marks that this was done.
+      if (loan.completedAt) {
+        return;
+      }
+      loan.completedAt = new Date();
+      await this.passLoanRepository.save(loan);
+    } else if (loan.status === PassLoanStatus.ACCEPTED) {
+      await this.closeUnusedLoan(loan);
+    } else {
       return;
     }
+    await this.awardLoanPoints(loan);
+  }
+
+  /** Lent and accepted, but the borrowed entry was never scanned: COMPLETED. */
+  private async closeUnusedLoan(loan: PassLoan): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       const loanRepo = manager.getRepository(PassLoan);
       loan.status = PassLoanStatus.COMPLETED;
@@ -1279,7 +1333,9 @@ export class SeasonPassesService {
         await this.qrService.revoke(loanTicket.qrJti);
       }
     });
+  }
 
+  private async awardLoanPoints(loan: PassLoan): Promise<void> {
     try {
       await this.loyaltyService.award({
         userId: loan.lenderUserId,

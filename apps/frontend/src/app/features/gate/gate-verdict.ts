@@ -43,7 +43,7 @@ export interface Verdict {
 export const SOURCE_LABELS: Readonly<Record<TicketSource, string>> = {
   single: 'Egyedi jegy',
   season_pass: 'Bérlet',
-  loan: 'Kölcsönkapott belépő',
+  loan: 'Kölcsönzött bérlet',
 };
 
 /** Why the server refused a code, in words a steward can act on. */

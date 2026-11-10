@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { SKIP_ERROR_SNACKBAR } from '../interceptors/error.interceptor';
 import {
+  IncomingLoan,
   LoanPreview,
   PassLoanResponse,
   PurchaseSeasonPassPayload,
@@ -74,6 +75,16 @@ export class SeasonPassesService {
       `/season-passes/loans/accept/${encodeURIComponent(invitationToken)}`,
       {},
     );
+  }
+
+  /**
+   * Invitations waiting for the signed-in user. The profile still works without
+   * them, so a failure raises no global toast.
+   */
+  listIncomingLoans(): Observable<IncomingLoan[]> {
+    return this.http.get<IncomingLoan[]>('/season-passes/loans/incoming', {
+      context: new HttpContext().set(SKIP_ERROR_SNACKBAR, true),
+    });
   }
 
   previewLoan(token: string): Observable<LoanPreview> {

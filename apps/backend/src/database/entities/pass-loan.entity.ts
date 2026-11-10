@@ -12,8 +12,10 @@ export enum PassLoanStatus {
   /** The pass owner had already entered, so the entry right could not be lent. */
   OWNER_ENTERED = 'owner_entered',
   EXPIRED = 'expired',
+  /** The borrowed entry was scanned at the gate: lent and used. */
   USED = 'used',
   CANCELLED = 'cancelled',
+  /** Lent and accepted, the match is over, and the entry was never scanned: lent, but they did not come. */
   COMPLETED = 'completed',
 }
 

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In, LessThan } from 'typeorm';
+import { DataSource, In, IsNull, LessThan } from 'typeorm';
 import { CronConfig } from '../../../config';
 import { Match, PassLoan, PassLoanStatus } from '../../../database/entities';
 import { SeasonPassesService } from '../season-passes.service';
@@ -11,8 +11,10 @@ import { SeasonPassesService } from '../season-passes.service';
 /**
  * Hourly sweeper that:
  *   - Marks expired pending invitations as EXPIRED.
- *   - Marks accepted loans whose match has finished as COMPLETED (and
- *     awards loyalty points to the lender via SeasonPassesService).
+ *   - Marks accepted loans whose match has finished as COMPLETED, meaning
+ *     "lent, but the borrower did not come" (a loan scanned at the gate is
+ *     already USED and stays so), and awards loyalty points to the lender
+ *     for both, via SeasonPassesService.
  */
 @Injectable()
 export class LoanReleaseJob {
@@ -51,11 +53,14 @@ export class LoanReleaseJob {
     if (finishedMatches.length === 0) {
       return;
     }
+    const matchIds = In(finishedMatches.map((m) => m.id));
     const accepted = await this.dataSource.getRepository(PassLoan).find({
-      where: {
-        status: PassLoanStatus.ACCEPTED,
-        matchId: In(finishedMatches.map((m) => m.id)),
-      },
+      where: [
+        // Lent, accepted, never scanned -> COMPLETED.
+        { status: PassLoanStatus.ACCEPTED, matchId: matchIds },
+        // Lent and scanned stays USED; only its one-off lender reward is pending.
+        { status: PassLoanStatus.USED, matchId: matchIds, completedAt: IsNull() },
+      ],
       relations: ['lender'],
     });
     for (const loan of accepted) {

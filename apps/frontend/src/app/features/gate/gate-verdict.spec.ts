@@ -40,6 +40,34 @@ describe('gate verdicts', () => {
     expect(isAdmission(v)).toBeTrue();
   });
 
+  describe('a borrowed pass', () => {
+    it('shows the borrower and the "Kölcsönzött bérlet" chip', () => {
+      const v = verdictFromResponse({
+        success: true,
+        result: 'ok',
+        holderName: 'Nagy Béla',
+        seat,
+        match,
+        source: 'loan',
+      });
+      expect(v.holderName).toBe('Nagy Béla');
+      expect(v.typeLabel).toBe('Kölcsönzött bérlet');
+    });
+
+    it('the verdict never depends on it: same answer, same decision, with or without the chip', () => {
+      for (const result of ['ok', 'already_used', 'expired', 'invalid', 'wrong_match'] as const) {
+        const own = verdictFromResponse({ success: result === 'ok', result, source: 'season_pass', holderName: 'A' });
+        const lent = verdictFromResponse({ success: result === 'ok', result, source: 'loan', holderName: 'B' });
+        const bare = verdictFromResponse({ success: result === 'ok', result });
+        for (const v of [own, lent, bare]) {
+          expect(v.kind).toBe(own.kind);
+          expect(v.tone).toBe(own.tone);
+          expect(isAdmission(v)).toBe(isAdmission(own));
+        }
+      }
+    });
+  });
+
   it('already used is amber, names the time and sends the person to the desk', () => {
     const v = verdictFromResponse({
       success: false,
