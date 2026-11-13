@@ -3,6 +3,9 @@ import { provideRouter } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { provideStore } from '@ngrx/store';
+import { signal } from '@angular/core';
+import { of } from 'rxjs';
+import { AuthService } from '../../auth/auth.service';
 import { AppShellComponent } from './app-shell.component';
 import { cartReducer } from '../../../state/cart/cart.reducer';
 import { CART_FEATURE_KEY } from '../../../state/cart/cart.selectors';
@@ -33,6 +36,49 @@ describe('AppShellComponent', () => {
     expect(routes).toContain('/');
     expect(routes).toContain('/admin');
     expect(routes).toContain('/stadium');
+  });
+
+  describe('the Admin link', () => {
+    function navLabels(user: { role: string } | null): string[] {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        imports: [AppShellComponent, HttpClientTestingModule],
+        providers: [
+          provideRouter([]),
+          provideAnimationsAsync(),
+          provideStore({ [CART_FEATURE_KEY]: cartReducer }),
+          {
+            provide: AuthService,
+            useValue: {
+              user: signal(user),
+              isAuthenticated: signal(user !== null),
+              logout: () => of(undefined),
+            },
+          },
+        ],
+      });
+      const fixture = TestBed.createComponent(AppShellComponent);
+      fixture.detectChanges();
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('a[href="/admin"]'),
+      ).map((a) => a.textContent?.trim() ?? '');
+    }
+
+    it('is not shown to a signed-out visitor', () => {
+      expect(navLabels(null)).toEqual([]);
+    });
+
+    for (const role of ['fan', 'gate']) {
+      it(`is not shown to a signed-in ${role}`, () => {
+        expect(navLabels({ role })).toEqual([]);
+      });
+    }
+
+    for (const role of ['admin', 'super_admin']) {
+      it(`is shown to a signed-in ${role}`, () => {
+        expect(navLabels({ role }).length).toBeGreaterThan(0);
+      });
+    }
   });
 
   describe('the chat launcher', () => {

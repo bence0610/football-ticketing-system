@@ -95,6 +95,8 @@ const ADMIN_ONLY = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
 const REQUIRED_ROLES: Record<string, UserRole[]> = {
   'GET admin/health': ADMIN_ONLY,
   'GET admin/revenue': ADMIN_ONLY,
+  'GET admin/overview': ADMIN_ONLY,
+  'GET admin/seat-sales': ADMIN_ONLY,
   'GET admin/matches/:matchId/occupancy': ADMIN_ONLY,
   'GET tickets/count': ADMIN_ONLY,
   'GET loyalty/transactions/count': ADMIN_ONLY,

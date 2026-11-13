@@ -1,8 +1,16 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  DefaultValuePipe,
+  Get,
+  ParseIntPipe,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
-import { UserRole } from '../../database/entities';
+import { LoyaltyTransaction, UserRole } from '../../database/entities';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -16,6 +24,8 @@ import {
 interface AuthenticatedRequest extends Request {
   user?: { sub: string; userId?: string; id?: string };
 }
+
+const MAX_PAGE = 100;
 
 @ApiTags('Loyalty')
 @Controller('loyalty')
@@ -60,17 +70,44 @@ export class LoyaltyController {
       nextTier: snapshot.nextTier ? { ...snapshot.nextTier } : undefined,
       pointsToNextTier: snapshot.pointsToNextTier,
       ticketPointsPerTicket: snapshot.ticketPointsPerTicket,
-      recentTransactions: snapshot.recentTransactions.map(
-        (tx): LoyaltyTransactionResponseDto => ({
-          id: tx.id,
-          type: tx.type,
-          source: tx.source,
-          points: tx.points,
-          balanceAfter: tx.balanceAfter,
-          description: tx.description,
-          createdAt: tx.createdAt.toISOString(),
-        }),
-      ),
+      earning: { ...snapshot.earning },
+      matchesAttended: snapshot.matchesAttended,
+      totalTransactions: snapshot.totalTransactions,
+      recentTransactions: snapshot.recentTransactions.map(toTransactionDto),
     };
   }
+
+  @Get('me/transactions')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: [LoyaltyTransactionResponseDto] })
+  async getMyTransactions(
+    @Req() req: AuthenticatedRequest,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
+    @Query('limit', new DefaultValuePipe(MAX_PAGE), ParseIntPipe) limit: number,
+  ): Promise<LoyaltyTransactionResponseDto[]> {
+    const userId = req.user?.sub ?? req.user?.userId ?? req.user?.id;
+    if (!userId) {
+      throw new Error('Authenticated user id missing from request');
+    }
+    const rows = await this.loyaltyService.getTransactions(
+      userId,
+      Math.max(offset, 0),
+      Math.min(Math.max(limit, 1), MAX_PAGE),
+    );
+    return rows.map(toTransactionDto);
+  }
+}
+
+function toTransactionDto(tx: LoyaltyTransaction): LoyaltyTransactionResponseDto {
+  return {
+    id: tx.id,
+    type: tx.type,
+    source: tx.source,
+    points: tx.points,
+    balanceAfter: tx.balanceAfter,
+    description: tx.description,
+    referenceId: tx.referenceId,
+    createdAt: tx.createdAt.toISOString(),
+  };
 }

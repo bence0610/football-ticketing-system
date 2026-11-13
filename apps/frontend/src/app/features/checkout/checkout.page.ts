@@ -35,7 +35,7 @@ import { WeatherApiService } from '../../shared/services/weather.api.service';
 import { extractApiErrorMessage } from '../../shared/utils/api-error';
 import { holdRemainingText, lockExpiryFromTtl } from '../../shared/utils/hold-duration';
 import { SeatsActions } from '../../state/seats';
-import { discountAmount, shortestHoldMs } from '../cart/logic/cart-logic';
+import { shortestHoldMs } from '../cart/logic/cart-logic';
 import { formatFullName } from '../../shared/utils/format-name';
 import { CheckoutSummaryComponent } from './components/checkout-summary.component';
 import { ExpiredHoldAlertComponent } from './components/expired-hold-alert.component';
@@ -350,7 +350,6 @@ export class CheckoutPageComponent implements AfterViewInit, OnDestroy {
   // ---- cart ----------------------------------------------------------------
   protected readonly items = this.cart.items;
   protected readonly matchId = computed(() => this.items()[0]?.matchId ?? this.cart.expired()[0]?.matchId ?? '');
-  protected readonly subtotal = computed(() => this.cart.total());
   protected readonly sectionsInCart = computed(() => this.items().map((i) => i.section));
 
   /** Live remaining hold: the shortest one of the seats being paid for. */
@@ -385,20 +384,27 @@ export class CheckoutPageComponent implements AfterViewInit, OnDestroy {
     { initialValue: null },
   );
 
+  // The money shown here is the server's, from the payment intent - the browser
+  // does no arithmetic on it. Until the intent exists there is nothing to show
+  // (null renders as an em-dash), so the screen can never display one number
+  // while another is charged.
+  protected readonly subtotal = computed<number | null>(() => this.intent()?.subtotal ?? null);
+
   protected readonly discount = computed<TierDiscount | null>(() => {
+    const i = this.intent();
     const s = this.snapshot();
-    if (!s || s.tier.discountPercent <= 0) {
+    if (!i || !s || i.discountAmount <= 0) {
       return null;
     }
     return {
       tier: s.tier.tier,
       label: s.tier.label,
-      percent: s.tier.discountPercent,
-      amount: discountAmount(this.subtotal(), s.tier.discountPercent),
+      percent: i.discountPercent,
+      amount: i.discountAmount,
     };
   });
 
-  protected readonly total = computed(() => this.subtotal() - (this.discount()?.amount ?? 0));
+  protected readonly total = computed<number | null>(() => this.intent()?.amount ?? null);
 
   protected readonly points = computed(() => {
     const perTicket = this.snapshot()?.ticketPointsPerTicket;

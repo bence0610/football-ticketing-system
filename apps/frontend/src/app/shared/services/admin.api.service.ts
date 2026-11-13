@@ -1,21 +1,20 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import {
-  MatchOccupancy,
-  RevenueStats,
-} from '../models/admin.model';
+import { Overview, OverviewPeriod, SeatSales } from '../models/admin.model';
 
+/** Read-only: the admin area has no write endpoint (see the notice on every page). */
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
   private readonly http = inject(HttpClient);
 
-  revenue(days = 30): Observable<RevenueStats> {
-    const params = new HttpParams().set('days', String(days));
-    return this.http.get<RevenueStats>('/admin/revenue', { params });
+  overview(period: OverviewPeriod): Observable<Overview> {
+    return this.http.get<Overview>('/admin/overview', {
+      params: new HttpParams().set('period', period),
+    });
   }
 
-  occupancy(matchId: string): Observable<MatchOccupancy> {
-    return this.http.get<MatchOccupancy>(`/admin/matches/${matchId}/occupancy`);
+  seatSales(): Observable<SeatSales> {
+    return this.http.get<SeatSales>('/admin/seat-sales');
   }
 }

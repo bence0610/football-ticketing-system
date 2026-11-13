@@ -7,6 +7,7 @@ import {
   LoyaltyTransaction,
   LoyaltyTransactionSource,
   LoyaltyTransactionType,
+  Ticket,
   User,
 } from '../../database/entities';
 import { LoyaltyConfig, MailConfig } from '../../config';
@@ -48,8 +49,26 @@ export interface LoyaltySnapshot {
   pointsToNextTier?: number;
   /** Points awarded per purchased ticket (LOYALTY_TICKET_POINTS_PER_TICKET). */
   ticketPointsPerTicket: number;
+  /** The real earning rules (from LoyaltyConfig), so the UI never hard-codes them. */
+  earning: LoyaltyEarningRules;
+  /** Distinct matches the user actually entered (a ticket with a scan). */
+  matchesAttended: number;
+  /** Size of the whole ledger, so the UI knows whether `recentTransactions` is all of it. */
+  totalTransactions: number;
   recentTransactions: LoyaltyTransaction[];
 }
+
+export interface LoyaltyEarningRules {
+  registrationPoints: number;
+  profileCompletionPoints: number;
+  ticketPointsPerTicket: number;
+  seasonPassPoints: number;
+  passLoanPoints: number;
+  /** Share of the balance kept at the season-end conversion (0-100). */
+  carryoverPercent: number;
+}
+
+export const SNAPSHOT_TRANSACTION_LIMIT = 25;
 
 /**
  * Encapsulates all loyalty-points mutations.
@@ -102,11 +121,11 @@ export class LoyaltyService {
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
     }
-    const recentTransactions = await this.loyaltyRepository.find({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-      take: 25,
-    });
+    const [recentTransactions, totalTransactions, matchesAttended] = await Promise.all([
+      this.getTransactions(userId, 0, SNAPSHOT_TRANSACTION_LIMIT),
+      this.loyaltyRepository.count({ where: { userId } }),
+      this.countMatchesAttended(userId),
+    ]);
     const currentTier = definitionFor(user.loyaltyTier);
     const nextTier = TIER_DEFINITIONS.find((t) => t.minPoints > user.loyaltyPoints);
     return {
@@ -116,8 +135,44 @@ export class LoyaltyService {
       nextTier,
       pointsToNextTier: nextTier ? Math.max(nextTier.minPoints - user.loyaltyPoints, 0) : undefined,
       ticketPointsPerTicket: this.config.ticketPointsPerTicket,
+      earning: {
+        registrationPoints: this.config.registrationPoints,
+        profileCompletionPoints: this.config.profileCompletionPoints,
+        ticketPointsPerTicket: this.config.ticketPointsPerTicket,
+        seasonPassPoints: this.config.seasonPassPoints,
+        passLoanPoints: this.config.passLoanPoints,
+        carryoverPercent: this.config.carryoverPercent,
+      },
+      matchesAttended,
+      totalTransactions,
       recentTransactions,
     };
+  }
+
+  /** Newest first. `id` breaks ties so paging is stable for rows created in the same second. */
+  async getTransactions(
+    userId: string,
+    offset: number,
+    limit: number,
+  ): Promise<LoyaltyTransaction[]> {
+    return this.loyaltyRepository.find({
+      where: { userId },
+      order: { createdAt: 'DESC', id: 'DESC' },
+      skip: offset,
+      take: limit,
+    });
+  }
+
+  /** Distinct matches for which one of the user's tickets was scanned at the gate. */
+  private async countMatchesAttended(userId: string): Promise<number> {
+    const row = await this.dataSource
+      .getRepository(Ticket)
+      .createQueryBuilder('t')
+      .select('COUNT(DISTINCT t.match_id)', 'count')
+      .where('t.user_id = :userId', { userId })
+      .andWhere('t.scanned_at IS NOT NULL')
+      .getRawOne<{ count: string }>();
+    return Number(row?.count ?? 0);
   }
 
   /**

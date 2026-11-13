@@ -11,6 +11,7 @@ import { MatListModule } from '@angular/material/list';
 import { CommonModule } from '@angular/common';
 import { filter } from 'rxjs';
 import { AuthService } from '../../auth/auth.service';
+import { isAdminRole } from '../../auth/roles';
 import { CartFacade } from '../../cart/cart.facade';
 import { ChatbotWidgetComponent } from '../../../features/chatbot/chatbot-widget.component';
 import { initialsOf } from '../../../shared/utils/format-name';
@@ -21,6 +22,8 @@ interface NavItem {
   readonly icon: string;
   readonly exact?: boolean;
   readonly authOnly?: boolean;
+  /** Shown only to a signed-in admin or super-admin. Presentation only: the route and API enforce it. */
+  readonly adminOnly?: boolean;
 }
 
 const HIDDEN_CHATBOT_ROUTES: readonly string[] = ['/checkout'];
@@ -61,11 +64,17 @@ export class AppShellComponent {
     { label: 'Bérlet vásárlás', route: '/season-pass', icon: 'card_membership' },
     { label: 'Kosár', route: '/cart', icon: 'shopping_cart' },
     { label: 'Hűség', route: '/loyalty', icon: 'star', authOnly: true },
-    { label: 'Admin', route: '/admin', icon: 'shield', authOnly: true },
+    { label: 'Admin', route: '/admin', icon: 'shield', authOnly: true, adminOnly: true },
   ]);
 
+  protected readonly isAdmin = computed(
+    () => this.isAuthenticated() && isAdminRole(this.user()?.role),
+  );
+
   protected readonly visibleNavItems = computed(() =>
-    this.navItems().filter((item) => !item.authOnly || this.isAuthenticated()),
+    this.navItems().filter(
+      (item) => (!item.authOnly || this.isAuthenticated()) && (!item.adminOnly || this.isAdmin()),
+    ),
   );
 
   protected readonly sidenavOpen = signal(false);

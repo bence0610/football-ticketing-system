@@ -1,231 +1,304 @@
-import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  OnDestroy,
-  OnInit,
-  inject,
-  signal,
-} from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { Subscription, firstValueFrom, interval } from 'rxjs';
-import { MatchOccupancy } from '../../../shared/models/admin.model';
-import { MatchListItem } from '../../../shared/models/match.model';
+import { SeatSale, SeatSales } from '../../../shared/models/admin.model';
 import { AdminApiService } from '../../../shared/services/admin.api.service';
-import { MatchesApiService } from '../../../shared/services/matches.api.service';
-import { HeatmapLegendComponent } from './components/heatmap-legend.component';
-import { MatchPickerComponent } from './components/match-picker.component';
-import { StadiumHeatmapComponent } from './components/stadium-heatmap.component';
 import { extractApiErrorMessage } from '../../../shared/utils/api-error';
+import { AdminPageHeaderComponent } from '../components/admin-page-header.component';
+import {
+  headerSubtitle,
+  heatmapInterpretation,
+  sectionSummaries,
+  takenPercent,
+} from '../logic/admin-logic';
 
-const REFRESH_MS = 60_000;
+interface RowView {
+  readonly row: string;
+  readonly cells: readonly CellView[];
+}
+
+interface CellView {
+  readonly number: number;
+  readonly percent: number;
+  readonly color: string;
+  readonly title: string;
+}
+
+interface SectionView {
+  readonly section: string;
+  readonly averagePercent: number;
+  readonly rows: readonly RowView[];
+}
+
+/** Pale to deep on the brand purple: the token pair, mixed by how often the seat sold. */
+export function heatColor(percent: number): string {
+  return `color-mix(in srgb, var(--brand-deep) ${percent}%, var(--brand-tint))`;
+}
+
+function byRowThenNumber(a: SeatSale, b: SeatSale): number {
+  return a.row.localeCompare(b.row, 'hu', { numeric: true }) || a.number - b.number;
+}
 
 @Component({
   selector: 'kte-admin-heatmap-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    CommonModule,
-    MatProgressSpinnerModule,
-    MatIconModule,
-    MatchPickerComponent,
-    StadiumHeatmapComponent,
-    HeatmapLegendComponent,
-  ],
+  imports: [MatIconModule, MatProgressSpinnerModule, AdminPageHeaderComponent],
   template: `
-    <section class="kte-heatmap-page">
-      <header class="kte-heatmap-page__header">
-        <kte-heatmap-match-picker
-          [matches]="matches()"
-          [selectedMatchId]="selectedMatchId()"
-          (matchChanged)="onMatchChanged($event)"
-        />
+    <kte-admin-page-header title="Ülés-hőtérkép" [subtitle]="subtitle()" />
 
-        @if (occupancy(); as data) {
-          <div class="kte-heatmap-page__summary">
-            <div>
-              <span class="kte-heatmap-page__label">Foglaltság</span>
-              <strong>{{ data.occupancyPercent }}%</strong>
-            </div>
-            <div>
-              <span class="kte-heatmap-page__label">Eladott / Foglalt / Szabad</span>
-              <strong>{{ data.totalSold }} / {{ data.totalLocked }} / {{ data.totalAvailable }}</strong>
-            </div>
-            <div class="kte-heatmap-page__refresh">
-              <mat-icon>schedule</mat-icon>
-              <span>Frissítve: {{ data.generatedAt | date: 'HH:mm:ss' }}</span>
-            </div>
-          </div>
-        }
-      </header>
-
+    <div class="page">
       @if (loading()) {
-        <div class="kte-heatmap-page__loader" role="status" aria-live="polite">
-          <mat-spinner diameter="36" />
-          <span>Foglaltság betöltése…</span>
+        <div class="state" role="status" aria-live="polite">
+          <mat-spinner diameter="32" />
+          <span>Betöltés…</span>
         </div>
       } @else {
-        @if (error(); as err) {
-          <div class="kte-heatmap-page__error" role="alert">
-            <mat-icon>error</mat-icon>
-            {{ err }}
+        @if (error(); as message) {
+          <div class="state state--error" role="alert">
+            <mat-icon aria-hidden="true">error</mat-icon>
+            <span>{{ message }}</span>
+            <button type="button" class="retry" (click)="load()">Újra</button>
           </div>
         } @else {
-          @if (occupancy(); as data) {
-            <kte-stadium-heatmap [sectors]="data.sectors" />
-            <kte-heatmap-legend />
-          } @else {
-            <p class="kte-heatmap-page__empty">Válassz mérkőzést a foglaltsági kép megjelenítéséhez.</p>
+          @if (data(); as d) {
+            @if (d.matchCount === 0) {
+              <p class="state" data-testid="heatmap-empty">
+                Ebben a szezonban még nem volt lejátszott meccs, ezért nincs mit ábrázolni.
+              </p>
+            } @else {
+              <section class="card" aria-labelledby="heat-title">
+                <h2 id="heat-title" class="card__title">Milyen gyakran kel el egy ülés a szezonban</h2>
+                <p class="interpretation" data-testid="heatmap-interpretation">{{ interpretation() }}</p>
+
+                <div class="legend" aria-label="Jelmagyarázat">
+                  <span>ritkán</span>
+                  <span class="legend__bar" aria-hidden="true"></span>
+                  <span>mindig</span>
+                </div>
+
+                @for (section of sections(); track section.section) {
+                  <div class="section" data-testid="heat-section">
+                    <h3 class="section__title">
+                      {{ section.section }} szektor
+                      <span class="section__avg">átlagosan {{ section.averagePercent }}%</span>
+                    </h3>
+                    <div class="grid" role="group" [attr.aria-label]="section.section + ' szektor ülései'">
+                      @for (row of section.rows; track row.row) {
+                        <div class="grid__row">
+                          <span class="grid__row-label">{{ row.row }}. sor</span>
+                          @for (cell of row.cells; track cell.number) {
+                            <span
+                              class="cell"
+                              data-testid="heat-cell"
+                              [attr.data-percent]="cell.percent"
+                              [style.background]="cell.color"
+                              [title]="cell.title"
+                            ></span>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              </section>
+            }
           }
         }
       }
-    </section>
+    </div>
   `,
   styles: [
     `
-      .kte-heatmap-page {
+      .page {
         display: flex;
         flex-direction: column;
-        gap: 16px;
-        padding: 16px;
+        gap: 20px;
+        padding: 24px 32px;
       }
-      .kte-heatmap-page__header {
+
+      .state {
         display: flex;
-        flex-direction: column;
+        align-items: center;
         gap: 12px;
+        margin: 0;
+        padding: 24px;
+        color: var(--muted);
       }
-      .kte-heatmap-page__summary {
+
+      .state--error {
+        color: var(--error-ink);
+        background: var(--error-bg);
+        border: 1px solid var(--error-edge);
+        border-radius: var(--radius-block);
+      }
+
+      .retry {
+        min-height: 40px;
+        padding: 0 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-block);
+        background: var(--surface);
+        color: var(--brand-deep);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .card {
+        padding: 20px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-card);
+      }
+
+      .card__title {
+        margin: 0 0 8px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 16px;
+      }
+
+      .interpretation {
+        margin: 0 0 16px;
+        font-size: 14px;
+        color: var(--ink);
+      }
+
+      .legend {
         display: flex;
-        gap: 24px;
-        flex-wrap: wrap;
-        background: var(--kte-surface);
-        padding: 12px 16px;
-        border-radius: var(--kte-radius-sm);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+        font-size: 12px;
+        color: var(--muted);
       }
-      .kte-heatmap-page__summary > div {
+
+      .legend__bar {
+        width: 180px;
+        height: 10px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: linear-gradient(to right, var(--brand-tint), var(--brand-deep));
+      }
+
+      .section + .section {
+        margin-top: 24px;
+      }
+
+      .section__title {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin: 0 0 8px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 14px;
+      }
+
+      .section__avg {
+        font-family: var(--font-body);
+        font-weight: 400;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .grid {
         display: flex;
         flex-direction: column;
+        gap: 3px;
+        overflow-x: auto;
+        padding-bottom: 4px;
       }
-      .kte-heatmap-page__label {
+
+      .grid__row {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+
+      .grid__row-label {
+        flex: 0 0 44px;
         font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--kte-muted);
+        color: var(--muted);
       }
-      .kte-heatmap-page__summary strong {
-        font-size: 18px;
-        color: var(--kte-brand-mid);
+
+      .cell {
+        flex: 0 0 18px;
+        height: 18px;
+        border-radius: 3px;
+        box-shadow: inset 0 0 0 1px rgba(20, 18, 26, 0.08);
       }
-      .kte-heatmap-page__refresh {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        color: var(--kte-muted);
-        font-size: 13px;
-      }
-      .kte-heatmap-page__loader {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        justify-content: center;
-        padding: 64px 0;
-        color: var(--kte-muted);
-      }
-      .kte-heatmap-page__error {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 16px;
-        background: var(--kte-danger-bg);
-        color: var(--kte-danger);
-        border-radius: var(--kte-radius-sm);
-      }
-      .kte-heatmap-page__empty {
-        padding: 64px;
-        text-align: center;
-        color: var(--kte-muted);
+
+      @media (max-width: 899px) {
+        .page {
+          padding: 16px;
+        }
       }
     `,
   ],
 })
-export class SeatHeatmapPageComponent implements OnInit, OnDestroy {
+export class SeatHeatmapPageComponent {
   private readonly api = inject(AdminApiService);
-  private readonly matchesApi = inject(MatchesApiService);
-  private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly loading = signal(false);
+  protected readonly data = signal<SeatSales | null>(null);
+  protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
-  protected readonly occupancy = signal<MatchOccupancy | null>(null);
-  protected readonly matches = signal<readonly MatchListItem[]>([]);
-  protected readonly selectedMatchId = signal<string | null>(null);
 
-  private refreshSub: Subscription | null = null;
+  protected readonly subtitle = computed(() =>
+    headerSubtitle(this.data()?.season?.label ?? null, this.data()?.generatedAt ?? null),
+  );
 
-  async ngOnInit(): Promise<void> {
-    await this.loadMatches();
-  }
+  private readonly summaries = computed(() => {
+    const d = this.data();
+    return d ? sectionSummaries(d.seats, d.matchCount) : [];
+  });
 
-  ngOnDestroy(): void {
-    this.refreshSub?.unsubscribe();
-  }
+  protected readonly interpretation = computed(() =>
+    heatmapInterpretation(this.summaries(), this.data()?.matchCount ?? 0),
+  );
 
-  protected onMatchChanged(matchId: string): void {
-    this.selectedMatchId.set(matchId);
-    void this.loadOccupancy();
-  }
-
-  private async loadMatches(): Promise<void> {
-    try {
-      const matches = await firstValueFrom(this.matchesApi.list({ limit: 50 }));
-      this.matches.set(matches);
-      if (matches.length > 0 && !this.selectedMatchId()) {
-        this.selectedMatchId.set(matches[0].id);
-        await this.loadOccupancy();
+  protected readonly sections = computed<readonly SectionView[]>(() => {
+    const d = this.data();
+    if (!d) return [];
+    return this.summaries().map((summary) => {
+      const seats = d.seats.filter((s) => s.section === summary.section).sort(byRowThenNumber);
+      const rows = new Map<string, CellView[]>();
+      for (const seat of seats) {
+        const percent = takenPercent(seat.taken, d.matchCount);
+        const cells = rows.get(seat.row) ?? [];
+        cells.push({
+          number: seat.number,
+          percent,
+          color: heatColor(percent),
+          title: `${seat.section} szektor, ${seat.row}. sor, ${seat.number}. hely: ${seat.taken} / ${d.matchCount} meccsen foglalt`,
+        });
+        rows.set(seat.row, cells);
       }
-    } catch (error) {
-      this.error.set(this.normalizeError(error));
-    }
+      return {
+        section: summary.section,
+        averagePercent: summary.averagePercent,
+        rows: [...rows.entries()].map(([row, cells]) => ({ row, cells })),
+      };
+    });
+  });
+
+  constructor() {
+    this.load();
   }
 
-  private async loadOccupancy(): Promise<void> {
-    const matchId = this.selectedMatchId();
-    if (!matchId) {
-      return;
-    }
+  protected load(): void {
     this.loading.set(true);
     this.error.set(null);
-    try {
-      const data = await firstValueFrom(this.api.occupancy(matchId));
-      this.occupancy.set(data);
-      this.startAutoRefresh();
-    } catch (error) {
-      this.error.set(this.normalizeError(error));
-    } finally {
-      this.loading.set(false);
-    }
-  }
-
-  private startAutoRefresh(): void {
-    this.refreshSub?.unsubscribe();
-    this.refreshSub = interval(REFRESH_MS)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        const matchId = this.selectedMatchId();
-        if (!matchId) {
-          return;
-        }
-        this.api.occupancy(matchId).subscribe({
-          next: (data) => this.occupancy.set(data),
-          error: () => undefined, // keep last known state on transient errors
-        });
-      });
-  }
-
-  private normalizeError(error: unknown): string {
-    return extractApiErrorMessage(error, 'A foglaltsági adatok betöltése sikertelen.');
+    this.api.seatSales().subscribe({
+      next: (data) => {
+        this.data.set(data);
+        this.loading.set(false);
+      },
+      error: (err: unknown) => {
+        this.error.set(extractApiErrorMessage(err, 'A hőtérkép betöltése nem sikerült.'));
+        this.loading.set(false);
+      },
+    });
   }
 }

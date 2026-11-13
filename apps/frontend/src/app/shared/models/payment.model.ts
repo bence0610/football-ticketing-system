@@ -10,7 +10,14 @@ export interface PaymentIntentResponse {
   readonly paymentIntentId: string;
   readonly clientSecret: string;
   readonly currency: string;
+  /** HUF actually charged (server-computed, after the loyalty discount). Display this; never compute it. */
   readonly amount: number;
+  /** HUF list-price sum before the discount (server-computed; amount + discountAmount). */
+  readonly subtotal: number;
+  /** Loyalty tier discount in percent, as applied by the server. */
+  readonly discountPercent: number;
+  /** HUF taken off the subtotal by the server. */
+  readonly discountAmount: number;
   readonly lineItems: readonly PaymentIntentSeatLine[];
 }
 

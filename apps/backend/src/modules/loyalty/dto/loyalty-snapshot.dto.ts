@@ -41,8 +41,39 @@ export class LoyaltyTransactionResponseDto {
   @ApiProperty({ required: false })
   description?: string;
 
+  @ApiProperty({
+    required: false,
+    example: 'ticket:7c1e…',
+    description:
+      'Reference of the event that earned the points. (source, referenceId) is unique, so one event can never be credited twice.',
+  })
+  referenceId?: string;
+
   @ApiProperty({ type: String })
   createdAt!: string;
+}
+
+export class LoyaltyEarningRulesDto {
+  @ApiProperty({ example: 100 })
+  registrationPoints!: number;
+
+  @ApiProperty({ example: 50 })
+  profileCompletionPoints!: number;
+
+  @ApiProperty({ example: 50, description: 'Flat points per purchased ticket (not per forint).' })
+  ticketPointsPerTicket!: number;
+
+  @ApiProperty({ example: 500 })
+  seasonPassPoints!: number;
+
+  @ApiProperty({ example: 25 })
+  passLoanPoints!: number;
+
+  @ApiProperty({
+    example: 50,
+    description: 'Percent of the balance kept at the season-end conversion.',
+  })
+  carryoverPercent!: number;
 }
 
 export class LoyaltySnapshotResponseDto {
@@ -63,6 +94,18 @@ export class LoyaltySnapshotResponseDto {
     description: 'Points earned for each ticket bought (LOYALTY_TICKET_POINTS_PER_TICKET).',
   })
   ticketPointsPerTicket!: number;
+
+  @ApiProperty({ type: () => LoyaltyEarningRulesDto })
+  earning!: LoyaltyEarningRulesDto;
+
+  @ApiProperty({ example: 4, description: 'Distinct matches entered (a ticket with a gate scan).' })
+  matchesAttended!: number;
+
+  @ApiProperty({
+    example: 31,
+    description: 'Whole ledger size; recentTransactions holds the newest page.',
+  })
+  totalTransactions!: number;
 
   @ApiProperty({ type: () => [LoyaltyTransactionResponseDto] })
   recentTransactions!: LoyaltyTransactionResponseDto[];

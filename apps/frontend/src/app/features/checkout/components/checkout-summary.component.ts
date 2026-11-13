@@ -71,7 +71,7 @@ import { seatDescription } from '../../cart/logic/cart-logic';
           <mat-spinner diameter="20"></mat-spinner>
           Feldolgozás…
         </ng-container>
-        <ng-template #label>Fizetés · {{ total | hufCurrency }}</ng-template>
+        <ng-template #label>Fizetés<ng-container *ngIf="total !== null"> · {{ total | hufCurrency }}</ng-container></ng-template>
       </button>
 
       <p class="summary__note" data-testid="issue-note">
@@ -215,9 +215,9 @@ export class CheckoutSummaryComponent {
   @Input() items: readonly CartItem[] = [];
   /** From GET /matches/:id; shown once loaded. */
   @Input() venue: string | null = null;
-  @Input() subtotal = 0;
+  @Input() subtotal: number | null = null;
   @Input() discount: TierDiscount | null = null;
-  @Input() total = 0;
+  @Input() total: number | null = null;
   /** Loyalty points this purchase earns; null when unknown. */
   @Input() points: number | null = null;
   @Input() processing = false;

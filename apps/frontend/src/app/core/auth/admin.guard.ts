@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
+import { isAdminRole } from './roles';
 
 /**
  * Functional guard that allows only ADMIN or SUPER_ADMIN users into the
@@ -18,7 +19,7 @@ export const adminGuard: CanActivateFn = (_route, state) => {
   if (!user) {
     return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
   }
-  if (user.role === 'admin' || user.role === 'super_admin') {
+  if (isAdminRole(user.role)) {
     return true;
   }
   return router.createUrlTree(['/']);

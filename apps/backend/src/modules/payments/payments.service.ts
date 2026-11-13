@@ -28,6 +28,8 @@ import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import { EmailService } from '../email/email.service';
+import { allocateDiscount, normalizeDiscountPercent } from '../loyalty/loyalty-discount';
+import { definitionFor } from '../loyalty/loyalty.constants';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { SeatAvailability } from '../seats/dto';
 import { SeatsService } from '../seats/seats.service';
@@ -102,7 +104,16 @@ export class PaymentsService {
 
     const lines = await this.assertSeatsAvailable(dto.matchId, dto.seats, match);
 
-    const totalAmount = lines.reduce((acc, line) => acc + line.price, 0);
+    // Server-authoritative loyalty discount: the buyer's tier is read from the
+    // database (never from the client) and applied once to the subtotal, with
+    // the same rounding as the cart. The percent travels in the intent
+    // metadata so finalization can record the per-ticket price actually paid.
+    const discountPercent = await this.discountPercentForUser(userId);
+    const allocation = allocateDiscount(
+      lines.map((line) => line.price),
+      discountPercent,
+    );
+    const totalAmount = allocation.total;
     if (totalAmount <= 0) {
       throw new BadRequestException('Érvénytelen összeg.');
     }
@@ -121,7 +132,9 @@ export class PaymentsService {
       )
       .digest('hex')
       .slice(0, 16);
-    const idempotencyKey = `intent_${userId}_${dto.matchId}_${ownerTokenDigest}`;
+    // The discount percent is part of the key: if the same lock hold is reused
+    // after a tier change, Stripe would otherwise reject the changed amount.
+    const idempotencyKey = `intent_${userId}_${dto.matchId}_${ownerTokenDigest}_d${discountPercent}`;
 
     const stripeAmount = this.toStripeAmount(totalAmount);
     this.logger.debug(
@@ -138,6 +151,11 @@ export class PaymentsService {
           matchId: dto.matchId,
           seatIds: dto.seats.map((s) => s.seatId).join(','),
           ownerTokens: dto.seats.map((s) => s.ownerToken).join(','),
+          discountPercent: String(discountPercent),
+          // The per-seat amounts actually charged, in seatIds order. Finalization
+          // records exactly these, so a price change between payment creation and
+          // confirmation can never make the ticket disagree with the charge.
+          paidPrices: allocation.discounts.join(','),
         },
         description: `KTE Jegyportál — ${match.homeTeam} vs ${match.awayTeam}`,
       },
@@ -161,8 +179,33 @@ export class PaymentsService {
       clientSecret: intent.client_secret,
       currency: this.currency,
       amount: totalAmount,
+      subtotal: totalAmount + allocation.discountTotal,
       lineItems,
+      discountPercent,
+      discountAmount: allocation.discountTotal,
     };
+  }
+
+  /**
+   * Loyalty tier discount (0-100) of the buyer, read from `users.loyaltyTier`.
+   * A missing user or unknown tier means no discount.
+   */
+  private async discountPercentForUser(userId: string): Promise<number> {
+    const user = await this.dataSource.getRepository(User).findOne({
+      where: { id: userId },
+      select: ['id', 'loyaltyTier'],
+    });
+    if (!user?.loyaltyTier) {
+      return 0;
+    }
+    try {
+      return normalizeDiscountPercent(definitionFor(user.loyaltyTier).discountPercent);
+    } catch {
+      this.logger.warn(
+        `Unknown loyalty tier '${user.loyaltyTier}' for user ${userId} - no discount`,
+      );
+      return 0;
+    }
   }
 
   /**
@@ -417,6 +460,19 @@ export class PaymentsService {
       const seatById = new Map(seats.map((s) => [s.id, s]));
       const basePrice = Number(match.basePrice);
 
+      // What was actually charged per seat: the list prices of ALL seats of the
+      // intent (metadata order = the order createPaymentIntent priced them in)
+      // with the intent's discount spread over them. Legacy intents without
+      // `discountPercent` metadata resolve to 0 % = list price.
+      const paidBySeatId =
+        this.capturedPaidPrices(intent, seatIds) ??
+        this.paidPricesBySeat(
+          seatIds,
+          seatById,
+          basePrice,
+          normalizeDiscountPercent(intent.metadata.discountPercent),
+        );
+
       // Per-seat DB occupancy check: separate fulfillable seats from taken ones.
       // This is the "can this already-paid purchase be fulfilled?" question —
       // distinct from the Redis lock check in assertSeatsAvailable which guards
@@ -462,7 +518,7 @@ export class PaymentsService {
               this.logger.error(`Seat ${seatId} missing while finalizing payment ${intent.id}`);
               continue;
             }
-            const price = seatUnitPrice(basePrice, seat.priceModifier);
+            const price = paidBySeatId.get(seatId) ?? seatUnitPrice(basePrice, seat.priceModifier);
             const ticket = em.create(Ticket, {
               matchId,
               seatId,
@@ -497,11 +553,11 @@ export class PaymentsService {
       // fulfill it (sub-case b). Fire-and-forget the notification email so
       // the webhook response is never delayed by SMTP latency.
       if (takenSeatIds.length > 0) {
-        const refundHuf = takenSeatIds.reduce((acc, seatId) => {
-          const seat = seatById.get(seatId);
-          if (!seat) return acc;
-          return acc + seatUnitPrice(basePrice, seat.priceModifier);
-        }, 0);
+        // Refund exactly what was paid for the taken seats (discounted lines).
+        const refundHuf = takenSeatIds.reduce(
+          (acc, seatId) => acc + (paidBySeatId.get(seatId) ?? 0),
+          0,
+        );
 
         if (refundHuf > 0) {
           try {
@@ -871,6 +927,53 @@ export class PaymentsService {
       lines.push({ seat, ownerToken: item.ownerToken, price });
     }
     return lines;
+  }
+
+  /**
+   * The per-seat amounts captured when the intent was created
+   * (`metadata.paidPrices`, same order as `seatIds`). They are used only if they
+   * are well-formed and add up to exactly what Stripe charged; anything else
+   * (a legacy intent, or tampered/truncated metadata) returns null and the
+   * caller falls back to recomputing from current prices.
+   */
+  private capturedPaidPrices(
+    intent: Stripe.PaymentIntent,
+    seatIds: readonly string[],
+  ): Map<string, number> | null {
+    const raw = intent.metadata.paidPrices;
+    if (!raw) return null;
+    const prices = raw.split(',').map((p) => (/^\d+$/.test(p) ? Number(p) : NaN));
+    if (prices.length !== seatIds.length || prices.some((p) => !Number.isSafeInteger(p))) {
+      this.logger.error(`PaymentIntent ${intent.id}: malformed paidPrices metadata '${raw}'`);
+      return null;
+    }
+    const sum = prices.reduce((acc, p) => acc + p, 0);
+    if (this.toStripeAmount(sum) !== intent.amount) {
+      this.logger.error(
+        `PaymentIntent ${intent.id}: paidPrices sum ${sum} does not match charged amount ${intent.amount}`,
+      );
+      return null;
+    }
+    return new Map(seatIds.map((seatId, i) => [seatId, prices[i]]));
+  }
+
+  /**
+   * Legacy fallback: discounted price per seat id, allocated over the seats in the given order.
+   * A seat missing from the database counts as 0 (it gets neither a ticket nor
+   * a refund line, as before).
+   */
+  private paidPricesBySeat(
+    seatIds: readonly string[],
+    seatById: ReadonlyMap<string, Seat>,
+    basePrice: number,
+    discountPercent: number,
+  ): Map<string, number> {
+    const listPrices = seatIds.map((seatId) => {
+      const seat = seatById.get(seatId);
+      return seat ? seatUnitPrice(basePrice, seat.priceModifier) : 0;
+    });
+    const { discounts } = allocateDiscount(listPrices, discountPercent);
+    return new Map(seatIds.map((seatId, i) => [seatId, discounts[i]]));
   }
 
   private toStripeAmount(huf: number): number {

@@ -1,52 +1,59 @@
-export interface RevenueDailyPoint {
-  readonly date: string;
-  readonly amount: number;
-  readonly ticketCount: number;
+export type OverviewPeriod = 'season' | '90d' | '30d';
+
+export interface OverviewSeason {
+  readonly label: string;
+  readonly validFrom: string;
+  readonly validUntil: string;
 }
 
-export interface RevenueByMatch {
+export interface OverviewMatch {
   readonly matchId: string;
   readonly homeTeam: string;
   readonly awayTeam: string;
   readonly kickoffAt: string;
+  readonly status: string;
+  /** False while the match is still ahead: sales, and so the figures, can still move. */
+  readonly final: boolean;
   readonly ticketCount: number;
+  readonly passEntryCount: number;
+  readonly occupiedSeats: number;
+  readonly capacity: number;
+  readonly occupancyPercent: number;
+  /** HUF actually charged. */
   readonly revenue: number;
 }
 
-export interface RevenueSummary {
-  readonly todayRevenue: number;
-  readonly monthRevenue: number;
-  readonly todayTicketCount: number;
-  readonly monthTicketCount: number;
-  readonly topMatch?: RevenueByMatch;
+export interface OverviewMetrics {
+  readonly revenue: number;
+  readonly ticketsSold: number;
+  readonly passEntries: number;
+  readonly averageOccupancyPercent: number | null;
+  readonly finalMatchCount: number;
+  readonly redemptionPercent: number | null;
+  readonly scannedTickets: number;
+  readonly playedTickets: number;
 }
 
-export interface RevenueStats {
-  readonly summary: RevenueSummary;
-  readonly daily: readonly RevenueDailyPoint[];
-  readonly byMatch: readonly RevenueByMatch[];
-}
-
-export interface SectorOccupancy {
-  readonly section: string;
-  readonly total: number;
-  readonly sold: number;
-  readonly locked: number;
-  readonly available: number;
-  readonly occupancyPercent: number;
-}
-
-export interface MatchOccupancy {
-  readonly matchId: string;
-  readonly homeTeam: string;
-  readonly awayTeam: string;
-  readonly kickoffAt: string;
-  readonly venue: string;
-  readonly totalCapacity: number;
-  readonly totalSold: number;
-  readonly totalLocked: number;
-  readonly totalAvailable: number;
-  readonly occupancyPercent: number;
-  readonly sectors: readonly SectorOccupancy[];
+export interface Overview {
+  readonly season: OverviewSeason | null;
+  readonly period: OverviewPeriod;
   readonly generatedAt: string;
+  readonly metrics: OverviewMetrics;
+  readonly matches: readonly OverviewMatch[];
+}
+
+export interface SeatSale {
+  readonly section: string;
+  readonly row: string;
+  readonly number: number;
+  /** Played matches this seat was taken for. */
+  readonly taken: number;
+}
+
+export interface SeatSales {
+  readonly season: OverviewSeason | null;
+  readonly generatedAt: string;
+  /** Matches played in the season: the denominator of every seat. */
+  readonly matchCount: number;
+  readonly seats: readonly SeatSale[];
 }

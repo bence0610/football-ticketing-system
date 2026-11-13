@@ -28,7 +28,21 @@ export interface LoyaltyTransactionResponse {
   points: number;
   balanceAfter: number;
   description?: string;
+  /** What earned the points; (source, referenceId) is unique. Absent on older rows. */
+  referenceId?: string;
   createdAt: string;
+}
+
+/** The real earning rules, from the server configuration. */
+export interface LoyaltyEarningRules {
+  registrationPoints: number;
+  profileCompletionPoints: number;
+  /** Flat points per purchased ticket - not a rate per forint. */
+  ticketPointsPerTicket: number;
+  seasonPassPoints: number;
+  passLoanPoints: number;
+  /** Share of the balance kept at the season-end conversion (0-100). */
+  carryoverPercent: number;
 }
 
 export interface LoyaltySnapshotResponse {
@@ -38,6 +52,12 @@ export interface LoyaltySnapshotResponse {
   pointsToNextTier?: number;
   /** Points earned per ticket bought (server config). Absent on older servers. */
   ticketPointsPerTicket?: number;
+  /** Absent on older servers; the page then says nothing about the rules. */
+  earning?: LoyaltyEarningRules;
+  /** Distinct matches entered (a ticket with a gate scan). */
+  matchesAttended?: number;
+  /** Whole ledger size; `recentTransactions` is only the newest page. */
+  totalTransactions?: number;
   recentTransactions: LoyaltyTransactionResponse[];
 }
 

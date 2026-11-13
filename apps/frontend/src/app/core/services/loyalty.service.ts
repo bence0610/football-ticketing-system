@@ -1,7 +1,12 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { LoyaltySnapshotResponse, LoyaltyTier, LoyaltyTierResponse } from '../models/loyalty.models';
+import {
+  LoyaltySnapshotResponse,
+  LoyaltyTier,
+  LoyaltyTierResponse,
+  LoyaltyTransactionResponse,
+} from '../models/loyalty.models';
 
 const TIER_ORDER: readonly LoyaltyTier[] = ['bronze', 'silver', 'gold', 'platinum'];
 const LAST_SEEN_KEY_PREFIX = 'kte.loyalty.lastSeenTier.';
@@ -12,6 +17,13 @@ export class LoyaltyService {
 
   getSnapshot(): Observable<LoyaltySnapshotResponse> {
     return this.http.get<LoyaltySnapshotResponse>('/loyalty/me');
+  }
+
+  /** The ledger, newest first, `limit` rows from `offset`. */
+  getTransactions(offset: number, limit: number): Observable<LoyaltyTransactionResponse[]> {
+    return this.http.get<LoyaltyTransactionResponse[]>('/loyalty/me/transactions', {
+      params: { offset, limit },
+    });
   }
 
   getTiers(): Observable<LoyaltyTierResponse[]> {

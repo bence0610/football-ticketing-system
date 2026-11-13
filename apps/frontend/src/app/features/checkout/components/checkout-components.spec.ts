@@ -96,6 +96,12 @@ describe('CheckoutSummaryComponent', () => {
     expect(el.querySelector('.summary__pay')?.textContent).toMatch(/Fizetés · 8\s?312/);
   });
 
+  it('shows no amount, rather than a computed one, until the server has priced the order', () => {
+    const el = render({ subtotal: null, total: null }).nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="summary-total"]')?.textContent?.trim()).toBe('—');
+    expect(el.querySelector('.summary__pay')?.textContent?.trim()).toBe('Fizetés');
+  });
+
   it('states that the ticket is issued when Stripe confirms, not when the browser returns', () => {
     const el = render().nativeElement as HTMLElement;
     expect(el.querySelector('[data-testid="issue-note"]')?.textContent).toContain(

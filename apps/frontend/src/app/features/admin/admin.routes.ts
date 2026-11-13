@@ -1,10 +1,14 @@
 import { Routes } from '@angular/router';
-import { AdminPageComponent } from './admin.page';
+import { AdminShellComponent } from './admin-shell.component';
 
+/**
+ * Every route here is a read-only page. A new page needs a matching entry in
+ * admin-nav.ts, and a backend endpoint that is behind the admin role.
+ */
 export const ADMIN_ROUTES: Routes = [
   {
     path: '',
-    component: AdminPageComponent,
+    component: AdminShellComponent,
     children: [
       {
         path: '',
@@ -15,13 +19,18 @@ export const ADMIN_ROUTES: Routes = [
         path: 'revenue',
         loadComponent: () =>
           import('./revenue/revenue-stats.page').then((m) => m.RevenueStatsPageComponent),
-        title: 'Admin - Bevételi statisztikák',
+        title: 'Admin - Bevétel',
       },
       {
         path: 'heatmap',
         loadComponent: () =>
           import('./heatmap/seat-heatmap.page').then((m) => m.SeatHeatmapPageComponent),
-        title: 'Admin - Foglaltsági heatmap',
+        title: 'Admin - Ülés-hőtérkép',
+      },
+      {
+        // An unknown admin address stays inside the admin shell.
+        path: '**',
+        redirectTo: 'revenue',
       },
     ],
   },

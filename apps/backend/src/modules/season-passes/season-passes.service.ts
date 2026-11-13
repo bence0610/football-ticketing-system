@@ -536,7 +536,7 @@ export class SeasonPassesService {
               validFrom: priceRow.validFrom,
               validUntil: priceRow.validUntil,
               status: SeasonPassStatus.ACTIVE,
-              pricePaid: priceRow.price.toFixed(2),
+              pricePaid: this.amountChargedHuf(intent, priceRow).toFixed(2),
               currency: priceRow.currency,
               qrCode: `KTE-SP-${randomUUID()}`,
               autoRenew: false,
@@ -567,6 +567,23 @@ export class SeasonPassesService {
 
     await this.refundUnissuedPass(intent, failure);
     return null;
+  }
+
+  /**
+   * What the buyer was actually charged, in HUF: the amount the PaymentIntent
+   * was created with. The price row is read again at finalization and may have
+   * been changed by an admin in between, so it is only a fallback for an intent
+   * without a usable amount.
+   */
+  private amountChargedHuf(intent: Stripe.PaymentIntent, priceRow: SeasonPassPrice): number {
+    const minor = intent.amount;
+    if (Number.isSafeInteger(minor) && minor > 0 && minor % 100 === 0) {
+      return minor / 100;
+    }
+    this.logger.warn(
+      `[season-pass] PaymentIntent ${intent.id}: no usable charged amount (${String(minor)}); using the price row`,
+    );
+    return Number(priceRow.price);
   }
 
   private async refundUnissuedPass(intent: Stripe.PaymentIntent, reason: string): Promise<void> {

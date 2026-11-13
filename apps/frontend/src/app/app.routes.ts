@@ -14,6 +14,13 @@ export const APP_ROUTES: Routes = [
     loadComponent: () => import('./features/gate/gate.page').then((m) => m.GatePageComponent),
     title: 'Beléptető',
   },
+  // The admin area has its own shell (dark sidebar, no public header or chat), so it sits beside
+  // AppShell, not inside it. The guard is the route's protection; the API checks the role again.
+  {
+    path: 'admin',
+    canActivate: [adminGuard],
+    loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
+  },
   {
     path: '',
     component: AppShellComponent,
@@ -114,13 +121,6 @@ export const APP_ROUTES: Routes = [
         loadComponent: () =>
           import('./features/loans/accept-loan.page').then((m) => m.AcceptLoanPageComponent),
         title: 'Bérletkölcsön elfogadása',
-      },
-      {
-        path: 'admin',
-        canActivate: [adminGuard],
-        loadChildren: () =>
-          import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
-        title: 'Admin',
       },
       {
         path: '**',

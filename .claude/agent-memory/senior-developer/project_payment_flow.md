@@ -11,7 +11,8 @@ The backend has ONE Stripe PaymentIntent flow for ticket purchases, all inside `
 - Frontend-driven fallback: `POST /api/payments/confirm` → `PaymentsService.confirmPaymentAndCreateTicket` (idempotent; safe to call alongside the webhook).
 - Stripe webhook: `POST /api/webhooks/stripe` → `StripeWebhookController` → `PaymentsService.handleEvent` → `handlePaymentSuccess` → `finalizePaymentIntent`.
 - Tickets are NOT pre-created. They are inserted with status `PAID` only after Stripe confirms, by `finalizePaymentIntent`.
-- PaymentIntent metadata: `userId`, `matchId`, `seatIds` (csv), `ownerTokens` (csv).
+- PaymentIntent metadata: `userId`, `matchId`, `seatIds` (csv), `ownerTokens` (csv), `discountPercent` (loyalty tier %, added 2026-11-11; missing => 0 for legacy intents).
+- Loyalty tier discount is server-authoritative (2026-11-11): computed once on the subtotal with frontend rounding, spread per seat by `allocateDiscount` (loyalty/loyalty-discount.ts); `Ticket.pricePaid` and the taken-seat refund use the discounted per-seat price; `lineItems` stay list price. Season-pass purchases do NOT apply the tier discount.
 
 The raw-body middleware for `/api/webhooks/stripe` is registered in `main.ts` so signature verification works.
 
