@@ -33,6 +33,7 @@ import {
   MatchStatus,
   PassLoan,
   PassLoanStatus,
+  Seat,
   SeasonPass,
   SeasonPassPrice,
   SeasonPassStatus,
@@ -48,6 +49,7 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { isHomeMatch } from '../matches/match-home';
 import { QrService } from '../qr/qr.service';
 import { STRIPE_CLIENT } from '../payments/stripe.provider';
+import { SQL_ROW_ORDER } from '../seats/seat-order';
 import { seatUnitPrice } from '../seats/seat-pricing';
 import { TicketRendererService } from '../tickets/ticket-renderer.service';
 import { CancelLoanDto, CreateLoanDto } from './dto/create-loan.dto';
@@ -60,6 +62,16 @@ import { formatFullName } from '../../common/format-name';
 import { IncomingLoanDto, LoanPreviewDto } from './dto/season-pass-response.dto';
 
 const ACTIVE_SEASON_LABEL = '2026/2027';
+
+interface SectorFacts {
+  name: string | null;
+  covered: boolean;
+  arc: 'upper' | 'lower' | null;
+  position: number | null;
+  gate: number | null;
+  priceCategory: 'vip' | 'upper' | 'lower' | null;
+  isAway: boolean;
+}
 
 // TTL for the per-attempt Redis record. Two requests within this window for
 // the same (user, section, season) share one Stripe idempotency key so
@@ -99,6 +111,12 @@ interface PassHolder {
 const fullName = formatFullName;
 
 class NoFreeSeatError extends Error {}
+
+type PriceTier = 'vip' | 'upper' | 'lower';
+
+/** The `season_pass_prices.section` of a pass is a price tier, never a sector code. */
+const isPriceTier = (key: string): key is PriceTier =>
+  key === 'vip' || key === 'upper' || key === 'lower';
 
 /**
  * The one definition of "this seat can still be issued as a season pass" for a
@@ -150,41 +168,58 @@ export class SeasonPassesService {
   }
 
   /**
-   * Returns the per-section season pass price list for the currently
-   * active season (`2026/2027`), with what the buyer needs to weigh it:
-   * free seats, passes sold, and what the same seat would cost match by match.
-   * Public read endpoint — no auth.
+   * Returns the season pass price list for the currently active season
+   * (`2026/2027`): one entry per price tier (the whole upper arc, the whole
+   * lower arc, VIP), not per sector. A pass is bought for a tier and the
+   * purchase picks the seat inside it. Each entry carries what the buyer needs
+   * to weigh it: free seats, passes sold, and what the same seat would cost
+   * match by match. Public read endpoint — no auth.
    */
   async listPrices(): Promise<SeasonPassPriceDto[]> {
-    const prices = await this.seasonPassPriceRepository.find({
-      where: { seasonLabel: ACTIVE_SEASON_LABEL, isActive: true },
-      order: { price: 'DESC' },
-    });
+    const facts = await this.loadSectorFacts();
+    // Dearest first. The away section has no tier, so it can never have a row; a row
+    // keyed by a sector code (the old per-sector rows) is ignored all the same.
+    const prices = (
+      await this.seasonPassPriceRepository.find({
+        where: { seasonLabel: ACTIVE_SEASON_LABEL, isActive: true },
+      })
+    )
+      .filter((row) => isPriceTier(row.section))
+      .sort((a, b) => b.price - a.price || a.section.localeCompare(b.section, 'hu'));
     if (prices.length === 0) {
       return [];
     }
 
-    const [fixtures, stats, sold, covered] = await Promise.all([
+    const [fixtures, stats, sold] = await Promise.all([
       this.findSeasonHomeMatches(prices),
       this.loadSectorSeatStats(ACTIVE_SEASON_LABEL),
       this.loadPassesSoldBySector(ACTIVE_SEASON_LABEL),
-      this.loadSectorCoverage(),
     ]);
     const now = Date.now();
     const upcoming = fixtures.filter((m) => m.kickoffAt.getTime() > now);
 
     return prices.map((row) => {
-      const sector = stats.get(row.section);
+      // The sellable sectors of this tier (the away section is in none).
+      const sectors = [...facts.entries()].filter(
+        ([, f]) => !f.isAway && f.priceCategory === row.section,
+      );
+      const tierStats = sectors
+        .map(([code]) => stats.get(code))
+        .filter((x): x is SectorSeatStats => x !== undefined);
+      const total = tierStats.reduce((sum, x) => sum + x.total, 0);
+      const free = tierStats.reduce((sum, x) => sum + x.free, 0);
+      const passesSold = sectors.reduce((sum, [code]) => sum + (sold.get(code) ?? 0), 0);
       // A pass seat is priced per seat (base price x modifier). Only when every
-      // seat of the sector shares one modifier is "what this seat costs per
+      // seat of the tier shares one modifier is "what this seat costs per
       // match" a single well-defined number; otherwise we say nothing.
+      const modifiers = new Set(tierStats.map((x) => x.uniformModifier));
+      const uniform = modifiers.size === 1 ? [...modifiers][0] : null;
       const singleMatchTotal =
-        sector?.uniformModifier != null && upcoming.length > 0
-          ? upcoming.reduce(
-              (sum, m) => sum + seatUnitPrice(Number(m.basePrice), sector.uniformModifier!),
-              0,
-            )
+        uniform != null && upcoming.length > 0
+          ? upcoming.reduce((sum, m) => sum + seatUnitPrice(Number(m.basePrice), uniform), 0)
           : null;
+      const sameValue = <T>(values: T[]): T | null =>
+        values.length > 0 && values.every((v) => v === values[0]) ? values[0] : null;
       return {
         sectionId: row.section,
         sectionName: row.sectionLabel,
@@ -193,10 +228,14 @@ export class SeasonPassesService {
         seasonLabel: row.seasonLabel,
         validFrom: row.validFrom.toISOString().slice(0, 10),
         validUntil: row.validUntil.toISOString().slice(0, 10),
-        freeSeats: sector?.free ?? 0,
-        totalSeats: sector?.total ?? 0,
-        passesSold: sold.get(row.section) ?? 0,
-        isCovered: covered.get(row.section) ?? null,
+        freeSeats: free,
+        totalSeats: total,
+        passesSold,
+        isCovered: sameValue(sectors.map(([, f]) => f.covered)),
+        priceCategory: row.section as PriceTier,
+        arc: sameValue(sectors.map(([, f]) => f.arc)),
+        position: null,
+        gate: sameValue(sectors.map(([, f]) => f.gate)),
         upcomingHomeMatches: upcoming.length,
         singleMatchTotal,
       };
@@ -281,10 +320,35 @@ export class SeasonPassesService {
     return new Map(rows.map((r) => [r.section, Number(r.sold)]));
   }
 
-  private async loadSectorCoverage(): Promise<Map<string, boolean>> {
-    const rows: Array<{ code: string; covered: number | string | boolean }> =
-      await this.dataSource.query('SELECT code, is_covered AS covered FROM sectors');
-    return new Map(rows.map((r) => [r.code, Number(r.covered) === 1]));
+  /** Everything the `sectors` table says about each sector (the single source of truth). */
+  private async loadSectorFacts(): Promise<Map<string, SectorFacts>> {
+    const rows: Array<{
+      code: string;
+      name?: string | null;
+      covered: number | string | boolean;
+      arc?: 'upper' | 'lower' | null;
+      position?: number | null;
+      gate?: number | null;
+      priceCategory?: SectorFacts['priceCategory'];
+      isAway?: number | string | boolean | null;
+    }> = await this.dataSource.query(
+      'SELECT code, name, is_covered AS covered, arc, position, gate, ' +
+        'price_category AS priceCategory, is_away AS isAway FROM sectors',
+    );
+    return new Map(
+      (rows ?? []).map((r) => [
+        r.code,
+        {
+          name: r.name ?? null,
+          covered: Number(r.covered) === 1,
+          arc: r.arc ?? null,
+          position: r.position ?? null,
+          gate: r.gate ?? null,
+          priceCategory: r.priceCategory ?? null,
+          isAway: Number(r.isAway ?? 0) === 1,
+        },
+      ]),
+    );
   }
 
   /**
@@ -313,6 +377,11 @@ export class SeasonPassesService {
       throw new NotFoundException('A felhasználó nem található.');
     }
 
+    // The away section is for visiting fans only: no season pass can be bought for it.
+    if ((await this.loadSectorFacts()).get(dto.sectionId)?.isAway) {
+      throw new ForbiddenException('A vendégszektorra nem váltható bérlet.');
+    }
+
     const priceRow = await this.seasonPassPriceRepository.findOne({
       where: {
         section: dto.sectionId,
@@ -322,7 +391,12 @@ export class SeasonPassesService {
     });
     if (!priceRow) {
       throw new NotFoundException(
-        `Nem található aktív bérletár ehhez a szektorhoz: ${dto.sectionId}`,
+        `Nem található aktív bérletár ehhez az árkategóriához: ${dto.sectionId}`,
+      );
+    }
+    if (!isPriceTier(priceRow.section)) {
+      throw new NotFoundException(
+        `Nem található aktív bérletár ehhez az árkategóriához: ${dto.sectionId}`,
       );
     }
 
@@ -492,8 +566,9 @@ export class SeasonPassesService {
    * Persists the SeasonPass row backed by a succeeded PaymentIntent and
    * assigns the seat. Idempotent per `stripePaymentIntentId`.
    *
-   * Seat choice: the first free seat (by row, number) of the purchased
-   * section that is neither held by another pass this season nor occupied by
+   * Seat choice: the first free seat of the purchased tier, in stadium order
+   * (sector position on the arc, then row, then number), in a sector of the
+   * tier (never the away section) that is neither held by another pass this season nor occupied by
    * a single-match ticket. Concurrent purchases may pick the same seat; the
    * `uq_season_passes_seat_season` index rejects the loser, which retries with
    * the next free seat.
@@ -516,7 +591,7 @@ export class SeasonPassesService {
     }
 
     const maxSeatAttempts = 8;
-    let failure = 'no free seat in section';
+    let failure = 'no free seat in tier';
     for (let attempt = 0; attempt < maxSeatAttempts; attempt++) {
       try {
         return await this.dataSource.transaction(async (manager) => {
@@ -604,19 +679,26 @@ export class SeasonPassesService {
     }
   }
 
+  /** First free seat of a price tier, in stadium order. */
   private async findFreeSeatId(
     manager: EntityManager,
-    section: string,
+    tier: string,
     seasonLabel: string,
   ): Promise<string | null> {
     const rows: Array<{ id: string }> = await manager.query(
-      'SELECT s.id FROM seats s ' +
-        'WHERE s.section = ? AND s.is_active = 1 ' +
+      'SELECT s.id FROM seats s JOIN sectors c ON c.code = s.section ' +
+        'WHERE c.price_category = ? AND c.is_away = 0 AND s.is_active = 1 ' +
         `AND ${SEAT_FREE_FOR_PASS_SQL} ` +
-        'ORDER BY s.`row`, s.`number` LIMIT 1',
-      [section, seasonLabel],
+        `ORDER BY c.arc = 'lower', c.position, ${SQL_ROW_ORDER}, s.\`number\` LIMIT 1`,
+      [tier, seasonLabel],
     );
     return rows[0]?.id ?? null;
+  }
+
+  /** "D/1 szektor / 3. sor / 5. szék", with the sector's display name from the table. */
+  private async seatLabelOf(seat: Seat): Promise<string> {
+    const facts = await this.loadSectorFacts();
+    return this.renderer.formatSeat(seat, facts.get(seat.section)?.name ?? undefined);
   }
 
   private async defaultHolder(buyerId: string): Promise<PassHolder> {
@@ -680,7 +762,7 @@ export class SeasonPassesService {
     if (!seatId) {
       throw new ConflictException({
         statusCode: 409,
-        message: 'Ebben a szektorban nincs több szabad bérletes hely.',
+        message: 'Ebben az árkategóriában nincs több szabad bérletes hely.',
         code: 'section_sold_out',
       });
     }
@@ -728,9 +810,15 @@ export class SeasonPassesService {
       .filter((id): id is string => typeof id === 'string' && id.length > 0);
   }
 
-  async listForUser(
-    userId: string,
-  ): Promise<Array<{ pass: SeasonPass; loans: PassLoan[]; seat: string | undefined }>> {
+  async listForUser(userId: string): Promise<
+    Array<{
+      pass: SeasonPass;
+      loans: PassLoan[];
+      seat: string | undefined;
+      sectorName: string | undefined;
+      gate: number | null;
+    }>
+  > {
     // Passes the user manages: bought by them, or held by them (account link).
     const passes = await this.seasonPassRepository.find({
       where: [{ userId }, { holderUserId: userId }],
@@ -745,10 +833,15 @@ export class SeasonPassesService {
       relations: ['match', 'borrower'],
       order: { createdAt: 'DESC' },
     });
+    const facts = await this.loadSectorFacts();
     return passes.map((pass) => ({
       pass,
       loans: loans.filter((l) => l.seasonPassId === pass.id),
-      seat: pass.seat ? this.renderer.formatSeat(pass.seat) : undefined,
+      seat: pass.seat
+        ? this.renderer.formatSeat(pass.seat, facts.get(pass.seat.section)?.name ?? undefined)
+        : undefined,
+      sectorName: pass.seat ? (facts.get(pass.seat.section)?.name ?? pass.seat.section) : undefined,
+      gate: pass.seat ? (facts.get(pass.seat.section)?.gate ?? null) : null,
     }));
   }
 
@@ -1420,7 +1513,7 @@ export class SeasonPassesService {
         matchTitle: matchSummary.title,
         matchVenue: matchSummary.venue,
         matchKickoffLabel: matchSummary.kickoffLabel,
-        seatLabel: pass.seat ? this.renderer.formatSeat(pass.seat) : '-',
+        seatLabel: pass.seat ? await this.seatLabelOf(pass.seat) : '-',
         expiresAtLabel: this.renderer.formatKickoff(loan.expiresAt),
         acceptUrl,
       },
@@ -1443,7 +1536,7 @@ export class SeasonPassesService {
       return;
     }
     const matchSummary = this.renderer.matchSummary(loan.match);
-    const seatLabel = loan.seasonPass.seat ? this.renderer.formatSeat(loan.seasonPass.seat) : '-';
+    const seatLabel = loan.seasonPass.seat ? await this.seatLabelOf(loan.seasonPass.seat) : '-';
 
     // Generate QR from the LOAN Ticket so the gate scan path works
     const qrResult = await this.qrService.generateForTicket(

@@ -1,3 +1,4 @@
+import { sectorName } from './sector-name';
 /**
  * Wording helpers shared by the lending screens (profile banner, accept page,
  * owner's pass card), so the same fact is always phrased the same way.
@@ -34,7 +35,7 @@ export function kickoffLabel(iso: string): string {
   });
 }
 
-/** "B szektor · 3. sor · 12. szék" */
+/** "D/1 szektor · 3. sor · 12. szék" */
 export function loanSeatLabel(seat: { seatSection: string; seatRow: string; seatNumber: number }): string {
-  return `${seat.seatSection} szektor · ${seat.seatRow}. sor · ${seat.seatNumber}. szék`;
+  return `${sectorName(seat.seatSection)} · ${seat.seatRow}. sor · ${seat.seatNumber}. szék`;
 }

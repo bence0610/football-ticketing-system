@@ -54,6 +54,22 @@ jest.setTimeout(30_000);
  *   - 404 when ownerToken query param is missing
  */
 
+import { STADIUM_LAYOUT } from '../../database/stadium-layout';
+
+/** The sectors table as the migration leaves it: the 19 sectors of the real stadium. */
+function layoutSectors(): Array<Record<string, unknown>> {
+  return STADIUM_LAYOUT.map((l) => ({
+    code: l.code,
+    name: l.name,
+    isCovered: l.isCovered,
+    arc: l.arc,
+    position: l.position,
+    gate: l.gate,
+    priceCategory: l.priceCategory,
+    isAway: l.isAway,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // UUIDs
 // ---------------------------------------------------------------------------
@@ -142,10 +158,9 @@ describe('MatchSeatsController – integration', () => {
   let seasonPassRepoMock: { find: jest.Mock };
   let sectorRepoMock: { find: jest.Mock };
 
-  // Shared Redis mock — pipeline.exec is reconfigured per test via setData().
-  let redisPipeline: { get: jest.Mock; exec: jest.Mock };
+  // Shared Redis mock — mget is reconfigured per test via setData().
   let redisMock: {
-    pipeline: jest.Mock;
+    mget: jest.Mock;
     set: jest.Mock;
     exists: jest.Mock;
     ttl: jest.Mock;
@@ -167,12 +182,8 @@ describe('MatchSeatsController – integration', () => {
     seasonPassRepoMock = { find: jest.fn() };
     sectorRepoMock = { find: jest.fn() };
 
-    redisPipeline = {
-      get: jest.fn().mockReturnThis(),
-      exec: jest.fn().mockResolvedValue([]),
-    };
     redisMock = {
-      pipeline: jest.fn().mockReturnValue(redisPipeline),
+      mget: jest.fn().mockImplementation(async (...keys: string[]) => keys.map(() => null)),
       set: jest.fn().mockResolvedValue('OK'),
       exists: jest.fn().mockResolvedValue(0),
       ttl: jest.fn().mockResolvedValue(-2),
@@ -234,16 +245,9 @@ describe('MatchSeatsController – integration', () => {
     seatRepoMock.find.mockResolvedValue([]);
     ticketRepoMock.find.mockResolvedValue([]);
     seasonPassRepoMock.find.mockResolvedValue([]);
-    // the real stadium: VIP and B are covered, A and C are open
-    sectorRepoMock.find.mockResolvedValue([
-      { code: 'A', name: 'A szektor', isCovered: false },
-      { code: 'B', name: 'B szektor', isCovered: true },
-      { code: 'C', name: 'C szektor', isCovered: false },
-      { code: 'VIP', name: 'VIP szektor', isCovered: true },
-    ]);
-    redisPipeline.get.mockReturnThis();
-    redisPipeline.exec.mockResolvedValue([]);
-    redisMock.pipeline.mockReturnValue(redisPipeline);
+    // the real stadium: 19 sectors, as the StadiumLayout migration writes them
+    sectorRepoMock.find.mockResolvedValue(layoutSectors());
+    redisMock.mget.mockImplementation(async (...keys: string[]) => keys.map(() => null));
     redisMock.set.mockResolvedValue('OK');
     redisMock.exists.mockResolvedValue(0);
     redisMock.ttl.mockResolvedValue(-2);
@@ -275,7 +279,13 @@ describe('MatchSeatsController – integration', () => {
     seatRepoMock.find.mockResolvedValue(seats);
     ticketRepoMock.find.mockResolvedValue(tickets);
     seasonPassRepoMock.find.mockResolvedValue(seasonPassSeatIds.map((id) => ({ seatId: id })));
-    redisPipeline.exec.mockResolvedValue(lockedSeatIds.map((id) => [null, `token-${id}`]));
+    // MGET returns one value per requested key, in order: a token for a locked seat, else null.
+    redisMock.mget.mockImplementation(async (...keys: string[]) =>
+      keys.map((key) => {
+        const id = lockedSeatIds.find((candidate) => key.includes(candidate));
+        return id ? `token-${id}` : null;
+      }),
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -399,12 +409,13 @@ describe('MatchSeatsController – integration', () => {
       expect(summary.occupancyRatio).toBeCloseTo(0.67, 1);
     });
 
-    it("carries each sector's covered flag from the sectors table (VIP and B covered, A and C open)", async () => {
+    it("carries each sector's covered flag from the sectors table (the upper arc and VIP covered, the rest open)", async () => {
       setData(makeMatch(), [
-        makeSeat(SEAT_ID_FREE, 'A', '1', 1),
-        makeSeat('b-1', 'B', '1', 1),
-        makeSeat('c-1', 'C', '1', 1),
-        makeSeat('v-1', 'VIP', '1', 1),
+        makeSeat('s-d1', 'D/1', '1', 1),
+        makeSeat('s-b2', 'B/2', '1', 1),
+        makeSeat('s-j', 'J', '1', 1),
+        makeSeat('s-vip', 'VIP', '1', 1),
+        makeSeat('s-e', 'E', '1', 1),
       ]);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
@@ -415,38 +426,134 @@ describe('MatchSeatsController – integration', () => {
           s.covered,
         ]),
       );
-      expect(covered).toEqual({ A: false, B: true, C: false, VIP: true });
+      expect(covered).toEqual({ 'D/1': true, 'B/2': true, J: false, VIP: true, E: false });
     });
 
-    it('reports a sector with no row in the sectors table as unknown (null), never as open', async () => {
-      sectorRepoMock.find.mockResolvedValue([{ code: 'B', name: 'B szektor', isCovered: true }]);
-      setData(makeMatch(), [makeSeat('b-1', 'B', '1', 1), makeSeat('x-1', 'X', '1', 1)]);
+    it('reports a sector with no row in the sectors table as unknown, never as open and never with a gate', async () => {
+      sectorRepoMock.find.mockResolvedValue([
+        {
+          code: 'K',
+          name: 'K szektor',
+          isCovered: false,
+          arc: 'lower',
+          position: 5,
+          gate: 2,
+          priceCategory: 'lower',
+          isAway: false,
+        },
+      ]);
+      setData(makeMatch(), [makeSeat('k-1', 'K', '1', 1), makeSeat('x-1', 'X', '1', 1)]);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
-      const bySection = Object.fromEntries(
-        res.body.sectorSummary.map((s: { section: string; covered: boolean | null }) => [
-          s.section,
-          s.covered,
-        ]),
+      const by = Object.fromEntries(
+        res.body.sectorSummary.map((s: Record<string, unknown>) => [s.section, s]),
       );
-      expect(bySection).toEqual({ B: true, X: null });
+      expect(by.K).toMatchObject({ covered: false, gate: 2 });
+      expect(by.X).toMatchObject({ covered: null, gate: null, name: 'X', isAway: false });
     });
 
-    it('should sort sectorSummary alphabetically by section', async () => {
-      const match = makeMatch();
-      const seats = [
-        makeSeat(`${SEAT_ID_FREE}-b`, 'B', '1', 1),
-        makeSeat(`${SEAT_ID_FREE}-a`, 'A', '1', 1),
-        makeSeat(`${SEAT_ID_FREE}-c`, 'C', '1', 1),
-      ];
-
-      setData(match, seats, []);
+    it('sorts the sector summary in stadium order (upper arc first, west to east), not alphabetically', async () => {
+      setData(makeMatch(), [
+        makeSeat('s-vip', 'VIP', '1', 1),
+        makeSeat('s-k', 'K', '1', 1),
+        makeSeat('s-c2', 'C/2', '1', 1),
+        makeSeat('s-d1', 'D/1', '1', 1),
+        makeSeat('s-a2', 'A/2', '1', 1),
+      ]);
 
       const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
 
       const sections = res.body.sectorSummary.map((s: { section: string }) => s.section);
-      expect(sections).toEqual([...sections].sort());
+      expect(sections).toEqual(['D/1', 'C/2', 'A/2', 'K', 'VIP']);
+      expect(sections).not.toEqual([...sections].sort());
+      // the seats follow the same order
+      expect(res.body.seats.map((s: { section: string }) => s.section)).toEqual(sections);
+    });
+
+    it('orders rows as numbers within a sector: 1, 2, 10, 11 - not 1, 10, 11, 2', async () => {
+      setData(makeMatch(), [
+        makeSeat('r10', 'K', '10', 1),
+        makeSeat('r2', 'K', '2', 1),
+        makeSeat('r11', 'K', '11', 1),
+        makeSeat('r1', 'K', '1', 1),
+      ]);
+
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+
+      expect(res.body.seats.map((s: { row: string }) => s.row)).toEqual(['1', '2', '10', '11']);
+    });
+
+    it('carries name, arc, position, gate and price tier for every sector', async () => {
+      setData(makeMatch(), [makeSeat('s-f', 'F', '1', 1), makeSeat('s-vip', 'VIP', '1', 1)]);
+
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+
+      const by = Object.fromEntries(
+        res.body.sectorSummary.map((s: Record<string, unknown>) => [s.section, s]),
+      );
+      expect(by.F).toMatchObject({
+        name: 'F szektor',
+        arc: 'lower',
+        position: 10,
+        gate: 1,
+        priceCategory: 'lower',
+        isAway: false,
+      });
+      expect(by.VIP).toMatchObject({
+        name: 'VIP',
+        arc: 'lower',
+        position: 7,
+        gate: 1,
+        priceCategory: 'vip',
+      });
+    });
+
+    describe('the away section (VENDÉG)', () => {
+      it('shows its seats as "away" with nothing available, and marks the sector', async () => {
+        setData(makeMatch(), [makeSeat('v-1', 'VENDÉG', '1', 1), makeSeat('k-1', 'K', '1', 1)]);
+
+        const res = await request(app.getHttpServer())
+          .get(`/matches/${MATCH_ID}/seats`)
+          .expect(200);
+
+        const statusOf = (id: string): string =>
+          res.body.seats.find((s: { id: string }) => s.id === id).status;
+        expect(statusOf('v-1')).toBe('away');
+        expect(statusOf('k-1')).toBe('available');
+        const by = Object.fromEntries(
+          res.body.sectorSummary.map((s: Record<string, unknown>) => [s.section, s]),
+        );
+        expect(by['VENDÉG']).toMatchObject({ isAway: true, available: 0, gate: 3 });
+        expect(by.K).toMatchObject({ isAway: false, available: 1 });
+      });
+
+      it('is away even if the seat was somehow marked sold or held by a pass', async () => {
+        setData(
+          makeMatch(),
+          [makeSeat('v-1', 'VENDÉG', '1', 1)],
+          [makeTicket(MATCH_ID, 'v-1', TicketStatus.PAID)],
+          [],
+          ['v-1'],
+        );
+
+        const res = await request(app.getHttpServer())
+          .get(`/matches/${MATCH_ID}/seats`)
+          .expect(200);
+
+        expect(res.body.seats[0].status).toBe('away');
+      });
+
+      it('cannot be locked: 403, and no lock is taken', async () => {
+        setData(makeMatch(), [makeSeat(SEAT_ID_FREE, 'VENDÉG', '1', 1)], []);
+
+        const res = await request(app.getHttpServer())
+          .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
+          .expect(403);
+
+        expect(res.body.message).toContain('vendégszektor');
+        expect(seatLockAcquire).not.toHaveBeenCalled();
+      });
     });
 
     it('should return 404 when the matchId is not found', async () => {
@@ -492,6 +599,48 @@ describe('MatchSeatsController – integration', () => {
       expect(res.body.ownerToken).toBe(OWNER_TOKEN);
       expect(res.body.ttlSeconds).toBe(300);
       expect(res.body).toHaveProperty('expiresAt');
+    });
+
+    describe('a match that has kicked off', () => {
+      it('cannot be locked: 409 match_started, and no lock is taken', async () => {
+        setData(
+          makeMatch({ kickoffAt: new Date(Date.now() - 60 * 1000) }),
+          [makeSeat(SEAT_ID_FREE, 'A', '1', 1)],
+          [],
+        );
+
+        const res = await request(app.getHttpServer())
+          .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
+          .expect(409);
+
+        expect(res.body.code).toBe('match_started');
+        expect(seatLockAcquire).not.toHaveBeenCalled();
+      });
+
+      it('is refused at the very instant of kickoff, but not a minute before it', async () => {
+        setData(
+          makeMatch({ kickoffAt: new Date(Date.now() + 60 * 1000) }),
+          [makeSeat(SEAT_ID_FREE, 'A', '1', 1)],
+          [],
+        );
+        await request(app.getHttpServer())
+          .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
+          .expect(201);
+
+        setData(makeMatch({ kickoffAt: new Date() }), [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], []);
+        await request(app.getHttpServer())
+          .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
+          .expect(409);
+      });
+
+      it('is a 404, and takes no lock, when the match does not exist', async () => {
+        setData(null, [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], []);
+
+        await request(app.getHttpServer())
+          .post(`/matches/${NON_EXISTENT_MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
+          .expect(404);
+        expect(seatLockAcquire).not.toHaveBeenCalled();
+      });
     });
 
     it('should return a valid ISO 8601 expiresAt timestamp', async () => {

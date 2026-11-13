@@ -11,7 +11,9 @@ import {
 import { NgClass, NgFor, NgIf } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { SECTOR_COMPASS_LABEL, SeatStatus } from '../../../../shared/models/seat.model';
+import { ARC_LABEL, SeatStatus, StadiumArc } from '../../../../shared/models/seat.model';
+import { gateLabel } from '../../../../shared/utils/gate';
+import { sectorName } from '../../../../shared/utils/sector-name';
 import { coverLabel } from '../../../../shared/utils/sector-cover';
 
 interface SeatRow {
@@ -28,7 +30,9 @@ interface SeatRow {
     <section class="kte-seat-grid" *ngIf="section; else noSelection">
       <header class="kte-seat-grid__header">
         <h3>
-          {{ section }} – {{ compassLabel(section) }}
+          {{ displayName() }}
+          <span class="kte-seat-grid__chip" *ngIf="arcText() as arc" data-testid="grid-arc">{{ arc }}</span>
+          <span class="kte-seat-grid__chip kte-seat-grid__chip--gate" *ngIf="gateText() as g" data-testid="grid-gate">{{ g }}</span>
           <span
             class="kte-seat-grid__cover"
             *ngIf="coverText() as label"
@@ -257,6 +261,23 @@ interface SeatRow {
         line-height: 1;
       }
 
+      .kte-seat-grid__chip {
+        margin-left: 8px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        background: var(--border-light);
+        color: var(--muted);
+        font-family: var(--font-body, inherit);
+        font-size: 12px;
+        font-weight: 600;
+        vertical-align: middle;
+      }
+
+      .kte-seat-grid__chip--gate {
+        background: var(--ink);
+        color: #ffffff;
+      }
+
       .kte-seat-grid__empty {
         margin: 16px 0 0;
         text-align: center;
@@ -289,6 +310,11 @@ interface SeatRow {
 export class SeatGridComponent implements OnChanges {
   @Input() seats: readonly SeatStatus[] = [];
   @Input() section: string | null = null;
+  /** Display name of the selected sector from the sectors table; falls back to the code. */
+  @Input() sectorName: string | null = null;
+  @Input() arc: StadiumArc | null = null;
+  /** Entrance gate 1..4; null = unknown. */
+  @Input() gate: number | null = null;
   /** Is the selected sector under a roof? null = unknown (nothing is shown). */
   @Input() covered: boolean | null = null;
   @Input() selectedSeat: SeatStatus | null = null;
@@ -347,12 +373,13 @@ export class SeatGridComponent implements OnChanges {
       sold: 'Elkelt',
       season_pass: 'Bérletes hely',
       disabled: 'Inaktív',
+      away: 'Vendégszektor: a portálon nem vásárolható',
     };
     return `${seat.row}. sor / ${seat.number}. szék — ${labels[seat.status]}`;
   }
 
   protected ariaLabel(seat: SeatStatus): string {
-    return `${seat.section} szektor, ${seat.row}. sor, ${seat.number}. szék, állapot: ${seat.status}`;
+    return `${sectorName(seat.section, this.sectorName)}, ${seat.row}. sor, ${seat.number}. szék, állapot: ${seat.status}`;
   }
 
   protected trackByRow(_index: number, row: SeatRow): string {
@@ -367,7 +394,15 @@ export class SeatGridComponent implements OnChanges {
     return coverLabel(this.covered);
   }
 
-  protected compassLabel(section: string): string {
-    return SECTOR_COMPASS_LABEL[section] ?? section;
+  protected displayName(): string {
+    return sectorName(this.section ?? '', this.sectorName);
+  }
+
+  protected arcText(): string | null {
+    return this.arc ? ARC_LABEL[this.arc] : null;
+  }
+
+  protected gateText(): string | null {
+    return gateLabel(this.gate);
   }
 }

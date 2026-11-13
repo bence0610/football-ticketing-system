@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PassLoanStatus, SeasonPassStatus } from '../../../database/entities';
 
 export class PassLoanResponseDto {
@@ -98,6 +98,16 @@ export class SeasonPassResponseDto {
     description: 'A szektor azonosítója, ha a bérlethez konkrét szék tartozik.',
   })
   section?: string;
+
+  @ApiPropertyOptional({ description: 'A szektor megjelenített neve ("D/1 szektor", "VIP").' })
+  sectorName?: string;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    example: 3,
+    description: 'A szektort kiszolgáló bejárat (1-4); null, ha nincs adat.',
+  })
+  gate?: number | null;
 
   @ApiProperty({
     type: String,

@@ -117,6 +117,7 @@ describe('PaymentsService', () => {
         homeTeam: 'KTE',
         awayTeam: 'DVTK',
         basePrice: '3000',
+        kickoffAt: new Date(Date.now() + 86_400_000),
       });
       mockSeatRepo.find.mockResolvedValue([
         { id: 's-1', priceModifier: '1.0', section: 'A', row: '1', number: '1' },
@@ -182,10 +183,30 @@ describe('PaymentsService', () => {
         homeTeam: 'KTE',
         awayTeam: 'DVTK',
         basePrice: '3000',
+        kickoffAt: new Date(Date.now() + 86_400_000),
       });
       mockSeatRepo.find.mockResolvedValue([
         { id: seatId, priceModifier: '1.0', section: 'A', row: '1', number: 1 },
       ]);
+    });
+
+    it('refuses a match that has kicked off, before touching seats or Stripe', async () => {
+      mockMatchRepo.findOne.mockResolvedValue({
+        id: matchId,
+        homeTeam: 'KTE',
+        awayTeam: 'DVTK',
+        basePrice: '3000',
+        kickoffAt: new Date(Date.now() - 60_000),
+      });
+      mockSeatsService.resolveAvailabilityForSeats.mockResolvedValue(
+        new Map([[seatId, SeatAvailability.LOCKED]]),
+      );
+
+      await expect(
+        service.createPaymentIntent(userId, { matchId, seats: [{ seatId, ownerToken }] }),
+      ).rejects.toMatchObject({ response: { code: 'match_started' } });
+      expect(mockStripe.paymentIntents.create).not.toHaveBeenCalled();
+      expect(mockSeatsService.resolveAvailabilityForSeats).not.toHaveBeenCalled();
     });
 
     it('should throw ConflictException when a seat is held by a season pass', async () => {
@@ -241,7 +262,13 @@ describe('PaymentsService', () => {
     const seatB = 'bbbbbbbb-0000-4000-8000-00000000000b';
     // basePrice 3333: seat A = 3333, seat B = round(3333 * 1.5) = 5000, list sum 8333.
     // KTE Legenda 15 %: round(8333 * 0.15) = 1250 off -> 7083, split as [2833, 4250].
-    const match = { id: matchId, homeTeam: 'KTE', awayTeam: 'DVTK', basePrice: '3333' };
+    const match = {
+      id: matchId,
+      homeTeam: 'KTE',
+      awayTeam: 'DVTK',
+      basePrice: '3333',
+      kickoffAt: new Date(Date.now() + 86_400_000),
+    };
     const seats = [
       { id: seatA, priceModifier: '1.0', section: 'A', row: '1', number: 1 },
       { id: seatB, priceModifier: '1.5', section: 'A', row: '1', number: 2 },

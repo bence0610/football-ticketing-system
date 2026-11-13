@@ -70,7 +70,7 @@ describe('ChatbotContextService', () => {
   ];
 
   let cache: Map<string, string>;
-  let redis: { get: jest.Mock; set: jest.Mock; pipeline: jest.Mock };
+  let redis: { get: jest.Mock; set: jest.Mock; mget: jest.Mock };
   let matches: Match[];
   let seatsService: SeatsService;
   let service: ChatbotContextService;
@@ -85,18 +85,10 @@ describe('ChatbotContextService', () => {
         cache.set(k, v);
         return 'OK';
       }),
-      pipeline: jest.fn(() => {
-        const keys: string[] = [];
-        const pipe = {
-          get: (k: string) => {
-            keys.push(k);
-            return pipe;
-          },
-          // Only b2 is locked; the value carries the seat id like the real lock.
-          exec: async () => keys.map((k) => [null, k.includes('b2') ? 'owner:b2' : null]),
-        };
-        return pipe;
-      }),
+      // Only b2 is locked. MGET answers one value per key, in key order.
+      mget: jest.fn(async (...keys: string[]) =>
+        keys.map((k) => (k.includes('b2') ? 'owner:b2' : null)),
+      ),
     };
     const soon = new Date(Date.now() + 48 * 3_600_000);
     seasonPasses = {

@@ -32,6 +32,8 @@ interface MatchContext {
   readonly homeTeam: string;
   readonly awayTeam: string;
   readonly kickoffAt: string;
+  /** Display name of the seat's sector, when the caller has it. */
+  readonly sectorName?: string;
 }
 
 /**
@@ -94,6 +96,7 @@ export class CartFacade {
       awayTeam: match.awayTeam,
       kickoffAt: match.kickoffAt,
       section: seat.section,
+      sectorName: match.sectorName,
       row: seat.row,
       seatNumber: seat.number,
       category: seat.category,
@@ -132,6 +135,7 @@ export class CartFacade {
       homeTeam: lapsed.homeTeam,
       awayTeam: lapsed.awayTeam,
       kickoffAt: lapsed.kickoffAt,
+      sectorName: lapsed.sectorName,
     });
   }
 

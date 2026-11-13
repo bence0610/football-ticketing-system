@@ -44,8 +44,8 @@ export function isSoldOut(price: SeasonPassPrice): boolean {
 }
 
 /**
- * The sector with the most active passes sold — only when that is a single,
- * non-zero leader. A tie or an empty season has no "most popular" sector.
+ * The option (price tier) with the most active passes sold — only when that is a
+ * single, non-zero leader. A tie or an empty season has no "most popular" option.
  */
 export function mostPopularSectionId(prices: readonly SeasonPassPrice[]): string | null {
   let best: SeasonPassPrice | null = null;
@@ -98,7 +98,7 @@ export function savingsFor(price: SeasonPassPrice): Savings {
   };
 }
 
-/** The sector the panel talks about: the chosen one, else the cheapest. */
+/** The option the panel talks about: the chosen one, else the cheapest. */
 export function panelSector(
   prices: readonly SeasonPassPrice[],
   selectedId: string | null,

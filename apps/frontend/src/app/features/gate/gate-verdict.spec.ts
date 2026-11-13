@@ -1,4 +1,6 @@
 import {
+  gateNote,
+  gateText,
   isAdmission,
   whenLabel,
   verdictFromFailure,
@@ -7,7 +9,15 @@ import {
 } from './gate-verdict';
 import { TicketScanResponse } from '../../core/models/ticket.models';
 
-const seat = { id: 's', section: 'B', row: '5', number: 12, category: 'standard' };
+const seat = {
+  id: 's',
+  section: 'B',
+  sectorName: 'B szektor',
+  gate: 4,
+  row: '5',
+  number: 12,
+  category: 'standard',
+};
 const match = {
   id: 'm',
   homeTeam: 'KTE',
@@ -165,5 +175,41 @@ describe('gate verdicts', () => {
       expect(whenLabel(undefined, now)).toBeUndefined();
       expect(whenLabel('nope', now)).toBeUndefined();
     });
+  });
+});
+
+describe('the gate of a ticket', () => {
+  it('is carried on the verdict as information', () => {
+    const v = verdictFromResponse({ success: true, result: 'ok', seat, match, holderName: 'Kiss Anna' });
+    expect(v.gate).toBe(4);
+    expect(gateText(v.gate)).toBe('4-es kapu');
+  });
+
+  it('says nothing about a gate it does not know', () => {
+    expect(gateText(null)).toBeNull();
+    expect(gateNote(null, 2)).toBeNull();
+    expect(gateNote(undefined, 2)).toBeNull();
+  });
+
+  it('gives no note when the steward is at the right gate, or has not said which gate this is', () => {
+    expect(gateNote(3, 3)).toBeNull();
+    expect(gateNote(3, null)).toBeNull();
+  });
+
+  it('names the ticket gate when it differs, with the right article and suffix', () => {
+    expect(gateNote(1, 2)).toBe('Ez a jegy az 1-es kapuhoz tartozik.');
+    expect(gateNote(2, 1)).toBe('Ez a jegy a 2-es kapuhoz tartozik.');
+    expect(gateNote(3, 1)).toBe('Ez a jegy a 3-as kapuhoz tartozik.');
+    expect(gateNote(4, 1)).toBe('Ez a jegy a 4-es kapuhoz tartozik.');
+  });
+
+  it('never turns a good ticket into a refusal: the verdict does not depend on the steward gate', () => {
+    const v = verdictFromResponse({ success: true, result: 'ok', seat, match, holderName: 'Kiss Anna' });
+    // the verdict is built from the server answer alone; the gate note is a separate line
+    expect(v.kind).toBe('admitted');
+    expect(v.tone).toBe('ok');
+    expect(isAdmission(v)).toBe(true);
+    expect(gateNote(v.gate, 1)).not.toBeNull();
+    expect(isAdmission(v)).toBe(true);
   });
 });

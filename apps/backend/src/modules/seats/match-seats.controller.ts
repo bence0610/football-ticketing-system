@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Controller,
   Delete,
   Get,
@@ -60,12 +61,15 @@ export class MatchSeatsController {
       'Atomi `SET NX EX` művelettel zárolja a széket Redis-ben (alapértelmezett TTL 300 mp). Sikeres zárolás esetén egy ownerToken-t kap a hívó. Bejelentkezett és vendég felhasználó is használhatja: ha JWT érkezik, a `userId` a lock metaadatába kerül.',
   })
   @ApiOkResponse({ type: LockSeatResponseDto })
-  @ApiConflictResponse({ description: 'A szék már zárolva van.' })
+  @ApiConflictResponse({ description: 'A szék már zárolva van, vagy a mérkőzés már elkezdődött (`match_started`).' })
   async lockSeat(
     @Param('matchId', new ParseUUIDPipe()) matchId: string,
     @Param('seatId', new ParseUUIDPipe()) seatId: string,
     @CurrentUser() user: AuthenticatedUser | undefined,
   ): Promise<LockSeatResponseDto> {
+    // A match that has kicked off cannot be bought, whatever the client showed.
+    await this.seatsService.assertMatchOpenForSale(matchId);
+
     const availability = await this.seatsService.resolveAvailabilityForSeats(matchId, [seatId]);
     const status = availability.get(seatId);
 
@@ -74,6 +78,9 @@ export class MatchSeatsController {
     }
     if (status === SeatAvailability.DISABLED) {
       throw new ConflictException('Ez a hely nem foglalható.');
+    }
+    if (status === SeatAvailability.AWAY) {
+      throw new ForbiddenException('A vendégszektor helyei a portálon nem vásárolhatók meg.');
     }
     if (status === SeatAvailability.SOLD) {
       throw new ConflictException('Ez a hely már elkelt.');

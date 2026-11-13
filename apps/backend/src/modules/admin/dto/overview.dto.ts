@@ -67,11 +67,21 @@ export class SeatSaleDto {
   @ApiProperty({ description: 'Played matches this seat was taken for.' }) taken!: number;
 }
 
+export class SeatSaleSectorDto {
+  @ApiProperty({ example: 'D/1' }) code!: string;
+  @ApiProperty({ example: 'D/1 szektor' }) name!: string;
+  @ApiProperty({ enum: ['upper', 'lower'] }) arc!: 'upper' | 'lower';
+  @ApiProperty({ description: 'Order on the arc, west to east.' }) position!: number;
+  @ApiProperty() isAway!: boolean;
+}
+
 export class SeatSalesDto {
   @ApiPropertyOptional({ type: OverviewSeasonDto, nullable: true })
   season!: OverviewSeasonDto | null;
   @ApiProperty({ format: 'date-time' }) generatedAt!: string;
   @ApiProperty({ description: 'Matches played in the season; the denominator of every seat.' })
   matchCount!: number;
+  @ApiProperty({ type: [SeatSaleSectorDto], description: 'Stadium order, upper arc first.' })
+  sectors!: SeatSaleSectorDto[];
   @ApiProperty({ type: [SeatSaleDto] }) seats!: SeatSaleDto[];
 }

@@ -1,3 +1,4 @@
+import { sectorName } from '../../../shared/utils/sector-name';
 import { CartItem } from '../../../shared/models/cart.model';
 import { SeatCategory } from '../../../shared/models/seat.model';
 
@@ -53,20 +54,21 @@ export function shortestHoldMs(items: readonly CartItem[], nowMs: number): numbe
   return Math.max(0, Math.min(...items.map((i) => i.lockExpiresAtMs - nowMs)));
 }
 
-/** The 38px chip text: the sector code (A, B, C, VIP). */
+/** The 38px chip text: the sector code ("D/1", "K", "VIP"). */
 export function seatShortLabel(item: Pick<CartItem, 'section'>): string {
   return item.section;
 }
 
-/** "A szektor · 1. sor · 5. szék" (the VIP sector has no "szektor" suffix). */
-export function seatDescription(item: Pick<CartItem, 'section' | 'row' | 'seatNumber'>): string {
-  const sector = item.section === 'VIP' ? 'VIP' : `${item.section} szektor`;
-  return `${sector} · ${item.row}. sor · ${item.seatNumber}. szék`;
+/** "D/1 szektor · 1. sor · 5. szék": the sector's display name, then row and seat. */
+export function seatDescription(
+  item: Pick<CartItem, 'section' | 'row' | 'seatNumber'> & { sectorName?: string },
+): string {
+  return `${sectorName(item.section, item.sectorName)} · ${item.row}. sor · ${item.seatNumber}. szék`;
 }
 
 const TICKET_TYPES: Record<SeatCategory, string> = {
   standard: 'Normál jegy',
-  premium: 'Prémium jegy',
+  premium: 'Normál jegy', // legacy value: there is no premium tier any more
   vip: 'VIP jegy',
   standing: 'Álló jegy',
 };

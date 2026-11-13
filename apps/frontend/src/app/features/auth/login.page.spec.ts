@@ -31,6 +31,10 @@ const NEXT: MatchListItem = {
 };
 
 describe('LoginPageComponent', () => {
+  // provideMockStore pins a result on this app-wide memoized selector; without this it stays
+  // pinned for every spec that runs afterwards.
+  afterEach(() => selectAllMatches.clearResult());
+
   let fixture: ComponentFixture<LoginPageComponent>;
   let auth: jasmine.SpyObj<AuthService>;
 

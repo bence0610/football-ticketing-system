@@ -4,65 +4,74 @@ import {
   EventEmitter,
   Input,
   Output,
+  computed,
+  signal,
 } from '@angular/core';
-import { NgClass, NgFor, NgIf } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { SECTOR_COMPASS_LABEL, SectorSummary } from '../../../../shared/models/seat.model';
-import { coverDescription, coverLabel } from '../../../../shared/utils/sector-cover';
+import {
+  ARC_LABEL,
+  PRICE_CATEGORY_LABEL,
+  SectorSummary,
+  StadiumArc,
+} from '../../../../shared/models/seat.model';
+import { HufCurrencyPipe } from '../../../../shared/pipes/huf-currency.pipe';
+import { gateLabel } from '../../../../shared/utils/gate';
+import { coverLabel } from '../../../../shared/utils/sector-cover';
 
+interface Group {
+  readonly key: StadiumArc | 'other';
+  readonly label: string;
+  readonly sectors: readonly SectorSummary[];
+}
+
+/**
+ * The map's fallback: one dropdown listing every sector with its free seats and
+ * price, so a seat can be bought without the map (keyboard and screen-reader
+ * users, or a map that is too small to tap). A native `<select>`, on purpose: it
+ * is the control every assistive technology already knows how to drive.
+ *
+ * Sectors are grouped by arc and in stadium order (west to east); order and names
+ * come from the server. The away section is listed so it is visible that it
+ * exists, but it is disabled: it cannot be chosen.
+ */
 @Component({
   selector: 'kte-sector-summary',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgFor, NgIf, NgClass, MatCardModule, MatProgressBarModule],
+  imports: [HufCurrencyPipe],
   template: `
-    <section class="kte-sector-summary" *ngIf="summaries.length > 0">
-      <h3 class="kte-sector-summary__title">Szektorok foglaltsága</h3>
-      <div class="kte-sector-summary__grid">
-        <mat-card
-          *ngFor="let summary of summaries; trackBy: trackBySection"
-          class="kte-sector-card"
-          [ngClass]="{
-            'kte-sector-card--active': summary.section === selectedSection
-          }"
-          (click)="sectorSelected.emit(summary.section)"
-          (keyup.enter)="sectorSelected.emit(summary.section)"
-          tabindex="0"
-          role="button"
-          [attr.aria-pressed]="summary.section === selectedSection"
+    @if (groups().length > 0) {
+      <section class="kte-sector-select" aria-labelledby="kte-sector-select-label">
+        <label id="kte-sector-select-label" class="kte-sector-select__label" for="kte-sector-select">
+          Szektor kiválasztása a térkép nélkül
+        </label>
+        <select
+          id="kte-sector-select"
+          class="kte-sector-select__control"
+          data-testid="sector-select"
+          [value]="selectedSection ?? ''"
+          (change)="onChange($any($event.target).value)"
         >
-          <header class="kte-sector-card__header">
-            <span class="kte-sector-card__section">{{ summary.section }}</span>
-            <span class="kte-sector-card__compass">{{ compassLabel(summary.section) }}</span>
-            <span
-              class="kte-sector-card__cover"
-              *ngIf="cover(summary) as label"
-              [class.kte-sector-card__cover--covered]="summary.covered === true"
-              [attr.title]="coverText(summary)"
-              data-testid="sector-cover"
-              >{{ label }}</span
-            >
-          </header>
-
-          <p class="kte-sector-card__numbers">
-            <strong>{{ summary.available }}</strong>
-            <span>szabad / {{ summary.total }}</span>
-          </p>
-
-          <mat-progress-bar
-            mode="determinate"
-            [value]="summary.occupancyRatio * 100"
-            [color]="progressColor(summary.occupancyRatio)"
-          ></mat-progress-bar>
-
-          <footer class="kte-sector-card__legend">
-            <span><span class="dot dot--locked"></span>{{ summary.locked }} foglalva</span>
-            <span><span class="dot dot--sold"></span>{{ summary.sold }} elkelt</span>
-          </footer>
-        </mat-card>
-      </div>
-    </section>
+          <option value="" [selected]="!selectedSection" disabled>Válassz szektort…</option>
+          @for (group of groups(); track group.key) {
+            <optgroup [label]="group.label" data-testid="sector-group">
+              @for (summary of group.sectors; track summary.section) {
+                <option
+                  [value]="summary.section"
+                  [selected]="summary.section === selectedSection"
+                  [disabled]="summary.isAway"
+                  [attr.data-section]="summary.section"
+                >
+                  {{ optionText(summary) }}
+                </option>
+              }
+            </optgroup>
+          }
+        </select>
+        <p class="kte-sector-select__hint">
+          A szektor kiválasztása után lent a székek közül választhatsz.
+        </p>
+      </section>
+    }
   `,
   styles: [
     `
@@ -70,150 +79,104 @@ import { coverDescription, coverLabel } from '../../../../shared/utils/sector-co
         display: block;
       }
 
-      .kte-sector-summary__title {
-        margin: 0 0 12px;
-        font-family: var(--kte-font-display);
-        font-size: 20px;
-        font-weight: 700;
-        color: var(--kte-brand-deep);
-        letter-spacing: -0.005em;
-      }
-
-      .kte-sector-summary__grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 12px;
-      }
-
-      .kte-sector-card {
-        padding: 16px;
-        border-radius: var(--kte-radius);
-        cursor: pointer;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-        border: 2px solid transparent;
-      }
-
-      .kte-sector-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--kte-shadow-md);
-      }
-
-      .kte-sector-card--active {
-        border-color: var(--kte-brand-mid);
-        box-shadow: 0 0 0 4px rgba(107, 45, 150, 0.18);
-      }
-
-      .kte-sector-card__header {
+      .kte-sector-select {
         display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        margin-bottom: 6px;
-      }
-
-      .kte-sector-card__section {
-        font-family: var(--kte-font-display);
-        font-size: 24px;
-        font-weight: 700;
-        color: var(--kte-brand-deep);
-      }
-
-      .kte-sector-card__cover {
-        margin-left: auto;
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: var(--border-light);
-        color: var(--muted);
-        font-size: 12px;
-        font-weight: 600;
-      }
-
-      .kte-sector-card__cover--covered {
-        background: var(--brand-tint);
-        color: var(--brand-deep);
-      }
-
-      .kte-sector-card__compass {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.12em;
-        color: var(--kte-muted);
-      }
-
-      .kte-sector-card__numbers {
-        margin: 0 0 8px;
-        display: flex;
-        align-items: baseline;
+        flex-direction: column;
         gap: 6px;
+        padding: 12px 16px;
+        background: var(--kte-surface);
+        border-radius: var(--kte-radius);
+        box-shadow: var(--kte-shadow-sm);
+      }
+
+      .kte-sector-select__label {
+        font-weight: 600;
+        color: var(--kte-brand-deep);
+      }
+
+      .kte-sector-select__control {
+        width: 100%;
+        max-width: 560px;
+        min-height: 44px;
+        padding: 8px 12px;
+        font: inherit;
+        color: var(--ink);
+        background: var(--kte-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--kte-radius);
+      }
+
+      .kte-sector-select__control:focus-visible {
+        outline: 2px solid var(--brand-mid);
+        outline-offset: 2px;
+      }
+
+      .kte-sector-select__hint {
+        margin: 0;
+        font-size: 12px;
         color: var(--kte-muted);
-        font-size: 13px;
-      }
-
-      .kte-sector-card__numbers strong {
-        font-family: var(--kte-font-display);
-        font-size: 22px;
-        color: var(--kte-success);
-      }
-
-      .kte-sector-card__legend {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 8px;
-        font-size: 11px;
-        color: var(--kte-muted);
-
-        span {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-      }
-
-      .dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        display: inline-block;
-      }
-
-      .dot--locked {
-        background: var(--kte-seat-locked);
-      }
-
-      .dot--sold {
-        background: var(--kte-seat-sold);
       }
     `,
   ],
 })
 export class SectorSummaryComponent {
-  @Input() summaries: readonly SectorSummary[] = [];
+  private readonly all = signal<readonly SectorSummary[]>([]);
+  private readonly huf = new HufCurrencyPipe();
 
-  protected cover(summary: SectorSummary): string | null {
-    return coverLabel(summary.covered);
+  @Input() set summaries(value: readonly SectorSummary[]) {
+    this.all.set(value ?? []);
   }
-
-  protected coverText(summary: SectorSummary): string | null {
-    return coverDescription(summary.covered);
-  }
-
   @Input() selectedSection: string | null = null;
   @Output() sectorSelected = new EventEmitter<string>();
 
-  protected progressColor(ratio: number): 'primary' | 'accent' | 'warn' {
-    if (ratio >= 0.85) {
-      return 'warn';
+  /** Upper arc, then the lower arc, each west to east; sectors with no arc data come last. */
+  protected readonly groups = computed<readonly Group[]>(() => {
+    const all = this.all();
+    const onArc = (arc: StadiumArc): SectorSummary[] =>
+      all
+        .filter((s) => s.arc === arc)
+        .sort((a, b) => (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER));
+    const groups: Group[] = (['upper', 'lower'] as const)
+      .map((arc) => ({ key: arc, label: ARC_LABEL[arc], sectors: onArc(arc) }))
+      .filter((g) => g.sectors.length > 0);
+    const rest = all.filter((s) => s.arc === null);
+    if (rest.length > 0) {
+      groups.push({ key: 'other', label: 'További szektorok', sectors: rest });
     }
-    if (ratio >= 0.5) {
-      return 'accent';
+    return groups;
+  });
+
+  protected onChange(section: string): void {
+    const summary = this.all().find((s) => s.section === section);
+    // The away section is not for sale through the portal.
+    if (!summary || summary.isAway) {
+      return;
     }
-    return 'primary';
+    this.sectorSelected.emit(section);
   }
 
-  protected compassLabel(section: string): string {
-    return SECTOR_COMPASS_LABEL[section] ?? section;
+  /** "D/1 szektor · Felső ív · fedett · 150 szabad · 2 800 Ft": all a choice needs, in one line. */
+  protected optionText(summary: SectorSummary): string {
+    if (summary.isAway) {
+      return `${summary.name} · vendégszektor, a portálon nem vásárolható`;
+    }
+    const parts: Array<string | null> = [
+      summary.name,
+      summary.priceCategory ? PRICE_CATEGORY_LABEL[summary.priceCategory] : null,
+      coverLabel(summary.covered)?.toLowerCase() ?? null,
+      gateLabel(summary.gate),
+      summary.available > 0 ? `${summary.available} szabad` : 'elfogyott',
+      this.priceText(summary),
+    ];
+    return parts.filter((p): p is string => !!p).join(' · ');
   }
 
-  protected trackBySection(_index: number, item: SectorSummary): string {
-    return item.section;
+  private priceText(summary: SectorSummary): string {
+    if (summary.available <= 0) {
+      return '';
+    }
+    return summary.minPrice === summary.maxPrice
+      ? this.huf.transform(summary.minPrice)
+      : `${this.huf.transform(summary.minPrice)}-tól`;
   }
 }

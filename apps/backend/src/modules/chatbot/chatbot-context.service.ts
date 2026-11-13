@@ -26,6 +26,12 @@ const UPCOMING_STATUSES: MatchStatus[] = [MatchStatus.ON_SALE, MatchStatus.SCHED
 /** Per-sector counts, taken from the seat map's own sector summary. */
 export interface ChatbotSectorSnapshot {
   section: string;
+  /** Display name from the sectors table ("D/1 szektor", "VIP"); absent in older snapshots. */
+  name?: string;
+  /** The away section: not sold through the portal. Absent in older snapshots (= not away). */
+  away?: boolean;
+  /** Entrance gate 1..4, when known. */
+  gate?: number | null;
   total: number;
   free: number;
   sold: number;
@@ -312,6 +318,9 @@ export class ChatbotContextService {
       const { sectorSummary } = await this.seatsService.findSeatsForMatch(matchId);
       return sectorSummary.map((s) => ({
         section: s.section,
+        name: s.name,
+        away: s.isAway,
+        gate: s.gate ?? null,
         total: s.total,
         free: s.available,
         sold: s.sold,

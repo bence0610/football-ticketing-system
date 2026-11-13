@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Match, Seat, SeasonPass, SeasonPassPrice, Ticket } from '../../database/entities';
+import { Match, Seat, SeasonPass, SeasonPassPrice, Sector, Ticket } from '../../database/entities';
 import { AuthModule } from '../auth/auth.module';
 import { MatchesModule } from '../matches/matches.module';
 import { AdminController } from './admin.controller';
@@ -11,7 +11,7 @@ import { AdminService } from './admin.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Match, Seat, SeasonPass, SeasonPassPrice, Ticket]),
+    TypeOrmModule.forFeature([Match, Seat, SeasonPass, SeasonPassPrice, Sector, Ticket]),
     AuthModule,
     MatchesModule,
   ],

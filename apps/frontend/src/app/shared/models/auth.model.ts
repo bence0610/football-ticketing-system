@@ -61,6 +61,8 @@ export interface UserTicket {
   readonly kickoffAt: string;
   readonly venue: string;
   readonly section: string;
+  readonly sectorName: string;
+  readonly gate: number | null;
   readonly row: string;
   readonly seatNumber: number;
   readonly category: string;

@@ -77,7 +77,15 @@ function makeTicket(override: Partial<TicketResponse>): TicketResponse {
       venue: 'Stadion',
       kickoffAt: new Date(PAST_MS).toISOString(),
     },
-    seat: { id: 'seat-1', section: 'B', row: '5', number: 12, category: 'standard' },
+    seat: {
+      id: 'seat-1',
+      section: 'B',
+      sectorName: 'B szektor',
+      gate: 3,
+      row: '5',
+      number: 12,
+      category: 'standard',
+    },
     ...override,
   };
 }

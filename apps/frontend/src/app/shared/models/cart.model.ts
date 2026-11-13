@@ -12,6 +12,8 @@ export interface CartItem {
   readonly awayTeam: string;
   readonly kickoffAt: string;
   readonly section: string;
+  /** Display name from the sectors table; absent on carts persisted before it existed. */
+  readonly sectorName?: string;
   readonly row: string;
   readonly seatNumber: number;
   readonly category: SeatCategory;

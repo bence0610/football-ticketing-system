@@ -24,7 +24,12 @@ export class MatchPricesService {
     if (!entry) {
       entry = this.seats.loadSeats(matchId).pipe(
         map((res): MatchPrices => {
-          const sectors = [...res.sectorSummary].sort((a, b) => a.minPrice - b.minPrice);
+          // The away section is never offered: it is not for sale, so it is not a "cheapest
+          // sector" and does not set a "from" price. Everything that picks a sector from
+          // this list (hero, cards, the loyalty example, the cart suggestion) inherits that.
+          const sectors = res.sectorSummary
+            .filter((s) => !s.isAway)
+            .sort((a, b) => a.minPrice - b.minPrice);
           const prices = sectors.map((s) => s.minPrice).filter((p) => Number.isFinite(p));
           return { sectors, lowest: prices.length ? Math.min(...prices) : null };
         }),

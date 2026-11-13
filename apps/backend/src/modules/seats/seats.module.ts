@@ -5,11 +5,12 @@ import { AuthModule } from '../auth/auth.module';
 import { MatchSeatsController } from './match-seats.controller';
 import { SeatsController } from './seats.controller';
 import { SeatsService } from './seats.service';
+import { SectorCatalogueService } from './sector-catalogue.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Seat, Ticket, Match, SeasonPass, Sector]), AuthModule],
   controllers: [SeatsController, MatchSeatsController],
-  providers: [SeatsService],
-  exports: [SeatsService],
+  providers: [SeatsService, SectorCatalogueService],
+  exports: [SeatsService, SectorCatalogueService],
 })
 export class SeatsModule {}

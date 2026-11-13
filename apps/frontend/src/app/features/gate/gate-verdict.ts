@@ -1,3 +1,6 @@
+import { gateLabel } from '../../shared/utils/gate';
+import { hungarianArticle } from '../../shared/utils/hungarian-article';
+import { sectorName } from '../../shared/utils/sector-name';
 import { TicketScanResponse, TicketSource } from '../../core/models/ticket.models';
 
 /**
@@ -31,6 +34,8 @@ export interface Verdict {
   holderName?: string;
   /** "B szektor · 5. sor · 12. szék". */
   seat?: string;
+  /** The entrance gate (1..4) of the ticket's sector; null/absent = unknown. Information only. */
+  gate?: number | null;
   /** "Kecskeméti TE – Újpest FC". */
   fixture?: string;
   typeLabel?: string;
@@ -56,7 +61,9 @@ const INVALID_REASONS: Readonly<Record<string, string>> = {
 const INVALID_DEFAULT = 'Ez a kód nem érvényes jegy. Olvasd be újra, vagy kérj másik jegyet.';
 
 export function seatText(seat: TicketScanResponse['seat']): string | undefined {
-  return seat ? `${seat.section} szektor · ${seat.row}. sor · ${seat.number}. szék` : undefined;
+  return seat
+    ? `${sectorName(seat.section, seat.sectorName)} · ${seat.row}. sor · ${seat.number}. szék`
+    : undefined;
 }
 
 function fixtureText(match: TicketScanResponse['match']): string | undefined {
@@ -80,6 +87,7 @@ export function verdictFromResponse(res: TicketScanResponse): Verdict {
   const common = {
     holderName: res.holderName,
     seat: seatText(res.seat),
+    gate: res.seat?.gate ?? null,
     fixture: fixtureText(res.match),
     typeLabel: res.source ? SOURCE_LABELS[res.source] : undefined,
     retryable: false,
@@ -192,4 +200,25 @@ export function whenLabel(iso: string | undefined, now: Date): string | undefine
   const time = d.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
   if (d.toDateString() === now.toDateString()) return `ma ${time}`;
   return `${d.toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' })} ${time}`;
+}
+
+/** "3-as kapu", the words under the seat line; null when the gate is unknown. */
+export function gateText(gate: number | null | undefined): string | null {
+  return gateLabel(gate);
+}
+
+/**
+ * The amber note when a ticket belongs to another gate than the one this
+ * steward is standing at: "Ez a jegy az 1-es kapuhoz tartozik."
+ *
+ * ADVISORY ONLY. It is shown next to the verdict and never replaces or changes
+ * it: a steward must never turn anyone away over a gate number, so the person is
+ * admitted exactly as before. Null when either gate is unknown or they match.
+ */
+export function gateNote(ticketGate: number | null | undefined, myGate: number | null): string | null {
+  const label = gateLabel(ticketGate);
+  if (!label || myGate === null || ticketGate === myGate) {
+    return null;
+  }
+  return `Ez a jegy ${hungarianArticle(label)} ${label}hoz tartozik.`;
 }

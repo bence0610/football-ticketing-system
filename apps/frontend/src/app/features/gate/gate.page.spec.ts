@@ -13,7 +13,15 @@ const b64url = (o: unknown): string =>
   btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const TOKEN = `h.${b64url({ sub: 'ticket-1' })}.s`;
 
-const SEAT = { id: 's', section: 'B', row: '5', number: 12, category: 'standard' };
+const SEAT = {
+  id: 's',
+  section: 'B',
+  sectorName: 'B szektor',
+  gate: 3,
+  row: '5',
+  number: 12,
+  category: 'standard',
+};
 const MATCH = {
   id: 'm1',
   homeTeam: 'Kecskeméti TE',
@@ -172,6 +180,87 @@ describe('GatePageComponent', () => {
       expect(q('[data-testid="admitted-count"] strong')?.textContent).toBe('1');
       flush();
     }));
+
+    describe('the gate number', () => {
+      beforeEach(() => localStorage.removeItem('kte.gate.my-gate'));
+      afterEach(() => localStorage.removeItem('kte.gate.my-gate'));
+
+      function scanOnce(): void {
+        onFrame(TOKEN);
+        tick();
+        fixture.detectChanges();
+      }
+
+      it('offers the four gates and remembers the one chosen', fakeAsync(() => {
+        create();
+        tick();
+        fixture.detectChanges();
+        expect(el().querySelectorAll('[data-testid^="gate-pick-"]').length).toBe(4);
+        (q('[data-testid="gate-pick-2"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(q('[data-testid="gate-pick-2"]')?.getAttribute('aria-pressed')).toBe('true');
+        expect(localStorage.getItem('kte.gate.my-gate')).toBe('2');
+        // tapping it again clears the choice
+        (q('[data-testid="gate-pick-2"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(localStorage.getItem('kte.gate.my-gate')).toBeNull();
+        flush();
+      }));
+
+      it('shows the ticket gate, and no advisory when no gate has been chosen', fakeAsync(() => {
+        create();
+        tick();
+        fixture.detectChanges();
+        scanOnce();
+        expect(q('[data-testid="verdict-gate"]')?.textContent).toContain('3-as kapu');
+        expect(q('[data-testid="gate-advisory"]')).toBeNull();
+        flush();
+      }));
+
+      it('shows no advisory when the ticket is at the steward own gate', fakeAsync(() => {
+        localStorage.setItem('kte.gate.my-gate', '3');
+        create();
+        tick();
+        fixture.detectChanges();
+        scanOnce();
+        expect(q('[data-testid="verdict-title"]')?.textContent).toBe('BELÉPHET');
+        expect(q('[data-testid="gate-advisory"]')).toBeNull();
+        flush();
+      }));
+
+      it('at another gate: an amber note, and the holder is STILL admitted', fakeAsync(() => {
+        localStorage.setItem('kte.gate.my-gate', '1');
+        create();
+        tick();
+        fixture.detectChanges();
+        scanOnce();
+
+        // the verdict is exactly what it was: admitted, green, the admitted sound, counted
+        expect(q('[data-testid="verdict-admitted"]')).not.toBeNull();
+        expect(q('[data-testid="verdict-title"]')?.textContent).toBe('BELÉPHET');
+        expect(q('[data-testid="verdict-admitted"]')?.className).toContain('verdict--ok');
+        expect(feedback.played).toEqual([true]);
+        expect(q('[data-testid="admitted-count"] strong')?.textContent).toBe('1');
+        // ...and next to it, the advisory
+        expect(q('[data-testid="gate-advisory"]')?.textContent?.trim()).toBe(
+          'Ez a jegy a 3-as kapuhoz tartozik.',
+        );
+        flush();
+      }));
+
+      it('says nothing about gates for a ticket whose sector has no gate on record', fakeAsync(() => {
+        localStorage.setItem('kte.gate.my-gate', '1');
+        scan.and.returnValue(of({ ...ADMITTED, seat: { ...SEAT, gate: null } }));
+        create();
+        tick();
+        fixture.detectChanges();
+        scanOnce();
+        expect(q('[data-testid="verdict-gate"]')).toBeNull();
+        expect(q('[data-testid="gate-advisory"]')).toBeNull();
+        expect(q('[data-testid="verdict-title"]')?.textContent).toBe('BELÉPHET');
+        flush();
+      }));
+    });
 
     it('already used: amber verdict with when, the seat, and the instruction to the service desk', fakeAsync(() => {
       scan.and.returnValue(of(USED));

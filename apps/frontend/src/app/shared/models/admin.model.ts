@@ -50,10 +50,22 @@ export interface SeatSale {
   readonly taken: number;
 }
 
+export interface SeatSaleSector {
+  readonly code: string;
+  /** Display name from the sectors table ("D/1 szektor", "VIP"). */
+  readonly name: string;
+  readonly arc: 'upper' | 'lower';
+  readonly position: number;
+  /** The away section is never sold through the portal, so it is left off the scale. */
+  readonly isAway: boolean;
+}
+
 export interface SeatSales {
   readonly season: OverviewSeason | null;
   readonly generatedAt: string;
   /** Matches played in the season: the denominator of every seat. */
   readonly matchCount: number;
+  /** Stadium order: upper arc first, west to east. */
+  readonly sectors: readonly SeatSaleSector[];
   readonly seats: readonly SeatSale[];
 }

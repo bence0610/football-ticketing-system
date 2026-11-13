@@ -26,6 +26,8 @@ interface CellView {
 
 interface SectionView {
   readonly section: string;
+  readonly name: string;
+  readonly isAway: boolean;
   readonly averagePercent: number;
   readonly rows: readonly RowView[];
 }
@@ -36,6 +38,7 @@ export function heatColor(percent: number): string {
 }
 
 function byRowThenNumber(a: SeatSale, b: SeatSale): number {
+  // rows compare as numbers: row 10 comes after row 2
   return a.row.localeCompare(b.row, 'hu', { numeric: true }) || a.number - b.number;
 }
 
@@ -80,10 +83,14 @@ function byRowThenNumber(a: SeatSale, b: SeatSale): number {
                 @for (section of sections(); track section.section) {
                   <div class="section" data-testid="heat-section">
                     <h3 class="section__title">
-                      {{ section.section }} szektor
-                      <span class="section__avg">átlagosan {{ section.averagePercent }}%</span>
+                      {{ section.name }}
+                      @if (section.isAway) {
+                        <span class="section__avg">vendégszektor, a portálon nem vásárolható</span>
+                      } @else {
+                        <span class="section__avg">átlagosan {{ section.averagePercent }}%</span>
+                      }
                     </h3>
-                    <div class="grid" role="group" [attr.aria-label]="section.section + ' szektor ülései'">
+                    <div class="grid" role="group" [attr.aria-label]="section.name + ' ülései'">
                       @for (row of section.rows; track row.row) {
                         <div class="grid__row">
                           <span class="grid__row-label">{{ row.row }}. sor</span>
@@ -251,7 +258,7 @@ export class SeatHeatmapPageComponent {
 
   private readonly summaries = computed(() => {
     const d = this.data();
-    return d ? sectionSummaries(d.seats, d.matchCount) : [];
+    return d ? sectionSummaries(d.seats, d.matchCount, d.sectors) : [];
   });
 
   protected readonly interpretation = computed(() =>
@@ -270,13 +277,17 @@ export class SeatHeatmapPageComponent {
         cells.push({
           number: seat.number,
           percent,
-          color: heatColor(percent),
-          title: `${seat.section} szektor, ${seat.row}. sor, ${seat.number}. hely: ${seat.taken} / ${d.matchCount} meccsen foglalt`,
+          color: summary.isAway ? 'var(--border-light)' : heatColor(percent),
+          title: summary.isAway
+            ? `${summary.name}, ${seat.row}. sor, ${seat.number}. hely: vendégszektor`
+            : `${summary.name}, ${seat.row}. sor, ${seat.number}. hely: ${seat.taken} / ${d.matchCount} meccsen foglalt`,
         });
         rows.set(seat.row, cells);
       }
       return {
         section: summary.section,
+        name: summary.name,
+        isAway: summary.isAway,
         averagePercent: summary.averagePercent,
         rows: [...rows.entries()].map(([row, cells]) => ({ row, cells })),
       };

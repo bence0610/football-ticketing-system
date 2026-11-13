@@ -28,6 +28,8 @@ import {
   verdictNotATicket,
   whenLabel,
 } from './gate-verdict';
+import { GATES, gateLabel } from '../../shared/utils/gate';
+import { gateNote, gateText } from './gate-verdict';
 import { extractTicketId } from './ticket-token';
 
 type Mode = 'scan' | 'manual';
@@ -67,6 +69,22 @@ const CAMERA_MESSAGES: Record<CameraFailure, string> = {
               <strong>{{ admitted() }}</strong>
               <small>belépett<span class="sr"> ezen az eszközön</span></small>
             </span>
+          </div>
+          <div class="gatepick" role="group" aria-label="Ez a kapu" data-testid="gate-picker">
+            <span class="gatepick__label">Ez a kapu</span>
+            @for (g of gates; track g) {
+              <button
+                type="button"
+                class="gatepick__btn"
+                [class.gatepick__btn--on]="myGate() === g"
+                [attr.aria-pressed]="myGate() === g"
+                [attr.aria-label]="gateName(g)"
+                [attr.data-testid]="'gate-pick-' + g"
+                (click)="pickGate(g)"
+              >
+                {{ g }}
+              </button>
+            }
           </div>
           @if (fixture(); as f) {
             <p class="fixture" data-testid="fixture">
@@ -179,6 +197,12 @@ const CAMERA_MESSAGES: Record<CameraFailure, string> = {
               @if (v.seat) {
                 <p class="verdict__seat">{{ v.seat }}</p>
               }
+              @if (gateOf(v); as g) {
+                <p class="verdict__gate" data-testid="verdict-gate">{{ g }}</p>
+              }
+              @if (advice(v); as note) {
+                <p class="verdict__advice" role="note" data-testid="gate-advisory">{{ note }}</p>
+              }
               @if (v.holderName) {
                 <p class="verdict__holder" data-testid="gate-holder">{{ v.holderName }}</p>
               }
@@ -196,6 +220,12 @@ const CAMERA_MESSAGES: Record<CameraFailure, string> = {
                 <div class="verdict__panel">
                   @if (v.seat) {
                     <p class="verdict__seat">{{ v.seat }}</p>
+                  }
+                  @if (gateOf(v); as g) {
+                    <p class="verdict__gate" data-testid="verdict-gate">{{ g }}</p>
+                  }
+                  @if (advice(v); as note) {
+                    <p class="verdict__advice" role="note" data-testid="gate-advisory">{{ note }}</p>
                   }
                   @if (v.holderName) {
                     <p class="verdict__holder" data-testid="gate-holder">{{ v.holderName }}</p>
@@ -599,6 +629,50 @@ const CAMERA_MESSAGES: Record<CameraFailure, string> = {
         font-size: 21px;
         font-weight: 600;
       }
+      .verdict__gate {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        opacity: 0.9;
+      }
+      /* Amber, whatever the verdict colour: information for the steward, never a refusal. */
+      .verdict__advice {
+        margin: 8px 0 0;
+        padding: 10px 14px;
+        border: 2px solid var(--amber-edge);
+        border-radius: 10px;
+        background: var(--amber-bg);
+        color: var(--amber-ink);
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .gatepick {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0 0;
+      }
+      .gatepick__label {
+        font-size: 13px;
+        opacity: 0.8;
+      }
+      .gatepick__btn {
+        min-width: 44px;
+        min-height: 44px;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        border-radius: 10px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        font-size: 18px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .gatepick__btn--on {
+        background: #ffffff;
+        color: var(--ink);
+        border-color: #ffffff;
+      }
       .verdict__holder {
         margin: 0;
         font-size: 24px;
@@ -677,9 +751,32 @@ export class GatePageComponent {
 
   protected readonly mode = signal<Mode>('scan');
   protected readonly verdict = signal<Verdict | null>(null);
+  /** The four gates, for the "this is my gate" picker. */
+  protected readonly gates = GATES;
+  /** The gate this steward stands at (remembered on this device); null = not chosen. */
+  protected readonly myGate = signal<number | null>(readMyGate());
   protected readonly checking = signal(false);
   protected readonly cameraState = signal<CameraState>('starting');
   protected readonly tokenInput = signal('');
+
+  protected pickGate(gate: number): void {
+    const next = this.myGate() === gate ? null : gate;
+    this.myGate.set(next);
+    writeMyGate(next);
+  }
+
+  protected gateName(gate: number): string {
+    return `Ez a ${gateLabel(gate)}`;
+  }
+
+  protected gateOf(v: { gate?: number | null }): string | null {
+    return gateText(v.gate);
+  }
+
+  /** Amber note when the ticket belongs to another gate. Never changes the verdict. */
+  protected advice(v: { gate?: number | null }): string | null {
+    return gateNote(v.gate, this.myGate());
+  }
   protected readonly manualError = signal<string | null>(null);
   protected readonly admitted = signal(readAdmitted());
   private pressReady = signal(false);
@@ -904,6 +1001,29 @@ export class GatePageComponent {
     } catch {
       // Storage blocked: the count just restarts on reload.
     }
+  }
+}
+
+const MY_GATE_KEY = 'kte.gate.my-gate';
+
+function readMyGate(): number | null {
+  try {
+    const n = Number(localStorage.getItem(MY_GATE_KEY));
+    return GATES.includes(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeMyGate(gate: number | null): void {
+  try {
+    if (gate === null) {
+      localStorage.removeItem(MY_GATE_KEY);
+    } else {
+      localStorage.setItem(MY_GATE_KEY, String(gate));
+    }
+  } catch {
+    /* a device that cannot store it just asks again */
   }
 }
 

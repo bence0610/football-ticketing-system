@@ -18,7 +18,7 @@ function ticket(source: TicketSource, status: TicketStatus = 'paid'): TicketResp
     currency: 'HUF',
     scannedAt: status === 'used' ? '2026-11-01T17:40:00Z' : undefined,
     match: { id: 'm1', homeTeam: 'KTE', awayTeam: 'Fehérvár', venue: 'Stadion', kickoffAt: '2026-11-20T18:00:00Z' },
-    seat: { id: 's1', section: 'B', row: '5', number: 12, category: 'standard' },
+    seat: { id: 's1', section: 'B', sectorName: 'B szektor', gate: 3, row: '5', number: 12, category: 'standard' },
   };
 }
 
@@ -59,5 +59,10 @@ describe('TicketRowComponent', () => {
     expect(el.querySelector('.row--used')).not.toBeNull();
     expect(el.querySelector('[data-testid="scanned-at"]')).not.toBeNull();
     expect(el.querySelector('button.open')).toBeNull();
+  });
+
+  it('tells the holder which gate to use', () => {
+    const el = render('single');
+    expect(el.querySelector('[data-testid="ticket-gate"]')?.textContent).toContain('3-as kapu');
   });
 });

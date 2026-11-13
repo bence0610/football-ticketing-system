@@ -1,6 +1,8 @@
+import { assertMatchNotStarted } from '../matches/match-sale';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -18,6 +20,7 @@ import {
   LoyaltyTransactionType,
   Match,
   Seat,
+  Sector,
   Ticket,
   TicketSource,
   TicketStatus,
@@ -101,6 +104,8 @@ export class PaymentsService {
     if (!match) {
       throw new NotFoundException('Meccs nem található.');
     }
+    // Server-side guard: the client hides past matches, but it is not the only line of defence.
+    assertMatchNotStarted(match);
 
     const lines = await this.assertSeatsAvailable(dto.matchId, dto.seats, match);
 
@@ -743,13 +748,18 @@ export class PaymentsService {
         }
 
         const matchSummary = this.ticketRenderer.matchSummary(first.match);
-        const sections = userTickets.map((t) => this.ticketRenderer.renderTicketSection(t));
+        const sectors = await this.loadSectors();
+        const sections = userTickets.map((t) =>
+          this.ticketRenderer.renderTicketSection(t, sectors),
+        );
         const qrImageDataUrls = await Promise.all(
           userTickets.map(async (t) => {
             const result = await this.qrService.generateForTicket(t.id, t.qrJti);
             return {
               ticketId: t.id,
-              seatLabel: t.seat ? this.ticketRenderer.formatSeat(t.seat) : '',
+              seatLabel: t.seat
+                ? this.ticketRenderer.formatSeat(t.seat, sectors.get(t.seat.section)?.name)
+                : '',
               dataUrl: result.dataUrl,
             };
           }),
@@ -792,6 +802,16 @@ export class PaymentsService {
       } finally {
         await this.redis.del(lockKey).catch(() => undefined);
       }
+    }
+  }
+
+  /** Sector rows for the email's seat label and gate; an empty map (bare codes, no gate) if unavailable. */
+  private async loadSectors(): Promise<Map<string, Sector>> {
+    try {
+      const sectors = await this.dataSource.getRepository(Sector).find();
+      return new Map((sectors ?? []).map((s) => [s.code, s]));
+    } catch {
+      return new Map();
     }
   }
 
@@ -889,6 +909,9 @@ export class PaymentsService {
         throw new ConflictException(
           `Ez a hely nem foglalható (${seat.section}-${seat.row}-${seat.number}).`,
         );
+      }
+      if (seatStatus === SeatAvailability.AWAY) {
+        throw new ForbiddenException('A vendégszektor helyei a portálon nem vásárolhatók meg.');
       }
       if (seatStatus === SeatAvailability.SOLD) {
         throw new ConflictException('Ez a hely már elkelt.');

@@ -1,3 +1,5 @@
+import { gateLabel } from '../../../shared/utils/gate';
+import { sectorName } from '../../../shared/utils/sector-name';
 import { ChangeDetectionStrategy, Component, Input, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
@@ -22,7 +24,7 @@ export const TICKET_STATUS_TONE: Readonly<Record<TicketStatus, ChipTone>> = {
 };
 
 export function seatText(ticket: TicketResponse): string {
-  return `${ticket.seat.section} szektor · ${ticket.seat.row}. sor · ${ticket.seat.number}. szék`;
+  return `${sectorName(ticket.seat.section, ticket.seat.sectorName)} · ${ticket.seat.row}. sor · ${ticket.seat.number}. szék`;
 }
 
 /** Opens the gate QR dialog for a ticket. Shared by the row and the next-match card. */
@@ -56,6 +58,9 @@ export function openTicketQr(dialog: MatDialog, ticket: TicketResponse): void {
           <p class="meta">
             {{ seat }} · {{ ticket.match.kickoffAt | date: 'HH:mm' : '' : 'hu-HU' }}
           </p>
+          @if (gate; as g) {
+            <p class="meta" data-testid="ticket-gate">Belépés: <strong>{{ g }}</strong></p>
+          }
           @if (ticket.status === 'used' && ticket.scannedAt) {
             <p class="meta" data-testid="scanned-at">
               Beolvasva: {{ ticket.scannedAt | date: 'yyyy. MMM d. HH:mm' : '' : 'hu-HU' }}
@@ -195,6 +200,11 @@ export class TicketRowComponent {
   @Input({ required: true }) ticket!: TicketResponse;
 
   private readonly dialog = inject(MatDialog);
+
+  /** "3-as kapu": where this ticket's holder enters; null when the gate is unknown. */
+  protected get gate(): string | null {
+    return gateLabel(this.ticket.seat.gate);
+  }
 
   protected get seat(): string {
     return seatText(this.ticket);

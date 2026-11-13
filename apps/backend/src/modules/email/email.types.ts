@@ -23,6 +23,7 @@ export interface TicketConfirmationContext {
     seatLabel: string;
     categoryLabel: string;
     pricePaidLabel: string;
+    gateLabel?: string;
   }>;
   totalLabel: string;
   ticketsUrl: string;

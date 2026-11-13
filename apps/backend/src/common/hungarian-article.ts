@@ -8,7 +8,10 @@
  * two in sync.
  */
 const VOWEL_START = /^[aáeéiíoóöőuúüű]/i;
-const VOWEL_SOUNDING_LETTERS = 'AÁEÉIÍOÓÖŐUÚÜŰFLMNRSX';
+const VOWEL_SOUNDING_LETTERS = 'AÁEÉIÍOÓÖŐUÚÜŰFLMNRSXY';
+
+/** A sector-style code: one capital letter, optionally with a slash or dash and a number ("F", "A/1", "D-2"). */
+const LETTER_CODE = /^\p{Lu}(?:[/-]\d+)?$/u;
 
 export type HungarianArticle = 'a' | 'az';
 
@@ -21,6 +24,12 @@ export function hungarianArticle(name: string): HungarianArticle {
     return /^[15](?!\d)/.test(word) ? 'az' : 'a';
   }
   const first = word.split(/\s+/, 1)[0];
+  // A single letter is read by its NAME, not as a word: "az F szektor", "az L", "az A/1",
+  // but "a D/1", "a K". (E, F, L, M, N and A take "az"; the vowel-letter rule alone
+  // would get F, L, M and N wrong.)
+  if (LETTER_CODE.test(first)) {
+    return VOWEL_SOUNDING_LETTERS.includes(first[0]) ? 'az' : 'a';
+  }
   if (first.length >= 2 && first === first.toUpperCase() && /^\p{Lu}+$/u.test(first)) {
     return VOWEL_SOUNDING_LETTERS.includes(first[0]) ? 'az' : 'a';
   }

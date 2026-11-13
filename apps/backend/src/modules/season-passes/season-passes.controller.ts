@@ -73,7 +73,7 @@ export class SeasonPassesController {
 
   @Get('prices')
   @ApiOperation({
-    summary: 'Aktív szezon (2026/2027) bérletárainak listája szektoronként',
+    summary: 'Aktív szezon (2026/2027) bérletárainak listája árkategóriánként (felső ív, alsó ív, VIP)',
   })
   @ApiOkResponse({ type: [SeasonPassPriceDto] })
   async listPrices(): Promise<SeasonPassPriceDto[]> {
@@ -114,7 +114,7 @@ export class SeasonPassesController {
   async listMine(@Req() req: AuthenticatedRequest): Promise<SeasonPassResponseDto[]> {
     const userId = extractUserId(req);
     const items = await this.seasonPassesService.listForUser(userId);
-    return items.map(({ pass, loans, seat }) => {
+    return items.map(({ pass, loans, seat, sectorName, gate }) => {
       const window = validityWindow(pass.validFrom, pass.validUntil);
       return {
         id: pass.id,
@@ -130,6 +130,8 @@ export class SeasonPassesController {
         coversBefore: window.endsBefore.toISOString(),
         seatLabel: seat,
         section: pass.seat?.section,
+        sectorName,
+        gate,
         purchasedAt: pass.createdAt.toISOString(),
         pricePaid: pass.pricePaid,
         currency: pass.currency,

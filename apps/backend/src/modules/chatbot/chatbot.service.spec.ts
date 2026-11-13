@@ -294,6 +294,55 @@ describe('ChatbotService', () => {
       expect(header).not.toContain('hely- és szektoradatok');
     });
 
+    it('describes the away section without a price or seat counts, and never as something to buy', () => {
+      const away = new ChatbotService(
+        { getOrThrow: () => ({ apiKey: '', model: 'test-model', maxTokens: 100 }) } as never,
+        {} as never,
+        {} as never,
+      );
+      const text = (
+        away as unknown as {
+          formatSectors: (m: { sectors: unknown[] }) => string;
+        }
+      ).formatSectors({
+        sectors: [
+          {
+            section: 'VENDÉG',
+            name: 'Vendég szektor',
+            away: true,
+            gate: 3,
+            total: 280,
+            free: 0,
+            sold: 0,
+            locked: 0,
+            minPrice: 3500,
+            maxPrice: 3500,
+            covered: false,
+          },
+          {
+            section: 'F',
+            name: 'F szektor',
+            gate: 1,
+            total: 234,
+            free: 200,
+            sold: 34,
+            locked: 0,
+            minPrice: 3500,
+            maxPrice: 3500,
+            covered: false,
+          },
+        ],
+      });
+
+      expect(text).toContain('Vendég szektor: vendégszektor, csak vendégszurkolóknak');
+      expect(text).toContain('a portálon nem vásárolható, bérlet sem váltható rá');
+      // no price, no free-seat count and no gate for the section nobody can buy
+      expect(text.split('; ')[0]).not.toMatch(/jegyár|szabad|kapu/);
+      // a sellable sector shows its display name and its gate
+      expect(text).toContain('F szektor: jegyár');
+      expect(text).toContain('bejárat: 1. kapu');
+    });
+
     it('says a price is unavailable for sectors cached before prices existed', async () => {
       create.mockResolvedValue(okResponse());
       const legacy = new ChatbotService(

@@ -13,6 +13,7 @@ import {
   PassLoan,
   PassLoanStatus,
   SeasonPass,
+  Sector,
   Ticket,
   TicketSource,
   TicketStatus,
@@ -20,6 +21,7 @@ import {
 } from '../../database/entities';
 import { formatFullName } from '../../common/format-name';
 import { QrService } from '../qr/qr.service';
+import { loadSectorMap } from '../seats/sector-lookup';
 import { TicketScanResponseDto } from './dto/scan-ticket.dto';
 import { WaitlistNotificationService } from '../waitlist/waitlist-notification.service';
 
@@ -39,6 +41,11 @@ export class TicketsService {
 
   async count(): Promise<number> {
     return this.ticketRepository.count();
+  }
+
+  /** Sector rows (display name, gate) for the seats in a ticket list. */
+  async sectorsByCode(): Promise<Map<string, Sector>> {
+    return loadSectorMap(this.ticketRepository.manager);
   }
 
   async findForUser(userId: string): Promise<Ticket[]> {
@@ -135,7 +142,7 @@ export class TicketsService {
           scannedAt: (ticket.scannedAt ?? ticket.usedAt)?.toISOString(),
           source: ticket.source,
           holderName: await this.resolveEnteringName(manager, ticket),
-          ...this.scanDetails(ticket),
+          ...(await this.scanDetails(ticket)),
         };
       }
       if (ticket.status === TicketStatus.EXPIRED) {
@@ -170,7 +177,7 @@ export class TicketsService {
         scannedAt: now.toISOString(),
         source: ticket.source,
         holderName,
-        ...this.scanDetails(ticket),
+        ...(await this.scanDetails(ticket)),
       };
     });
   }
@@ -194,7 +201,13 @@ export class TicketsService {
   }
 
   /** Match and seat of a ticket, in the shape the gate screen shows. */
-  private scanDetails(ticket: Ticket): Pick<TicketScanResponseDto, 'match' | 'seat'> {
+  private async scanDetails(
+    ticket: Ticket,
+  ): Promise<Pick<TicketScanResponseDto, 'match' | 'seat'>> {
+    // The gate is advisory information for the steward: it never changes the verdict.
+    const sector = ticket.seat
+      ? (await loadSectorMap(this.ticketRepository.manager)).get(ticket.seat.section)
+      : undefined;
     return {
       match: ticket.match
         ? {
@@ -209,6 +222,8 @@ export class TicketsService {
         ? {
             id: ticket.seat.id,
             section: ticket.seat.section,
+            sectorName: sector?.name ?? ticket.seat.section,
+            gate: sector?.gate ?? null,
             row: ticket.seat.row,
             number: ticket.seat.number,
             category: ticket.seat.category,

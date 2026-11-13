@@ -1,3 +1,4 @@
+import { gateLabel } from '../../shared/utils/gate';
 import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -87,7 +88,7 @@ const MAX_RETRY_ATTEMPTS = 3;
             <p class="hero__note">
               A még hátralévő hazai meccsek jegyárából számolva.
               @if (!selectedPrice()) {
-                A legolcsóbb szektorra számoltunk – válassz szektort, és a sajátodat látod.
+                A legolcsóbb árkategóriára számoltunk – válassz egyet, és a sajátodat látod.
               }
             </p>
           </aside>
@@ -97,7 +98,11 @@ const MAX_RETRY_ATTEMPTS = 3;
 
     <div class="page">
       <section class="block" aria-labelledby="sectors-title">
-        <h2 id="sectors-title">Válassz szektort</h2>
+        <h2 id="sectors-title">Válassz árkategóriát</h2>
+        <p class="block__note block__note--lead" data-testid="seat-assignment-note">
+          Három ár van: a felső ív, az alsó ív és a VIP. A pontos helyet vásárláskor osztjuk ki a
+          kiválasztott árkategórián belül, és az az egész szezonra a tiéd marad.
+        </p>
 
         @if (loading()) {
           <div class="kte-season-pass__loader" role="status" aria-live="polite">
@@ -126,7 +131,10 @@ const MAX_RETRY_ATTEMPTS = 3;
                 @if (popularId() === price.sectionId) {
                   <span class="sector__ribbon">Legnépszerűbb</span>
                 }
-                <h3 class="sector__name">{{ price.sectionName }}</h3>
+                <h4 class="sector__name">{{ price.sectionName }}</h4>
+                @if (gateText(price); as g) {
+                  <p class="sector__gate" data-testid="sector-gate">{{ g }}</p>
+                }
                 @if (description(price); as d) {
                   <p class="sector__desc">{{ d }}</p>
                 }
@@ -515,6 +523,14 @@ const MAX_RETRY_ATTEMPTS = 3;
       }
 
       /* ---------- Sector cards ---------- */
+      .block__note--lead {
+        margin: 0 0 16px;
+      }
+      .sector__gate {
+        margin: 0 0 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
       .sectors {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
@@ -924,13 +940,17 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
     return match.status === 'finished' || new Date(match.kickoffAt).getTime() <= this.now;
   }
 
-  /** Only facts the API gave: roof and seat count. Nothing is made up. */
+  /** Only facts the API gave: the gate, when one gate serves the whole tier. */
+  protected gateText(price: SeasonPassPrice): string | null {
+    return gateLabel(price.gate);
+  }
+
   protected description(price: SeasonPassPrice): string {
     const parts: string[] = [];
     if (price.isCovered === true) {
-      parts.push('Fedett szektor');
+      parts.push('Fedett ülőhelyek');
     } else if (price.isCovered === false) {
-      parts.push('Fedetlen szektor');
+      parts.push('Fedetlen ülőhelyek');
     }
     if (price.totalSeats && price.totalSeats > 0) {
       parts.push(`${price.totalSeats} ülőhely`);

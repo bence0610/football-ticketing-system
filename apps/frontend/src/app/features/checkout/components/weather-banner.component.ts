@@ -1,3 +1,4 @@
+import { sectorName } from '../../../shared/utils/sector-name';
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatchWeatherForecast } from '../../../shared/models/payment.model';
@@ -134,7 +135,7 @@ export class WeatherBannerComponent {
       return '';
     }
     const rain = this.forecast?.rainWarning === true;
-    const name = (s: string) => (s === 'VIP' ? 'VIP' : `${s} szektor`);
+    const name = (s: string) => sectorName(s);
 
     if (open.length === 0) {
       return covered.length === 1

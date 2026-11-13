@@ -19,6 +19,8 @@ import { MatChipsModule } from '@angular/material/chips';
 import { LockSeatResponse, SeatStatus } from '../../../../shared/models/seat.model';
 import { HufCurrencyPipe } from '../../../../shared/pipes/huf-currency.pipe';
 import { Pad2Pipe } from '../../../../shared/pipes/time-until.pipe';
+import { gateLabel } from '../../../../shared/utils/gate';
+import { sectorName } from '../../../../shared/utils/sector-name';
 import { coverLabel } from '../../../../shared/utils/sector-cover';
 
 @Component({
@@ -38,7 +40,8 @@ import { coverLabel } from '../../../../shared/utils/sector-cover';
   template: `
     <aside class="kte-seat-detail" *ngIf="seat; else emptyState">
       <header class="kte-seat-detail__header">
-        <span class="kte-seat-detail__chip">{{ seat.section }} szektor</span>
+        <span class="kte-seat-detail__chip">{{ sectorLabel() }}</span>
+        <span class="kte-seat-detail__gate" *ngIf="gateText() as g" data-testid="detail-gate">{{ g }}</span>
         <span class="kte-seat-detail__cover" *ngIf="coverText() as label" data-testid="detail-cover">{{ label }}</span>
         <h3>{{ seat.row }}. sor / {{ seat.number }}. szék</h3>
         <p class="kte-seat-detail__category">{{ categoryLabel(seat.category) }}</p>
@@ -156,6 +159,15 @@ import { coverLabel } from '../../../../shared/utils/sector-cover';
         display: inline-block;
       }
 
+      .kte-seat-detail__gate {
+        padding: 2px 10px;
+        border-radius: 999px;
+        background: var(--ink);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
       .kte-seat-detail__cover {
         margin-left: 8px;
         padding: 2px 10px;
@@ -266,9 +278,21 @@ export class SeatDetailPanelComponent {
   @Input() seat: SeatStatus | null = null;
   /** Is the seat's sector under a roof? null = unknown (nothing is shown). */
   @Input() covered: boolean | null = null;
+  /** Display name of the seat's sector from the sectors table; falls back to the code. */
+  @Input() sectorName: string | null = null;
+  /** Entrance gate 1..4 for the seat's sector; null = unknown. */
+  @Input() gate: number | null = null;
   @Input() activeLock: LockSeatResponse | null = null;
   @Input() lockExpiresAtMs: number | null = null;
   @Input() locking = false;
+
+  protected sectorLabel(): string {
+    return sectorName(this.seat?.section ?? '', this.sectorName);
+  }
+
+  protected gateText(): string | null {
+    return gateLabel(this.gate);
+  }
 
   protected coverText(): string | null {
     return coverLabel(this.covered);
@@ -315,9 +339,8 @@ export class SeatDetailPanelComponent {
   protected categoryLabel(category: SeatStatus['category']): string {
     switch (category) {
       case 'standard':
-        return 'Standard';
-      case 'premium':
-        return 'Prémium';
+      case 'premium': // legacy value: there is no premium tier any more
+        return 'Normál';
       case 'vip':
         return 'VIP';
       case 'standing':
@@ -339,6 +362,8 @@ export class SeatDetailPanelComponent {
         return 'Bérletes';
       case 'disabled':
         return 'Inaktív';
+      case 'away':
+        return 'Vendégszektor';
       default:
         return status;
     }

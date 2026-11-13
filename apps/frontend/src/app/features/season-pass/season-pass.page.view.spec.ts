@@ -193,4 +193,26 @@ describe('SeasonPassPageComponent — what the page claims', () => {
     }
     expect(t).toContain('véglegesen nem ruházható át, csak meccsenként kölcsönadható');
   });
+
+  it('offers three options, one per price tier, with no tier headings or sector cards', () => {
+    const tier = (sectionId: string, sectionName: string, amount: number): SeasonPassPrice =>
+      price({ sectionId, sectionName, price: amount, priceCategory: sectionId as 'vip' | 'lower' | 'upper' });
+    const el = render(
+      [tier('vip', 'VIP', 45000), tier('lower', 'Alsó ív', 30000), tier('upper', 'Felső ív', 22000)],
+      season(5),
+    );
+    const cards = Array.from(el.querySelectorAll('article.sector'));
+    expect(cards.length).toBe(3);
+    expect(cards.map((c) => c.querySelector('.sector__name')!.textContent!.trim())).toEqual([
+      'VIP',
+      'Alsó ív',
+      'Felső ív',
+    ]);
+    expect(el.querySelector('[data-testid="tier-heading"]')).toBeNull();
+    expect(text(el)).toContain('Válassz árkategóriát');
+    // the buyer is told they do not pick the exact seat
+    expect(text(el.querySelector('[data-testid="seat-assignment-note"]') as HTMLElement)).toContain(
+      'vásárláskor osztjuk ki',
+    );
+  });
 });

@@ -12,6 +12,10 @@ export interface MatchSummary {
 export interface SeatSummary {
   id: string;
   section: string;
+  /** Display name from the sectors table ("D/1 szektor", "VIP"). */
+  sectorName: string;
+  /** Entrance gate 1..4 for the sector; null = unknown. */
+  gate: number | null;
   row: string;
   number: number;
   category: string;
@@ -51,6 +55,9 @@ export interface ScanMatchInfo {
 export interface ScanSeatInfo {
   id: string;
   section: string;
+  sectorName: string;
+  /** Entrance gate 1..4 for the sector; null = unknown. Advisory: it never changes the verdict. */
+  gate: number | null;
   row: string;
   number: number;
   category: string;

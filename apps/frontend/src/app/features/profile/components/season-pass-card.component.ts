@@ -33,7 +33,9 @@ import {
   LoanInitiationDialogResult,
 } from './loan-initiation-dialog/loan-initiation-dialog.component';
 import { extractApiErrorMessage } from '../../../shared/utils/api-error';
+import { gateLabel } from '../../../shared/utils/gate';
 import { timeLeft } from '../../../shared/utils/loan-format';
+import { sectorName } from '../../../shared/utils/sector-name';
 
 type MatchRowState =
   | 'mine_upcoming'
@@ -99,7 +101,7 @@ export function scanTimeLabel(value: string | undefined | null): string | undefi
           <mat-card-title>
             Bérlet — {{ pass.seasonLabel }}
             @if (pass.section) {
-              <span class="section-badge">{{ pass.section }} szektor</span>
+              <span class="section-badge">{{ sectorLabel() }}</span>
             }
           </mat-card-title>
           <mat-card-subtitle>
@@ -122,7 +124,13 @@ export function scanTimeLabel(value: string | undefined | null): string | undefi
           @if (pass.section) {
             <div class="row">
               <span class="label">Szektor</span>
-              <span>{{ pass.section }}</span>
+              <span>{{ sectorLabel() }}</span>
+            </div>
+          }
+          @if (gateText(); as g) {
+            <div class="row" data-testid="pass-gate">
+              <span class="label">Belépés</span>
+              <span>{{ g }}</span>
             </div>
           }
           @if (pass.seatLabel) {
@@ -369,6 +377,14 @@ export class SeasonPassCardComponent implements OnInit, OnChanges {
   @Input({ required: true }) pass!: SeasonPassResponse;
   @Input() myTickets: readonly TicketResponse[] = [];
   @Output() readonly changed = new EventEmitter<void>();
+
+  protected sectorLabel(): string {
+    return sectorName(this.pass.section ?? '', this.pass.sectorName);
+  }
+
+  protected gateText(): string | null {
+    return gateLabel(this.pass.gate);
+  }
 
   private readonly matchesService = inject(MatchesService);
   private readonly seasonPassesService = inject(SeasonPassesService);

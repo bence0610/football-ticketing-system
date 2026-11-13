@@ -1,3 +1,4 @@
+import { sectorName } from '../../shared/utils/sector-name';
 import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
@@ -246,7 +247,7 @@ export class CartPageComponent implements OnInit {
     const open = sectors.find((s) => s.available > 0);
     return open
       ? {
-          name: open.section === 'VIP' ? 'VIP' : `${open.section} szektor`,
+          name: sectorName(open.section, open.name),
           free: open.available,
           fromPrice: open.minPrice,
         }

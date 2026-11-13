@@ -97,21 +97,55 @@ describe('seat heatmap', () => {
     expect(takenPercent(1, 0)).toBe(0);
   });
 
-  it('averages per section and reads the result out in one line', () => {
-    const seats = [seat('A', 1, 4), seat('A', 2, 4), seat('B', 1, 0), seat('B', 2, 2)];
-    const summaries = sectionSummaries(seats, 4);
-    expect(summaries).toEqual([
-      { section: 'A', seatCount: 2, averagePercent: 100 },
-      { section: 'B', seatCount: 2, averagePercent: 25 },
-    ]);
+  const sectors = [
+    { code: 'F', name: 'F szektor', arc: 'lower', position: 10, isAway: false },
+    { code: 'D/1', name: 'D/1 szektor', arc: 'upper', position: 1, isAway: false },
+    { code: 'VENDÉG', name: 'Vendég szektor', arc: 'lower', position: 1, isAway: true },
+  ] as const;
+
+  it('averages per section, in stadium order, and reads the result out in one line', () => {
+    const seats = [
+      seat('F', 1, 4),
+      seat('F', 2, 4),
+      seat('D/1', 1, 0),
+      seat('D/1', 2, 2),
+    ];
+    const summaries = sectionSummaries(seats, 4, sectors);
+    // D/1 (upper arc) comes before F (lower arc), whatever the order of the seats
+    expect(summaries.map((s) => s.section)).toEqual(['D/1', 'F']);
+    expect(summaries.map((s) => s.averagePercent)).toEqual([25, 100]);
+    expect(summaries.map((s) => s.name)).toEqual(['D/1 szektor', 'F szektor']);
+
     const line = heatmapInterpretation(summaries, 4);
-    expect(line).toContain('A szektor');
-    expect(line).toContain('100%');
-    expect(line).toContain('B szektoré legritkábban (25%)');
+    // "az F szektor", not "a F szektor": F is spoken "ef"
+    expect(line).toContain('Az F szektor ülései fogynak leggyakrabban (átlagosan 100%)');
+    // "a D/1 szektor": D is spoken "dé"
+    expect(line).toContain('a D/1 szektor ülései legritkábban (25%)');
+    expect(line).not.toContain('A F ');
+    expect(line).not.toContain('a F ');
+  });
+
+  it('leaves the away section out of the reading: it sells nothing because it cannot be bought', () => {
+    const seats = [seat('F', 1, 4), seat('D/1', 1, 2), seat('VENDÉG', 1, 0)];
+    const summaries = sectionSummaries(seats, 4, sectors);
+    expect(summaries.find((s) => s.section === 'VENDÉG')?.isAway).toBe(true);
+    const line = heatmapInterpretation(summaries, 4);
+    expect(line).not.toContain('Vendég');
+    expect(line).toContain('legritkábban (50%)');
+  });
+
+  it('falls back to the code when the server sends no sector list', () => {
+    const summaries = sectionSummaries([seat('A', 1, 4), seat('B', 1, 0)], 4);
+    expect(summaries.map((s) => s.name)).toEqual(['A szektor', 'B szektor']);
   });
 
   it('says nothing when there is nothing to interpret', () => {
     expect(heatmapInterpretation([], 0)).toBe('');
-    expect(heatmapInterpretation([{ section: 'A', seatCount: 1, averagePercent: 0 }], 0)).toBe('');
+    expect(
+      heatmapInterpretation(
+        [{ section: 'A', name: 'A szektor', isAway: false, seatCount: 1, averagePercent: 0 }],
+        0,
+      ),
+    ).toBe('');
   });
 });

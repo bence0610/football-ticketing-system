@@ -1,6 +1,13 @@
 export type SeatCategory = 'standard' | 'premium' | 'vip' | 'standing';
 
-export type SeatAvailability = 'available' | 'locked' | 'sold' | 'season_pass' | 'disabled';
+/** `away`: a seat in the away section, never for sale through the portal. */
+export type SeatAvailability =
+  | 'available'
+  | 'locked'
+  | 'sold'
+  | 'season_pass'
+  | 'disabled'
+  | 'away';
 
 export interface SeatStatus {
   readonly id: string;
@@ -13,8 +20,23 @@ export interface SeatStatus {
   readonly isAccessible: boolean;
 }
 
+export type StadiumArc = 'upper' | 'lower';
+/** Three tiers: the whole upper arc, the whole lower arc, and VIP. The away section has none. */
+export type PriceCategory = 'vip' | 'upper' | 'lower';
+
 export interface SectorSummary {
   readonly section: string;
+  /** Display name from the sectors table ("D/1 szektor", "VIP"): shown as is, never composed. */
+  readonly name: string;
+  /** Which arc of the stadium; null = no sector data. */
+  readonly arc: StadiumArc | null;
+  /** Place on the arc, west to east. */
+  readonly position: number | null;
+  /** Entrance gate 1..4 serving the sector; null = unknown. */
+  readonly gate: number | null;
+  readonly priceCategory: PriceCategory | null;
+  /** The away section: not sold through the portal, no season passes. */
+  readonly isAway: boolean;
   /**
    * Is the sector under a roof? From the `sectors` table via the seat map.
    * null = the server has no data: nothing may be claimed about it.
@@ -45,13 +67,15 @@ export interface LockSeatResponse {
   readonly expiresAt: string;
 }
 
-/**
- * Mapping from logical sector codes to compass labels for the
- * stadium SVG layout (Artboard 02 reference).
- */
-export const SECTOR_COMPASS_LABEL: Readonly<Record<string, string>> = {
-  A: 'Észak',
-  B: 'Dél',
-  C: 'Kelet',
-  VIP: 'Nyugat',
+/** The two arcs of the stadium, as the plan names them. */
+export const ARC_LABEL: Readonly<Record<StadiumArc, string>> = {
+  upper: 'Felső ív',
+  lower: 'Főépület oldala',
+};
+
+/** Price tiers, dearest first. The tier is the reading of the map: colour follows it. */
+export const PRICE_CATEGORY_LABEL: Readonly<Record<PriceCategory, string>> = {
+  vip: 'VIP',
+  lower: 'Alsó ív',
+  upper: 'Felső ív',
 };

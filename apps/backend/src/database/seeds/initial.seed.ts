@@ -3,61 +3,22 @@ import { Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { Match, MatchStatus, Competition } from '../entities/match.entity';
-import { Seat, SeatCategory } from '../entities/seat.entity';
+import { Seat } from '../entities/seat.entity';
 import { Sector } from '../entities/sector.entity';
 import { SeasonPassPrice } from '../entities/season-pass-price.entity';
 import { User, UserRole, LoyaltyTier } from '../entities/user.entity';
 
+import {
+  SEASON_PASS_TIER_PRICE,
+  STADIUM_LAYOUT,
+  TIERS,
+  TIER_LABEL,
+  priceModifierFor,
+  seatCategoryFor,
+  totalSeatCount,
+} from '../stadium-layout';
+
 const logger = new Logger('InitialSeed');
-
-interface SeatBlueprint {
-  section: string;
-  rows: string[];
-  seatsPerRow: number;
-  category: SeatCategory;
-  priceModifier: string;
-  accessibleRows?: string[];
-}
-
-const STADIUM_LAYOUT: SeatBlueprint[] = [
-  {
-    section: 'A',
-    rows: ['1', '2', '3', '4', '5'],
-    seatsPerRow: 20,
-    category: SeatCategory.PREMIUM,
-    priceModifier: '1.50',
-    accessibleRows: ['1'],
-  },
-  {
-    section: 'B',
-    rows: ['1', '2', '3', '4', '5', '6', '7', '8'],
-    seatsPerRow: 25,
-    category: SeatCategory.STANDARD,
-    priceModifier: '1.00',
-  },
-  {
-    section: 'C',
-    rows: ['1', '2', '3', '4', '5', '6', '7', '8'],
-    seatsPerRow: 25,
-    category: SeatCategory.STANDARD,
-    priceModifier: '1.00',
-  },
-  {
-    section: 'VIP',
-    rows: ['1', '2'],
-    seatsPerRow: 12,
-    category: SeatCategory.VIP,
-    priceModifier: '2.50',
-  },
-];
-
-/** Which stadium sectors are under a roof. Mirrors the Sectors migration. */
-const SECTORS: ReadonlyArray<{ code: string; name: string; isCovered: boolean }> = [
-  { code: 'A', name: 'A szektor', isCovered: false },
-  { code: 'B', name: 'B szektor', isCovered: true },
-  { code: 'C', name: 'C szektor', isCovered: false },
-  { code: 'VIP', name: 'VIP szektor', isCovered: true },
-];
 
 export async function runInitialSeed(dataSource: DataSource): Promise<void> {
   const matchRepo = dataSource.getRepository(Match);
@@ -124,40 +85,64 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
     logger.log('Gate user already exists, skipping.');
   }
 
-  // 4b. Sectors (idempotent per code; never overwrites a value someone changed)
+  // 4b. Sectors. The StadiumLayout migration inserts them; this only fills in a
+  // sector that is missing (idempotent per code, never overwrites a changed value).
   const sectorRepo = dataSource.getRepository(Sector);
-  for (const sector of SECTORS) {
-    const existing = await sectorRepo.findOne({ where: { code: sector.code } });
+  for (const layout of STADIUM_LAYOUT) {
+    const existing = await sectorRepo.findOne({ where: { code: layout.code } });
     if (!existing) {
-      await sectorRepo.save(sectorRepo.create({ id: randomUUID(), ...sector }));
-      logger.log(`Created sector ${sector.code} (covered: ${sector.isCovered})`);
+      await sectorRepo.save(
+        sectorRepo.create({
+          id: randomUUID(),
+          code: layout.code,
+          name: layout.name,
+          isCovered: layout.isCovered,
+          arc: layout.arc,
+          position: layout.position,
+          gate: layout.gate,
+          priceCategory: layout.priceCategory,
+          isAway: layout.isAway,
+        }),
+      );
+      logger.log(`Created sector ${layout.code} (covered: ${layout.isCovered})`);
     }
   }
 
-  // 5. Seats (idempotent)
+  // 5. Seats, generated from the stadium layout (idempotent).
+  // A database that already holds seats must hold exactly this layout: a stale one
+  // (the old four-sector stadium) is refused, never silently kept.
   const seatCount = await seatRepo.count();
+  const expectedSeats = totalSeatCount();
   if (seatCount === 0) {
     const seatsToInsert: Seat[] = [];
-    for (const blueprint of STADIUM_LAYOUT) {
-      for (const row of blueprint.rows) {
-        for (let n = 1; n <= blueprint.seatsPerRow; n += 1) {
+    for (const sector of STADIUM_LAYOUT) {
+      for (let row = 1; row <= sector.rows; row += 1) {
+        for (let n = 1; n <= sector.seatsPerRow; n += 1) {
           seatsToInsert.push(
             seatRepo.create({
               id: randomUUID(),
-              section: blueprint.section,
-              row,
+              section: sector.code,
+              row: String(row),
               number: n,
-              category: blueprint.category,
-              priceModifier: blueprint.priceModifier,
-              isAccessible: blueprint.accessibleRows?.includes(row) ?? false,
+              category: seatCategoryFor(sector.priceCategory),
+              priceModifier: priceModifierFor(sector.priceCategory),
+              isAccessible: sector.accessibleRows?.includes(String(row)) ?? false,
               isActive: true,
             }),
           );
         }
       }
     }
-    await seatRepo.save(seatsToInsert, { chunk: 200 });
-    logger.log(`Inserted ${seatsToInsert.length} seats across ${STADIUM_LAYOUT.length} sections.`);
+    // Bulk insert: `save` would look each of the 5,468 rows up first, which is slow.
+    for (let i = 0; i < seatsToInsert.length; i += 500) {
+      await seatRepo.insert(seatsToInsert.slice(i, i + 500));
+    }
+    logger.log(`Inserted ${seatsToInsert.length} seats across ${STADIUM_LAYOUT.length} sectors.`);
+  } else if (seatCount !== expectedSeats) {
+    throw new Error(
+      `The database holds ${seatCount} seats but the stadium layout has ${expectedSeats}. ` +
+        'Run the StadiumLayout migration (it clears the old seats), then seed again.',
+    );
   } else {
     logger.log(`Seats already present (${seatCount}), skipping seat seed.`);
   }
@@ -179,6 +164,13 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
 
   // 7. Upcoming friendly matches (pre-season July 2026)
   const totalCapacity = await seatRepo.count({ where: { isActive: true } });
+  // Matches created before a layout change carry the old seat count.
+  await dataSource
+    .createQueryBuilder()
+    .update(Match)
+    .set({ capacity: totalCapacity })
+    .where('capacity != :totalCapacity', { totalCapacity })
+    .execute();
 
   interface FriendlyBlueprint {
     homeTeam: string;
@@ -250,22 +242,18 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
   }
 
   // 8. Season pass prices for 2026/2027 (idempotent per (section, seasonLabel))
-  interface SeasonPassPriceBlueprint {
-    section: string;
-    sectionLabel: string;
-    price: number;
-  }
-
   const SEASON_LABEL = '2026/2027';
   const SEASON_VALID_FROM = new Date('2026-07-01T00:00:00.000Z');
   const SEASON_VALID_UNTIL = new Date('2027-06-30T00:00:00.000Z');
 
-  const seasonPassPriceBlueprints: SeasonPassPriceBlueprint[] = [
-    { section: 'VIP', sectionLabel: 'VIP szektor', price: 45000 },
-    { section: 'A', sectionLabel: 'A szektor', price: 30000 },
-    { section: 'B', sectionLabel: 'B szektor', price: 25000 },
-    { section: 'C', sectionLabel: 'C szektor', price: 20000 },
-  ];
+  // One row per price tier, not per sector: a pass is bought for the whole upper
+  // arc, the whole lower arc or VIP, and the purchase picks the seat inside it.
+  // The row's `section` carries the tier key. The away section has no row.
+  const seasonPassPriceBlueprints = TIERS.map((tier) => ({
+    section: tier,
+    sectionLabel: TIER_LABEL[tier],
+    price: SEASON_PASS_TIER_PRICE[tier],
+  }));
 
   for (const blueprint of seasonPassPriceBlueprints) {
     const existing = await seasonPassPriceRepo.findOne({

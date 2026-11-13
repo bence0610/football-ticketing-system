@@ -8,10 +8,13 @@ import {
   SeasonPass,
   SeasonPassPrice,
   SeasonPassStatus,
+  Sector,
   Ticket,
   TicketSource,
   TicketStatus,
 } from '../../database/entities';
+import { compareSeats } from '../seats/seat-order';
+import { compareSectors } from '../seats/sector-catalogue.service';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import {
   OverviewDto,
@@ -66,6 +69,7 @@ export class AdminOverviewService {
     @InjectRepository(SeasonPass) private readonly passRepository: Repository<SeasonPass>,
     @InjectRepository(SeasonPassPrice)
     private readonly priceRepository: Repository<SeasonPassPrice>,
+    @InjectRepository(Sector) private readonly sectorRepository: Repository<Sector>,
   ) {}
 
   /** The active season, from the price list the pass purchase uses. */
@@ -203,10 +207,12 @@ export class AdminOverviewService {
     const played = await query.getMany();
     const matchIds = played.map((m) => m.id);
 
-    const seats = await this.seatRepository.find({
-      where: { isActive: true },
-      order: { section: 'ASC', row: 'ASC', number: 'ASC' },
-    });
+    // Stadium order, with rows compared as numbers (they are stored as strings).
+    const sectors = (await this.sectorRepository.find()).sort(compareSectors);
+    const positions = new Map(sectors.map((sec, i) => [sec.code, i + 1]));
+    const seats = (await this.seatRepository.find({ where: { isActive: true } })).sort(
+      compareSeats(positions),
+    );
     const taken = new Map<string, number>();
     const bump = (seatId: string): void => {
       taken.set(seatId, (taken.get(seatId) ?? 0) + 1);
@@ -238,6 +244,13 @@ export class AdminOverviewService {
       season: seasonDto(season),
       generatedAt: now.toISOString(),
       matchCount: played.length,
+      sectors: sectors.map((sec) => ({
+        code: sec.code,
+        name: sec.name,
+        arc: sec.arc,
+        position: sec.position,
+        isAway: sec.isAway,
+      })),
       seats: seats.map((s) => ({
         section: s.section,
         row: s.row,

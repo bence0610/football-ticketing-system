@@ -61,6 +61,16 @@ export class ProfileTicketDto {
   @ApiProperty()
   section!: string;
 
+  @ApiProperty({ description: 'A szektor megjelenített neve ("D/1 szektor", "VIP").' })
+  sectorName!: string;
+
+  @ApiProperty({
+    nullable: true,
+    example: 3,
+    description: 'A szektort kiszolgáló bejárat (1-4); null, ha nincs adat.',
+  })
+  gate!: number | null;
+
   @ApiProperty()
   row!: string;
 

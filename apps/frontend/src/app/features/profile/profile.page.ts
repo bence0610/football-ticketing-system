@@ -31,6 +31,7 @@ import { SeasonPassesService } from '../../core/services/season-passes.service';
 import { TicketsService } from '../../core/services/tickets.service';
 import { formatFullName } from '../../shared/utils/format-name';
 import { withArticle } from '../../shared/utils/hungarian-article';
+import { sectorName } from '../../shared/utils/sector-name';
 import { HufCurrencyPipe } from '../../shared/pipes/huf-currency.pipe';
 import { UserProfile } from '../../shared/models/auth.model';
 import { WaitlistEntry } from '../../shared/models/waitlist.model';
@@ -340,7 +341,7 @@ export function untilLabel(kickoffIso: string, now: number): string {
                   <div>
                     <div class="pass__season">{{ p.seasonLabel }}</div>
                     <div class="pass__seat">
-                      @if (p.section) { {{ p.section }} szektor }
+                      @if (p.section) { {{ sectorName(p.section, p.sectorName) }} }
                       @if (p.seatLabel) { · {{ p.seatLabel }} }
                     </div>
                     <div class="muted">
@@ -816,6 +817,7 @@ export class ProfilePageComponent implements OnInit {
     return TRANSACTION_SOURCE_LABELS[source] ?? 'Pontmozgás';
   }
   protected withArticle = withArticle;
+  protected sectorName = sectorName;
   protected abs(n: number): number {
     return Math.abs(n);
   }

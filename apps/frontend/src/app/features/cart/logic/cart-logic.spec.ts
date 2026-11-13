@@ -73,6 +73,13 @@ describe('labels', () => {
     expect(seatDescription(item({}))).toBe('A szektor · 1. sor · 5. szék');
     expect(seatDescription(item({ section: 'VIP', row: '2', seatNumber: 3 }))).toBe('VIP · 2. sor · 3. szék');
   });
+  it('uses the sector display name from the server when the item carries it', () => {
+    expect(seatDescription(item({ section: 'D/1', sectorName: 'D/1 szektor' }))).toBe(
+      'D/1 szektor · 1. sor · 5. szék',
+    );
+    // an older cart item has only the code: the fallback gives the same name for every real sector
+    expect(seatDescription(item({ section: 'C/2' }))).toBe('C/2 szektor · 1. sor · 5. szék');
+  });
   it('names the ticket type from the seat category', () => {
     expect(ticketTypeLabel('standard')).toBe('Normál jegy');
     expect(ticketTypeLabel('vip')).toBe('VIP jegy');

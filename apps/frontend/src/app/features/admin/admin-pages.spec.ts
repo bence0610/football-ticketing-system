@@ -206,6 +206,10 @@ describe('SeatHeatmapPageComponent', async () => {
     season: { label: '2026/2027', validFrom: '2026-07-01', validUntil: '2027-06-30' },
     generatedAt: '2026-11-13T13:32:00.000Z',
     matchCount,
+    sectors: [
+      { code: 'A', name: 'A szektor', arc: 'upper', position: 1, isAway: false },
+      { code: 'B', name: 'B szektor', arc: 'upper', position: 2, isAway: false },
+    ],
     seats: [
       { section: 'A', row: '1', number: 1, taken: 4 },
       { section: 'A', row: '1', number: 2, taken: 4 },

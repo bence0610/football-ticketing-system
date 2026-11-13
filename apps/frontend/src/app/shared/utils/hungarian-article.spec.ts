@@ -20,6 +20,27 @@ describe('hungarianArticle', () => {
     });
   });
 
+  it('reads a single-letter sector code by the name of the letter', () => {
+    // vowel-sounding names: a, e, ef, el, em, en
+    for (const code of ['A', 'E', 'F', 'L', 'M', 'N', 'A/1']) {
+      expect(hungarianArticle(code)).toBe('az');
+      expect(hungarianArticle(`${code} szektor`)).toBe('az');
+    }
+    // consonant-sounding names: be, ce, de, ge, há, jé, ká
+    for (const code of ['B', 'C', 'D', 'G', 'H', 'J', 'K', 'B/2', 'C/1', 'D/2']) {
+      expect(hungarianArticle(code)).toBe('a');
+      expect(hungarianArticle(`${code} szektor`)).toBe('a');
+    }
+    expect(withArticle('F szektor')).toBe('az F szektor');
+    expect(withArticle('D/1 szektor')).toBe('a D/1 szektor');
+  });
+
+  it('keeps reading the other sector names as words and acronyms', () => {
+    expect(hungarianArticle('VENDÉG')).toBe('a');
+    expect(hungarianArticle('Vendég szektor')).toBe('a');
+    expect(hungarianArticle('VIP')).toBe('a');
+  });
+
   it('reads acronyms by the name of their first letter', () => {
     expect(hungarianArticle('MTK Budapest')).toBe('az'); // "em-té-ká"
     expect(hungarianArticle('NB I')).toBe('az'); // "en-bé"

@@ -53,6 +53,7 @@ import {
 } from './components/seat-detail-bottom-sheet/seat-detail-bottom-sheet.component';
 import { WaitlistJoinButtonComponent } from './components/waitlist-join-button/waitlist-join-button.component';
 import { lockErrorMessage } from '../../shared/utils/lock-error';
+import { hasKickedOff, purchasableMatches } from '../../shared/utils/match-sale';
 
 @Component({
   selector: 'kte-stadium-page',
@@ -90,75 +91,102 @@ import { lockErrorMessage } from '../../shared/utils/lock-error';
       </header>
 
       <ng-container *ngIf="(matchId$ | async); else noMatch">
-        <ng-container *ngIf="selectedMatch$ | async as activeMatch">
-          <div *ngIf="isSoldOut(activeMatch)" class="kte-stadium__sold-out">
-            <mat-icon>info</mat-icon>
-            <div>
-              <strong>Telt ház!</strong>
-              <p>Erre a meccsre minden hely elkelt vagy átmenetileg foglalt. Ha mégis szeretnél jönni, iratkozz fel a várólistára - értesítünk, ha valaki visszamondja a jegyét.</p>
-            </div>
-            <kte-waitlist-join-button [matchId]="activeMatch.id" />
+        <div
+          *ngIf="startedMatch$ | async as started"
+          class="kte-stadium__started"
+          role="status"
+          data-testid="match-started"
+        >
+          <mat-icon>schedule</mat-icon>
+          <div>
+            <strong>Ez a mérkőzés már elkezdődött.</strong>
+            <p>
+              {{ started.homeTeam }} – {{ started.awayTeam }}: a mérkőzésre már nem vásárolható jegy.
+              Válassz egy másik mérkőzést a fenti listából.
+            </p>
           </div>
-        </ng-container>
-        <kte-sector-summary
-          [summaries]="(summaries$ | async) ?? []"
-          [selectedSection]="(selectedSection$ | async) ?? null"
-          (sectorSelected)="onSectorSelected($event)"
-        ></kte-sector-summary>
+        </div>
 
-        <div class="kte-stadium__toolbar">
-          <kte-accessibility-toggle
-            [checked]="(accessibleOnly$ | async) ?? false"
-            (changed)="onAccessibilityToggle()"
-          ></kte-accessibility-toggle>
+        <ng-container *ngIf="!(startedMatch$ | async)">
+          <ng-container *ngIf="selectedMatch$ | async as activeMatch">
+            <div *ngIf="isSoldOut(activeMatch)" class="kte-stadium__sold-out">
+              <mat-icon>info</mat-icon>
+              <div>
+                <strong>Telt ház!</strong>
+                <p>Erre a meccsre minden hely elkelt vagy átmenetileg foglalt. Ha mégis szeretnél jönni, iratkozz fel a várólistára - értesítünk, ha valaki visszamondja a jegyét.</p>
+              </div>
+              <kte-waitlist-join-button [matchId]="activeMatch.id" />
+            </div>
+          </ng-container>
+
           <span *ngIf="(seatsLoading$ | async)" class="kte-stadium__loading">
             <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
             Ülésrend betöltése…
           </span>
-        </div>
 
-        <mat-sidenav-container class="kte-stadium__container" autosize>
-          <mat-sidenav
-            #sidenav
-            mode="side"
-            position="end"
-            [opened]="!isMobile() && (selectedSeat$ | async) !== null"
-            [disableClose]="true"
-            class="kte-stadium__sidenav"
-          >
-            <kte-seat-detail-panel
-              [seat]="(selectedSeat$ | async) ?? null"
-              [covered]="(selectedSeatCovered$ | async) ?? null"
-              [activeLock]="(activeLock$ | async) ?? null"
-              [lockExpiresAtMs]="(lockExpiresAtMs$ | async) ?? null"
-              [locking]="(locking$ | async) ?? false"
-              (lock)="onLockSeat($event)"
-              (release)="onReleaseLock()"
-              (closed)="onClosePanel()"
-            ></kte-seat-detail-panel>
-          </mat-sidenav>
+          <mat-sidenav-container class="kte-stadium__container" autosize>
+            <mat-sidenav
+              #sidenav
+              mode="side"
+              position="end"
+              [opened]="!isMobile() && (selectedSeat$ | async) !== null"
+              [disableClose]="true"
+              class="kte-stadium__sidenav"
+            >
+              <kte-seat-detail-panel
+                [seat]="(selectedSeat$ | async) ?? null"
+                [covered]="(selectedSeatCovered$ | async) ?? null"
+                [sectorName]="(selectedSeatSector$ | async)?.name ?? null"
+                [gate]="(selectedSeatSector$ | async)?.gate ?? null"
+                [activeLock]="(activeLock$ | async) ?? null"
+                [lockExpiresAtMs]="(lockExpiresAtMs$ | async) ?? null"
+                [locking]="(locking$ | async) ?? false"
+                (lock)="onLockSeat($event)"
+                (release)="onReleaseLock()"
+                (closed)="onClosePanel()"
+              ></kte-seat-detail-panel>
+            </mat-sidenav>
 
-          <mat-sidenav-content class="kte-stadium__content">
-            <div class="kte-stadium__map-wrapper">
-              <kte-stadium-map
-                [sectorSummary]="(summaries$ | async) ?? []"
+            <mat-sidenav-content class="kte-stadium__content">
+              <!-- The map first: it is what people came for. -->
+              <div class="kte-stadium__map-wrapper">
+                <kte-stadium-map
+                  [sectorSummary]="(summaries$ | async) ?? []"
+                  [selectedSection]="(selectedSection$ | async) ?? null"
+                  (sectorSelected)="onSectorSelected($event)"
+                ></kte-stadium-map>
+                <div class="kte-stadium__legend">
+                  <kte-color-legend></kte-color-legend>
+                </div>
+              </div>
+
+              <!-- The fallback below it: the same choice as a list, for keyboard and screen readers. -->
+              <kte-sector-summary
+                [summaries]="(summaries$ | async) ?? []"
                 [selectedSection]="(selectedSection$ | async) ?? null"
                 (sectorSelected)="onSectorSelected($event)"
-              ></kte-stadium-map>
-              <div class="kte-stadium__legend">
-                <kte-color-legend></kte-color-legend>
-              </div>
-            </div>
+              ></kte-sector-summary>
 
-            <kte-seat-grid
-              [seats]="(seatsForSector$ | async) ?? []"
-              [section]="(selectedSection$ | async) ?? null"
-              [covered]="(selectedSectorCovered$ | async) ?? null"
-              [selectedSeat]="(selectedSeat$ | async) ?? null"
-              (seatSelected)="onSeatSelected($event)"
-            ></kte-seat-grid>
-          </mat-sidenav-content>
-        </mat-sidenav-container>
+              <div class="kte-stadium__toolbar">
+                <kte-accessibility-toggle
+                  [checked]="(accessibleOnly$ | async) ?? false"
+                  (changed)="onAccessibilityToggle()"
+                ></kte-accessibility-toggle>
+              </div>
+
+              <kte-seat-grid
+                [seats]="(seatsForSector$ | async) ?? []"
+                [section]="(selectedSection$ | async) ?? null"
+                [sectorName]="(selectedSector$ | async)?.name ?? null"
+                [arc]="(selectedSector$ | async)?.arc ?? null"
+                [gate]="(selectedSector$ | async)?.gate ?? null"
+                [covered]="(selectedSectorCovered$ | async) ?? null"
+                [selectedSeat]="(selectedSeat$ | async) ?? null"
+                (seatSelected)="onSeatSelected($event)"
+              ></kte-seat-grid>
+            </mat-sidenav-content>
+          </mat-sidenav-container>
+        </ng-container>
       </ng-container>
 
       <ng-template #noMatch>
@@ -249,6 +277,28 @@ import { lockErrorMessage } from '../../shared/utils/lock-error';
         z-index: 5;
       }
 
+      .kte-stadium__started {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 20px;
+        background: var(--kte-surface);
+        border-left: 4px solid var(--kte-muted);
+        border-radius: var(--kte-radius);
+      }
+      .kte-stadium__started mat-icon {
+        color: var(--kte-muted);
+        font-size: 28px;
+        width: 28px;
+        height: 28px;
+      }
+      .kte-stadium__started p {
+        margin: 4px 0 0;
+        color: var(--kte-muted);
+        font-size: 14px;
+      }
+
       .kte-stadium__sold-out {
         display: grid;
         grid-template-columns: auto 1fr auto;
@@ -325,9 +375,20 @@ export class StadiumPageComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly cart = inject(CartFacade);
 
-  protected readonly matches$ = this.store.select(selectAllMatches);
+  /**
+   * Only the matches still to be played: a match that has kicked off is not
+   * offered. The server refuses it too (seat lock and payment intent); this is
+   * not the only guard.
+   */
+  protected readonly matches$ = this.store
+    .select(selectAllMatches)
+    .pipe(map((matches) => purchasableMatches(matches)));
   protected readonly matchId$ = this.store.select(selectSelectedMatchId);
   protected readonly selectedMatch$ = this.store.select(selectSelectedMatch);
+  /** The match a deep link (?matchId=...) points at, when it has already kicked off. */
+  protected readonly startedMatch$ = this.selectedMatch$.pipe(
+    map((match) => (match && hasKickedOff(match) ? match : null)),
+  );
   protected readonly seats$ = this.store.select(selectSeats);
   protected readonly summaries$ = this.store.select(selectSectorSummary);
   protected readonly seatsLoading$ = this.store.select(selectSeatsLoading);
@@ -346,6 +407,14 @@ export class StadiumPageComponent implements OnInit {
   );
   protected readonly selectedSeatCovered$ = combineLatest([this.selectedSeat$, this.summaries$]).pipe(
     map(([seat, sums]) => (seat ? sums.find((s) => s.section === seat.section)?.covered ?? null : null)),
+  );
+
+  /** The selected sector / the sector of the selected seat, from the seat map's sector summary. */
+  protected readonly selectedSector$ = combineLatest([this.selectedSection$, this.summaries$]).pipe(
+    map(([section, sums]) => sums.find((s) => s.section === section) ?? null),
+  );
+  protected readonly selectedSeatSector$ = combineLatest([this.selectedSeat$, this.summaries$]).pipe(
+    map(([seat, sums]) => (seat ? sums.find((s) => s.section === seat.section) ?? null : null)),
   );
 
   protected readonly isMobile = signal<boolean>(false);
@@ -451,6 +520,10 @@ export class StadiumPageComponent implements OnInit {
   }
 
   protected onSectorSelected(section: string): void {
+    // The away section is not for sale through the portal: it cannot be opened.
+    if (this.latestSummaries.find((s) => s.section === section)?.isAway) {
+      return;
+    }
     this.store.dispatch(SeatsActions.setSelectedSector({ section }));
   }
 
@@ -464,6 +537,10 @@ export class StadiumPageComponent implements OnInit {
 
   protected async onLockSeat(seat: SeatStatus): Promise<void> {
     if (!this.currentMatchId || !this.currentMatch) {
+      return;
+    }
+    if (hasKickedOff(this.currentMatch)) {
+      this.snackBar.open('Erre a mérkőzésre már nem vásárolható jegy.', 'Bezárás', { duration: 4000 });
       return;
     }
     if (this.cart.isFull()) {
@@ -484,6 +561,7 @@ export class StadiumPageComponent implements OnInit {
         homeTeam: this.currentMatch.homeTeam,
         awayTeam: this.currentMatch.awayTeam,
         kickoffAt: this.currentMatch.kickoffAt,
+        sectorName: this.latestSummaries.find((s) => s.section === seat.section)?.name,
       });
       // Reflect the new lock in the seats slice so the UI repaints the seat as locked.
       this.store.dispatch(
@@ -548,8 +626,17 @@ export class StadiumPageComponent implements OnInit {
       this.mobileSheetRef = null;
     }
 
-    const covered = this.latestSummaries.find((s) => s.section === seat.section)?.covered ?? null;
-    const data: SeatDetailBottomSheetData = { seat, covered, activeLock, lockExpiresAtMs, locking };
+    const sector = this.latestSummaries.find((s) => s.section === seat.section);
+    const covered = sector?.covered ?? null;
+    const data: SeatDetailBottomSheetData = {
+      seat,
+      covered,
+      sectorName: sector?.name ?? null,
+      gate: sector?.gate ?? null,
+      activeLock,
+      lockExpiresAtMs,
+      locking,
+    };
     this.mobileSheetRef = this.bottomSheet.open(SeatDetailBottomSheetComponent, {
       data,
       panelClass: 'kte-bottom-sheet',

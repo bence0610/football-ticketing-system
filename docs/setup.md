@@ -24,7 +24,9 @@ mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS kte_jegyportal CHARACTER SET 
 # 4. Migrációk + seed
 npm run migration:run
 npm run seed
-# Létrejön: 2 mérkőzés, ~370 szék 4 szektorban,
+# Létrejön: 2 mérkőzés, 5 468 szék a Széktói Stadion 19 szektorában (felső ív: D/1..A/2,
+# főépület oldala: VENDÉG, N..E, a VIP középen; a sorok/székek száma rekonstrukció, nem felmért adat),
+# 18 bérletár-sor (a vendégszektorra nincs bérlet),
 # admin@kte.hu (Admin123!), fan@kte.hu (Fan12345!), kapu@kte.hu (Kapu123!).
 
 # 5. Indítás

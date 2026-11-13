@@ -7,6 +7,8 @@ export enum SeatAvailability {
   SOLD = 'sold',
   SEASON_PASS = 'season_pass',
   DISABLED = 'disabled',
+  /** The away section: never sold through the portal. */
+  AWAY = 'away',
 }
 
 /**
@@ -18,7 +20,7 @@ export class SeatStatusDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({ example: 'A' })
+  @ApiProperty({ example: 'D/1' })
   section!: string;
 
   @ApiProperty({ example: '3' })

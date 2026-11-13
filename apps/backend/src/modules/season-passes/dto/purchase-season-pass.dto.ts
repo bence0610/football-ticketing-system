@@ -3,9 +3,9 @@ import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-valid
 
 export class PurchaseSeasonPassDto {
   @ApiProperty({
-    example: 'A',
+    example: 'upper',
     description:
-      'A vásárolt szektor azonosítója (megegyezik a `season_pass_prices.section` mezővel).',
+      'A vásárolt árkategória azonosítója (megegyezik a `season_pass_prices.section` mezővel: `vip`, `lower`, `upper`). A helyet a szerver osztja ki az árkategórián belül.',
   })
   @IsString()
   @MinLength(1)

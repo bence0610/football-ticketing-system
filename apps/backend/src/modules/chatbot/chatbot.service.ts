@@ -38,6 +38,7 @@ Szigorú szabályok a számokra és tényekre:
 - Ha a kért adat nincs a pillanatképben (például egy szektor, egy meccs vagy egy érték hiányzik, vagy "nem elérhető" áll mellette), mondd meg egyenesen, hogy ezt nem tudod, és irányítsd a felhasználót a jegyvásárlási oldalra vagy a jegy@kte.hu címre.
 - A szektor fedettsége (fedett / nem fedett) állandó adat: ha a pillanatkép megadja, válaszolj róla közvetlenül (például a „melyik szektor fedett?” kérdésre sorold fel a fedett szektorokat), időbélyeges figyelmeztetés nélkül. Ha a fedettség mellett „nem elérhető” áll, mondd meg, hogy ezt nem tudod.
 - Csak a szabad, eladott és zárolt helyek számai mozognak gyorsan: ezek a pillanatkép készítésének idejét tükrözik, ezért CSAK akkor jelezd (a pillanatkép időpontjával), hogy közben változhattak, ha ilyen számot mondasz. Az árakra (alapár, szektorárak) és a hűségprogram szabályaira ezt NE mondd: azok nem változnak a pillanatkép érvényességi idején belül. Ha csak árat vagy szabályt közölsz, ne tégy hozzá időbélyeges figyelmeztetést. Az időjárás előrejelzés: így mutasd be, és jelezd, hogy a kezdésig változhat.
+- A vendégszektor kizárólag vendégszurkolóké: a portálon nem vásárolható, bérlet sem váltható rá. Soha ne ajánld jegyvásárlásra vagy helyválasztásra, akkor sem, ha a felhasználó olcsó vagy sok szabad helyet keres.
 - Hogy egy meccs hazai vagy idegenbeli-e, azt kizárólag a "Hazai/idegenbeli" sor mondja meg; ne találgasd.
 
 A pillanatkép a mérkőzések mellett a hűségprogram szabályait is tartalmazza; a hűségprogramról ezek alapján válaszolj, az ott szereplő számokat kimondhatod. A felhasználó saját pontjait és szintjét nem ismered — erre a profil oldalra irányítsd.
@@ -332,10 +333,16 @@ export class ChatbotService {
       return 'szektoronkénti adat nem elérhető';
     }
     return match.sectors
-      .map(
-        (s) =>
-          `${s.section} szektor: jegyár ${this.formatSectorPrice(s)}; helyek (mozgó adat): szabad ${s.free}, eladott ${s.sold}, zárolt ${s.locked}, összes ${s.total}; fedettség: ${this.formatCoverage(s)}`,
-      )
+      .map((s) => {
+        const name = s.name ?? `${s.section} szektor`;
+        if (s.away) {
+          // The away section: described so questions about it can be answered, but with no
+          // price or seat counts, so there is nothing to recommend or quote for sale.
+          return `${name}: vendégszektor, csak vendégszurkolóknak; a portálon nem vásárolható, bérlet sem váltható rá`;
+        }
+        const gate = s.gate ? `; bejárat: ${s.gate}. kapu` : '';
+        return `${name}: jegyár ${this.formatSectorPrice(s)}; helyek (mozgó adat): szabad ${s.free}, eladott ${s.sold}, zárolt ${s.locked}, összes ${s.total}; fedettség: ${this.formatCoverage(s)}${gate}`;
+      })
       .join('; ');
   }
 

@@ -15,7 +15,7 @@ import {
 } from '../../core/models/loyalty.models';
 import { LoyaltyService } from '../../core/services/loyalty.service';
 import { HufCurrencyPipe } from '../../shared/pipes/huf-currency.pipe';
-import { SECTOR_COMPASS_LABEL } from '../../shared/models/seat.model';
+import { sectorName } from '../../shared/utils/sector-name';
 import { MatchesActions, selectAllMatches } from '../../state/matches';
 import { upcomingHomeMatches } from '../home/logic/match-availability';
 import { MatchPricesService } from '../home/logic/match-prices.service';
@@ -534,10 +534,9 @@ export class LoyaltyDashboardPageComponent implements OnInit {
     if (!s || !match || !sector || !Number.isFinite(sector.minPrice) || sector.minPrice <= 0) {
       return null;
     }
-    const compass = SECTOR_COMPASS_LABEL[sector.section];
     return {
       match: `${match.homeTeam} – ${match.awayTeam}`,
-      sector: compass ? `${sector.section} szektor (${compass})` : `${sector.section} szektor`,
+      sector: sectorName(sector.section, sector.name),
       calc: checkoutExample(sector.minPrice, s.tier.discountPercent),
     };
   });

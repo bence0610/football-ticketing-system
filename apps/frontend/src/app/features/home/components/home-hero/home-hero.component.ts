@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed } from '@angular/core';
+import { TierPrice, tierPrices } from '../../logic/tier-prices';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, signal } from '@angular/core';
 import { DatePipe, NgFor, NgIf } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
@@ -110,10 +111,10 @@ import { countdownParts } from '../../logic/countdown-parts';
 
         <aside class="hero__prices" *ngIf="match" aria-labelledby="hero-prices-title">
           <p id="hero-prices-title" class="hero__eyebrow">Jegyárak</p>
-          <ul class="hero__price-list" *ngIf="sectors.length > 0; else noPrices">
-            <li *ngFor="let s of sectors" class="hero__price-row">
-              <span>{{ sectorLabel(s) }}</span>
-              <strong>{{ priceText(s) }}</strong>
+          <ul class="hero__price-list" *ngIf="tiers().length > 0; else noPrices">
+            <li *ngFor="let t of tiers()" class="hero__price-row" data-testid="hero-tier">
+              <span>{{ t.label }}</span>
+              <strong>{{ priceText(t) }}</strong>
             </li>
           </ul>
           <ng-template #noPrices>
@@ -325,7 +326,12 @@ import { countdownParts } from '../../logic/countdown-parts';
 })
 export class HomeHeroComponent {
   @Input() match: MatchListItem | null = null;
-  @Input() sectors: readonly SectorSummary[] = [];
+  /** The match's sectors; the panel groups them into the three price tiers. */
+  @Input() set sectors(value: readonly SectorSummary[]) {
+    this.sectorList.set(value ?? []);
+  }
+  private readonly sectorList = signal<readonly SectorSummary[]>([]);
+  protected readonly tiers = computed(() => tierPrices(this.sectorList()));
   @Input() pricesLoading = false;
   @Input() loading = false;
   @Input() error: string | null = null;
@@ -341,11 +347,7 @@ export class HomeHeroComponent {
       : { days: 0, hours: 0, minutes: 0, started: true },
   );
 
-  protected sectorLabel(s: SectorSummary): string {
-    return s.section === 'VIP' ? 'VIP' : `${s.section} szektor`;
-  }
-
-  protected priceText(s: SectorSummary): string {
+  protected priceText(s: Pick<TierPrice, 'minPrice' | 'maxPrice'>): string {
     const fmt = new Intl.NumberFormat('hu-HU', { maximumFractionDigits: 0 });
     return s.maxPrice > s.minPrice
       ? `${fmt.format(s.minPrice)}–${fmt.format(s.maxPrice)} Ft`

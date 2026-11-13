@@ -9,6 +9,7 @@ import {
   User,
 } from '../../database/entities';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { loadSectorMap } from '../seats/sector-lookup';
 import { ProfileDto, ProfileTicketDto, ProfileTicketsDto, UpdateProfileDto } from './dto';
 
 /**
@@ -71,6 +72,7 @@ export class UsersService {
       skip: Math.max(offset, 0),
     });
 
+    const sectors = await loadSectorMap(this.ticketRepository.manager);
     const now = Date.now();
     const items: ProfileTicketDto[] = rows.map((ticket) => {
       const kickoff = ticket.match?.kickoffAt?.getTime() ?? 0;
@@ -83,6 +85,8 @@ export class UsersService {
         kickoffAt: ticket.match?.kickoffAt.toISOString() ?? '',
         venue: ticket.match?.venue ?? '',
         section: ticket.seat?.section ?? '',
+        sectorName: sectors.get(ticket.seat?.section ?? '')?.name ?? ticket.seat?.section ?? '',
+        gate: sectors.get(ticket.seat?.section ?? '')?.gate ?? null,
         row: ticket.seat?.row ?? '',
         seatNumber: ticket.seat?.number ?? 0,
         category: ticket.seat?.category ?? 'standard',

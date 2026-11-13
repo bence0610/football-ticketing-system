@@ -1338,13 +1338,19 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   /* Season-pass purchase webhook scenarios                              */
   /* ------------------------------------------------------------------ */
 
-  async function seedSeasonPassPrice(section = 'A', seatCount = 3): Promise<SeasonPassPrice> {
-    // Passes get a seat at purchase, so the section needs free seats.
+  /** A real sector of each price tier: the seats a pass buys are looked up through the `sectors` table. */
+  const SECTOR_OF_TIER = { upper: 'D/1', lower: 'K', vip: 'VIP' } as const;
+
+  async function seedSeasonPassPrice(
+    tier: keyof typeof SECTOR_OF_TIER = 'upper',
+    seatCount = 3,
+  ): Promise<SeasonPassPrice> {
+    // Passes get a seat at purchase, so the tier needs free seats (in one of its sectors).
     const seatRepo = ctx.dataSource.getRepository(Seat);
     for (let n = 1; n <= seatCount; n++) {
       await seatRepo.save(
         seatRepo.create({
-          section,
+          section: SECTOR_OF_TIER[tier],
           row: 'SP',
           number: n,
           category: SeatCategory.STANDARD,
@@ -1357,8 +1363,8 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     const repo = ctx.dataSource.getRepository(SeasonPassPrice);
     return repo.save(
       repo.create({
-        section,
-        sectionLabel: `Szektor ${section}`,
+        section: tier,
+        sectionLabel: { upper: 'Felső ív', lower: 'Alsó ív', vip: 'VIP' }[tier],
         seasonLabel: '2026/2027',
         price: 30000,
         currency: 'HUF',
@@ -1382,7 +1388,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   }
 
   it('season-pass purchase scenario a — webhook-only finalisation: exactly one pass, status active, loyalty awarded', async () => {
-    const priceRow = await seedSeasonPassPrice('A');
+    const priceRow = await seedSeasonPassPrice('upper');
     const fan = await registerFan('sp-purchase-a');
 
     const { paymentIntentId } = await purchaseSeasonPassIntent(fan.accessToken, priceRow.section);
@@ -1418,7 +1424,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('season-pass purchase scenario b — double webhook delivery: one pass, one loyalty transaction', async () => {
-    const priceRow = await seedSeasonPassPrice('B');
+    const priceRow = await seedSeasonPassPrice('upper');
     const fan = await registerFan('sp-purchase-b');
 
     const { paymentIntentId } = await purchaseSeasonPassIntent(fan.accessToken, priceRow.section);
@@ -1498,7 +1504,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   /* ------------------------------------------------------------------ */
 
   it('season-pass idempotency — two purchase requests for the same attempt collapse to exactly one PaymentIntent, one pass, one loyalty tx', async () => {
-    const priceRow = await seedSeasonPassPrice('E');
+    const priceRow = await seedSeasonPassPrice('upper');
     const fan = await registerFan('sp-idem-a');
 
     // Two successive calls while the Redis attempt key is still alive.
@@ -1543,7 +1549,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('season-pass idempotency — retry after card decline creates a fresh PaymentIntent without a 24-hour block', async () => {
-    const priceRow = await seedSeasonPassPrice('F');
+    const priceRow = await seedSeasonPassPrice('upper');
     const fan = await registerFan('sp-idem-b');
 
     // First attempt: simulate a card decline (Stripe throws with payment_intent).
@@ -1692,7 +1698,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     passes: { self: SeasonPass; partner: SeasonPass; child: SeasonPass };
   }
 
-  /** Buyer buys three passes in one section: for themself, their partner (account), a child (no account). */
+  /** Buyer buys three passes in one tier: for themself, their partner (account), a child (no account). */
   async function buyFamilyPasses(section: string): Promise<Family> {
     const buyer = await registerFan('fam-buyer', { firstName: 'Péter', lastName: 'Kovács' });
     const partner = await registerFan('fam-partner', { firstName: 'Anna', lastName: 'Kovácsné' });
@@ -1707,8 +1713,8 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   }
 
   it('family a — one buyer, three holders in one section: three passes, three different seats, three charges', async () => {
-    await seedSeasonPassPrice('A');
-    const { buyer, partner, passes } = await buyFamilyPasses('A');
+    await seedSeasonPassPrice('upper');
+    const { buyer, partner, passes } = await buyFamilyPasses('upper');
 
     expect(ctx.stripeStub.paymentIntentsCreateMock).toHaveBeenCalledTimes(3);
     const created = await Promise.all(
@@ -1736,14 +1742,14 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('family a2 — three webhooks delivered concurrently still get three different seats', async () => {
-    await seedSeasonPassPrice('A');
+    await seedSeasonPassPrice('upper');
     const buyer = await registerFan('fam-conc');
     const intents: StubbedPaymentIntent[] = [];
     for (const holderName of ['Gyerek Egy', 'Gyerek Kettő', 'Gyerek Három']) {
       const resp = await request(server)
         .post('/api/season-passes/purchase')
         .set('Authorization', `Bearer ${buyer.accessToken}`)
-        .send({ sectionId: 'A', holderName });
+        .send({ sectionId: 'upper', holderName });
       expect(resp.status).toBe(201);
       intents.push(ctx.stripeStub.getStoredIntent(resp.body.paymentIntentId as string)!);
     }
@@ -1760,9 +1766,9 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it("family b — each holder's per-match entry works at the gate and the scan names the holder", async () => {
-    await seedSeasonPassPrice('A');
+    await seedSeasonPassPrice('upper');
     const { match } = await seedMinimalFixture(ctx.dataSource);
-    const { buyer, partner, passes } = await buyFamilyPasses('A');
+    const { buyer, partner, passes } = await buyFamilyPasses('upper');
     const gate = await createGateUser(ctx.dataSource, { email: 'gate-fam-b@kte.hu' });
     const gateToken = await loginAs(gate.user.email, gate.plainPassword);
 
@@ -1848,34 +1854,34 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('family c2 — a full section refuses a further purchase before any charge', async () => {
-    await seedSeasonPassPrice('A', 2);
+    await seedSeasonPassPrice('upper', 2);
     const buyer = await registerFan('full-section');
-    await buyPassFor(buyer, 'A', { holderName: 'Egy' });
-    await buyPassFor(buyer, 'A', { holderName: 'Kettő' });
+    await buyPassFor(buyer, 'upper', { holderName: 'Egy' });
+    await buyPassFor(buyer, 'upper', { holderName: 'Kettő' });
     ctx.stripeStub.paymentIntentsCreateMock.mockClear();
 
     const resp = await request(server)
       .post('/api/season-passes/purchase')
       .set('Authorization', `Bearer ${buyer.accessToken}`)
-      .send({ sectionId: 'A', holderName: 'Három' });
+      .send({ sectionId: 'upper', holderName: 'Három' });
     expect(resp.status).toBe(409);
     expect(resp.body.code).toBe('section_sold_out');
     expect(ctx.stripeStub.paymentIntentsCreateMock).not.toHaveBeenCalled();
   });
 
   it('family d — an account holds at most one pass per season (API pre-check, DB constraint, refund on race)', async () => {
-    await seedSeasonPassPrice('A');
+    await seedSeasonPassPrice('upper');
     const buyer = await registerFan('hold-buyer');
     const partner = await registerFan('hold-partner');
 
     // 1) First pass for the partner succeeds, a second purchase is refused before charging.
-    const first = await buyPassFor(buyer, 'A', { holderEmail: partner.email });
+    const first = await buyPassFor(buyer, 'upper', { holderEmail: partner.email });
     expect(first.pass?.holderUserId).toBe(partner.userId);
     ctx.stripeStub.paymentIntentsCreateMock.mockClear();
     const again = await request(server)
       .post('/api/season-passes/purchase')
       .set('Authorization', `Bearer ${buyer.accessToken}`)
-      .send({ sectionId: 'A', holderEmail: partner.email });
+      .send({ sectionId: 'upper', holderEmail: partner.email });
     expect(again.status).toBe(409);
     expect(again.body.code).toBe('holder_already_has_pass');
     // Buying FOR someone else: the message names them (not "ennek a felhasználónak").
@@ -1889,7 +1895,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     const own = await request(server)
       .post('/api/season-passes/purchase')
       .set('Authorization', `Bearer ${partner.accessToken}`)
-      .send({ sectionId: 'A' });
+      .send({ sectionId: 'upper' });
     expect(own.status).toBe(409);
     expect(own.body.code).toBe('holder_already_has_pass');
     // Buying for MYSELF: second person.
@@ -1911,11 +1917,11 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     const respA = await request(server)
       .post('/api/season-passes/purchase')
       .set('Authorization', `Bearer ${buyer.accessToken}`)
-      .send({ sectionId: 'A', holderEmail: racer.email, holderName: 'Racer A' });
+      .send({ sectionId: 'upper', holderEmail: racer.email, holderName: 'Racer A' });
     const respB = await request(server)
       .post('/api/season-passes/purchase')
       .set('Authorization', `Bearer ${buyer.accessToken}`)
-      .send({ sectionId: 'A', holderEmail: racer.email, holderName: 'Racer B' });
+      .send({ sectionId: 'upper', holderEmail: racer.email, holderName: 'Racer B' });
     expect(respA.status).toBe(201);
     expect(respB.status).toBe(201);
     ctx.stripeStub.refundCreateMock.mockClear();
@@ -1935,19 +1941,19 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('family e — unknown holder email is rejected before charging', async () => {
-    await seedSeasonPassPrice('A');
+    await seedSeasonPassPrice('upper');
     const buyer = await registerFan('unknown-holder');
     const resp = await request(server)
       .post('/api/season-passes/purchase')
       .set('Authorization', `Bearer ${buyer.accessToken}`)
-      .send({ sectionId: 'A', holderEmail: 'nobody-here@kte.hu' });
+      .send({ sectionId: 'upper', holderEmail: 'nobody-here@kte.hu' });
     expect(resp.status).toBe(404);
     expect(resp.body.code).toBe('holder_account_not_found');
     expect(ctx.stripeStub.paymentIntentsCreateMock).not.toHaveBeenCalled();
   });
 
   it('family f — lending: buyer and holder may both lend; a borrower displaces only one match of one pass', async () => {
-    await seedSeasonPassPrice('A');
+    await seedSeasonPassPrice('upper');
     const { match: match1 } = await seedMinimalFixture(ctx.dataSource);
     const matchRepo = ctx.dataSource.getRepository(Match);
     const match2 = await matchRepo.save(
@@ -1963,7 +1969,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
         isSeasonPassEligible: false,
       }),
     );
-    const { buyer, partner, passes } = await buyFamilyPasses('A');
+    const { buyer, partner, passes } = await buyFamilyPasses('upper');
     const borrower = await registerFan('fam-borrower', { firstName: 'Kölcsön', lastName: 'Vevő' });
     const stranger = await registerFan('fam-stranger-2');
     const gate = await createGateUser(ctx.dataSource, { email: 'gate-fam-f@kte.hu' });

@@ -74,6 +74,10 @@ export interface SeasonPassResponse {
   coversBefore: string;
   seatLabel?: string;
   section?: string;
+  /** Display name from the sectors table; falls back to the code. */
+  sectorName?: string;
+  /** Entrance gate 1..4; null = unknown. */
+  gate?: number | null;
   purchasedAt?: string;
   pricePaid?: string;
   currency?: string;
@@ -109,6 +113,13 @@ export interface SeasonPassPrice {
   passesSold?: number;
   /** `null` = unknown. */
   isCovered?: boolean | null;
+  /** Price tier (`vip`, `lower`, `upper`); the same as `sectionId`. */
+  priceCategory?: 'vip' | 'upper' | 'lower' | null;
+  arc?: 'upper' | 'lower' | null;
+  /** Place on the arc, west to east. */
+  position?: number | null;
+  /** Entrance gate 1..4. */
+  gate?: number | null;
   /** Home matches still to be played that the pass is valid for. */
   upcomingHomeMatches?: number;
   /** The same seat bought match by match for those fixtures; `null` = not derivable. */

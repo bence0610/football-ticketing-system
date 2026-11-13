@@ -8,7 +8,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { TicketsService } from './tickets.service';
 import { ScanTicketDto, TicketScanResponseDto } from './dto/scan-ticket.dto';
 import { TicketResponseDto, TicketQrResponseDto } from './dto/ticket-response.dto';
-import { Ticket } from '../../database/entities';
+import { Sector, Ticket } from '../../database/entities';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 
 interface AuthenticatedRequest extends Request {
@@ -23,7 +23,7 @@ function extractUserId(req: AuthenticatedRequest): string {
   return userId;
 }
 
-function ticketToDto(ticket: Ticket): TicketResponseDto {
+function ticketToDto(ticket: Ticket, sectors: ReadonlyMap<string, Sector>): TicketResponseDto {
   if (!ticket.match || !ticket.seat) {
     throw new Error(`Ticket ${ticket.id} missing required relations`);
   }
@@ -43,6 +43,8 @@ function ticketToDto(ticket: Ticket): TicketResponseDto {
     seat: {
       id: ticket.seat.id,
       section: ticket.seat.section,
+      sectorName: sectors.get(ticket.seat.section)?.name ?? ticket.seat.section,
+      gate: sectors.get(ticket.seat.section)?.gate ?? null,
       row: ticket.seat.row,
       number: ticket.seat.number,
       category: ticket.seat.category,
@@ -74,8 +76,11 @@ export class TicketsController {
   @ApiOkResponse({ type: [TicketResponseDto] })
   async listMine(@Req() req: AuthenticatedRequest): Promise<TicketResponseDto[]> {
     const userId = extractUserId(req);
-    const tickets = await this.ticketsService.findForUser(userId);
-    return tickets.map(ticketToDto);
+    const [tickets, sectors] = await Promise.all([
+      this.ticketsService.findForUser(userId),
+      this.ticketsService.sectorsByCode(),
+    ]);
+    return tickets.map((t) => ticketToDto(t, sectors));
   }
 
   @Get(':id/qr')
