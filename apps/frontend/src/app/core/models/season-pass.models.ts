@@ -1,3 +1,5 @@
+import type { SeatStatus, StadiumArc } from '../../shared/models/seat.model';
+
 export type SeasonPassStatus = 'active' | 'expired' | 'cancelled' | 'pending_payment';
 export type PassLoanStatus =
   | 'pending'
@@ -140,8 +142,71 @@ export interface SeasonOverview {
   homeMatches: SeasonHomeMatch[];
 }
 
+/** One sector of a price tier, as the season-pass seat picker lists it (the away section is never included). */
+export interface SeasonPassSector {
+  readonly section: string;
+  /** Display name from the sectors table ("D/1 szektor", "VIP"). */
+  readonly name: string;
+  readonly arc: StadiumArc | null;
+  /** Place on the arc, west to east. */
+  readonly position: number | null;
+  /** Entrance gate 1..4; null = unknown. */
+  readonly gate: number | null;
+  /** null = unknown: nothing is claimed. */
+  readonly covered: boolean | null;
+  readonly total: number;
+  /** Seats that can still be chosen for a pass this season. */
+  readonly freeSeats: number;
+}
+
+/** `GET /season-passes/tiers/:tier/sectors`. */
+export interface SeasonPassTierSectors {
+  readonly tier: string;
+  readonly seasonLabel: string;
+  readonly price: number;
+  readonly sectors: readonly SeasonPassSector[];
+}
+
+/**
+ * Season state of one seat. Never `sold`: a single-match sale says nothing about
+ * the season. `locked` = another buyer is paying for it right now. `ticketed` = the seat
+ * has a ticket for an upcoming match of the season: a pass on it could not be honoured
+ * at that match, so it cannot be bought as a season seat.
+ */
+export type SeasonSeatAvailability = 'available' | 'season_pass' | 'ticketed' | 'locked' | 'disabled';
+
+/** `GET /season-passes/seats?section=`: the seat board of one sector, in season terms. */
+export interface SeasonPassSeatMap {
+  readonly section: string;
+  readonly name: string;
+  readonly arc: StadiumArc | null;
+  readonly gate: number | null;
+  readonly covered: boolean | null;
+  readonly tier: string;
+  /** The tier's season price: every seat of the sector costs this. */
+  readonly price: number;
+  readonly seasonLabel: string;
+  readonly aisles: readonly number[];
+  readonly longestRun: number;
+  /** `status` is a {@link SeasonSeatAvailability}; typed as the shared seat so the one seat grid renders it. */
+  readonly seats: readonly SeatStatus[];
+}
+
+/** `POST /season-passes/seats/:seatId/hold`: the seat is the buyer's for `ttlSeconds` while they pay. */
+export interface SeasonSeatHold {
+  readonly seatId: string;
+  readonly holdToken: string;
+  readonly ttlSeconds: number;
+  /** ISO 8601 */
+  readonly expiresAt: string;
+}
+
 export interface PurchaseSeasonPassPayload {
+  /** The price tier (`vip`, `lower`, `upper`). */
   sectionId: string;
+  /** The seat the buyer chose and holds. */
+  seatId: string;
+  holdToken: string;
   /** Who the pass is for; omit both for the buyer. A name alone = holder without account. */
   holderName?: string;
   /** Email of the holder's registered account (links the pass to their profile). */

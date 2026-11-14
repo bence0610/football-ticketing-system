@@ -210,9 +210,9 @@ describe('SeasonPassPageComponent — what the page claims', () => {
     ]);
     expect(el.querySelector('[data-testid="tier-heading"]')).toBeNull();
     expect(text(el)).toContain('Válassz árkategóriát');
-    // the buyer is told they do not pick the exact seat
-    expect(text(el.querySelector('[data-testid="seat-assignment-note"]') as HTMLElement)).toContain(
-      'vásárláskor osztjuk ki',
-    );
+    // the buyer is told they pick the sector and the seat themselves
+    const note = text(el.querySelector('[data-testid="seat-assignment-note"]') as HTMLElement);
+    expect(note).toContain('te választod ki a szektort és a helyet');
+    expect(note).not.toContain('osztjuk ki');
   });
 });

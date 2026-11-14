@@ -1,4 +1,4 @@
-import { HttpClient, HttpContext } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { SKIP_ERROR_SNACKBAR } from '../interceptors/error.interceptor';
@@ -11,6 +11,9 @@ import {
   SeasonOverview,
   SeasonPassPrice,
   SeasonPassResponse,
+  SeasonPassSeatMap,
+  SeasonPassTierSectors,
+  SeasonSeatHold,
 } from '../models/season-pass.models';
 import { TicketQrResponse } from '../models/ticket.models';
 
@@ -45,6 +48,41 @@ export class SeasonPassesService {
    */
   getSeasonOverview(): Observable<SeasonOverview> {
     return this.http.get<SeasonOverview>('/season-passes/season', {
+      context: new HttpContext().set(SKIP_ERROR_SNACKBAR, true),
+    });
+  }
+
+  /** Sectors of one price tier with their free pass seats. The page shows a failure inline. */
+  listTierSectors(tier: string): Observable<SeasonPassTierSectors> {
+    return this.http.get<SeasonPassTierSectors>(
+      `/season-passes/tiers/${encodeURIComponent(tier)}/sectors`,
+      { context: new HttpContext().set(SKIP_ERROR_SNACKBAR, true) },
+    );
+  }
+
+  /** The season seat board of one sector. The page shows a failure inline. */
+  getSeatMap(section: string): Observable<SeasonPassSeatMap> {
+    return this.http.get<SeasonPassSeatMap>('/season-passes/seats', {
+      params: new HttpParams().set('section', section),
+      context: new HttpContext().set(SKIP_ERROR_SNACKBAR, true),
+    });
+  }
+
+  /**
+   * Holds a seat for the buyer while they pay. One hold per user: the server
+   * releases the previous one. A 409 (`seat_taken`, `seat_held`) is worded by the page.
+   */
+  holdSeat(seatId: string): Observable<SeasonSeatHold> {
+    return this.http.post<SeasonSeatHold>(
+      `/season-passes/seats/${encodeURIComponent(seatId)}/hold`,
+      {},
+      { context: new HttpContext().set(SKIP_ERROR_SNACKBAR, true) },
+    );
+  }
+
+  releaseHold(seatId: string, holdToken: string): Observable<void> {
+    return this.http.delete<void>(`/season-passes/seats/${encodeURIComponent(seatId)}/hold`, {
+      params: new HttpParams().set('holdToken', holdToken),
       context: new HttpContext().set(SKIP_ERROR_SNACKBAR, true),
     });
   }

@@ -33,6 +33,7 @@ describe('SeasonPassesService.listIncomingLoans', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never, // SeasonPassHoldService: not used here
     );
   }
 

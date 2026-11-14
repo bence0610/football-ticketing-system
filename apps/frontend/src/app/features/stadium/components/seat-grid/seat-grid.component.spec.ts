@@ -155,6 +155,143 @@ describe('SeatGridComponent', () => {
     });
   });
 
+  describe('season mode (a season-pass purchase)', () => {
+    const seasonSeats = (): SeatStatus[] => [
+      seat(1, 1, 'available'),
+      seat(1, 2, 'available'),
+      seat(1, 3, 'locked'),
+      seat(1, 4, 'sold'),
+      seat(1, 5, 'season_pass'),
+      seat(1, 6, 'disabled'),
+      seat(1, 7, 'away'),
+      seat(1, 8, 'ticketed'),
+    ];
+
+    it('the legend has only the season states: no sold, no "foglalja" match wording', () => {
+      const f = mount(900, seasonSeats(), { mode: 'season', chosenIds: new Set(['s-1-2']) });
+      const items = Array.from(el(f).querySelectorAll('[data-testid="grid-legend"] li')).map((li) => text(li));
+      expect(items.length).toBe(7);
+      expect(items.slice(0, 6)).toEqual([
+        '12 Szabad',
+        '✓ Kiválasztott',
+        'B Már bérlet tartozik rá',
+        'J Közelgő meccsre már van jegy: nem váltható bérletre',
+        '… Másik vásárló épp fizet',
+        '– Nem használható',
+      ]);
+      expect(items[6]).toContain('Akadálymentes');
+      const joined = items.join(' | ');
+      expect(joined).not.toContain('Elkelt');
+      expect(joined).not.toContain('×');
+      expect(joined).not.toContain('foglalja');
+    });
+
+    it("renders a 'sold' (or 'away') seat as unusable, never as a match-sold seat", () => {
+      const f = mount(900, seasonSeats(), { mode: 'season' });
+      for (const n of [4, 7]) {
+        const b = seatButton(f, `s-1-${n}`);
+        expect(b.classList).toContain('kte-seat--unusable');
+        expect(b.classList).not.toContain('kte-seat--sold');
+        expect(text(b)).toBe('–');
+        expect(b.getAttribute('aria-label')).toContain('nem használható');
+        expect(b.getAttribute('aria-label')).not.toContain('elkelt');
+      }
+      expect(el(f).querySelector('.kte-seat--sold')).toBeNull();
+      const glyphs = [1, 3, 5, 6].map((n) => text(seatButton(f, `s-1-${n}`)));
+      expect(glyphs).toEqual(['1', '…', 'B', '–']);
+    });
+
+    it('speaks of pass places, with no per-match seat price', () => {
+      const f = mount(900, seasonSeats(), { mode: 'season' });
+      const free = seatButton(f, 's-1-1').getAttribute('aria-label')!;
+      expect(free).toContain('1. sor, 1. hely');
+      expect(free).toContain('szabad bérletes hely');
+      expect(free).not.toContain('szék');
+      expect(free).not.toContain('Ft');
+      expect(seatButton(f, 's-1-5').getAttribute('aria-label')).toContain('már bérlet tartozik rá');
+      expect(seatButton(f, 's-1-3').getAttribute('aria-label')).toContain('másik vásárló épp fizet');
+      expect(text(el(f).querySelector('[data-testid="grid-help"]'))).toContain('bérletes helyre');
+      expect(text(el(f).querySelector('[data-testid="grid-help"]'))).not.toContain('székre');
+    });
+
+    it('only free seats and the chosen one can be tapped; a sold seat cannot', () => {
+      const f = mount(900, seasonSeats(), { mode: 'season' });
+      const picked: SeatStatus[] = [];
+      f.componentInstance.seatToggled.subscribe((s) => picked.push(s));
+      for (let n = 1; n <= 8; n++) seatButton(f, `s-1-${n}`).click();
+      expect(picked.map((s) => s.id)).toEqual(['s-1-1', 's-1-2']);
+    });
+
+    it('a seat ticketed for an upcoming match is its own state: a J, a double border and level stripes, not "unusable"', () => {
+      const f = mount(900, seasonSeats(), { mode: 'season' });
+      const b = seatButton(f, 's-1-8');
+      expect(text(b)).toBe('J');
+      expect(b.classList).toContain('kte-seat--ticketed');
+      expect(b.classList).not.toContain('kte-seat--unusable');
+      const css = getComputedStyle(b);
+      expect(css.borderTopStyle).toBe('double');
+      expect(css.backgroundImage).toContain('repeating-linear-gradient');
+      expect(b.getAttribute('aria-label')).toBe('B/1 szektor, 1. sor, 8. hely, közelgő meccsre már van jegy, bérletre nem választható');
+      expect(b.tabIndex).toBe(-1);
+      expect(b.getAttribute('aria-disabled')).toBe('true');
+      // every season state has a glyph of its own
+      const glyphs = [1, 2, 3, 5, 6, 8].map((n) => text(seatButton(f, `s-1-${n}`)));
+      expect(new Set(glyphs).size).toBe(6);
+    });
+
+    it('a tap on a seat that cannot be chosen is reported (so the page can say why), never as a toggle', () => {
+      const f = mount(900, seasonSeats(), { mode: 'season', chosenIds: new Set(['s-1-2']) });
+      const picked: string[] = [];
+      const refused: string[] = [];
+      f.componentInstance.seatToggled.subscribe((s) => picked.push(s.id));
+      f.componentInstance.unavailableSeatTapped.subscribe((s) => refused.push(s.id));
+      for (let n = 1; n <= 8; n++) seatButton(f, `s-1-${n}`).click();
+      expect(picked).toEqual(['s-1-1', 's-1-2']);
+      expect(refused).toEqual(['s-1-3', 's-1-4', 's-1-5', 's-1-6', 's-1-7', 's-1-8']);
+    });
+
+    it('a free seat whose hold is in flight is neither toggled nor reported', () => {
+      const f = mount(900, seasonSeats(), { mode: 'season', busyIds: new Set(['s-1-1']) });
+      const events: string[] = [];
+      f.componentInstance.seatToggled.subscribe((s) => events.push(`t:${s.id}`));
+      f.componentInstance.unavailableSeatTapped.subscribe((s) => events.push(`u:${s.id}`));
+      seatButton(f, 's-1-1').click();
+      expect(events).toEqual([]);
+    });
+
+    it('when seats are too small to hit, a tap on an unavailable seat zooms in instead of reporting it', () => {
+      const seats = sector(8, 28, (r, n) => (r === 3 && n === 20 ? 'ticketed' : 'available'));
+      const f = mount(296, seats, { mode: 'season' });
+      const refused: string[] = [];
+      f.componentInstance.unavailableSeatTapped.subscribe((s) => refused.push(s.id));
+      const port = el(f).querySelector('[data-testid="grid-port"]')!;
+      pointer(port, 'pointerdown');
+      pointer(port, 'pointerup');
+      seatButton(f, 's-3-20').click(); // zooms
+      expect(refused).toEqual([]);
+      expect(scaleOf(f)).toBe(1);
+      pointer(port, 'pointerdown');
+      pointer(port, 'pointerup');
+      seatButton(f, 's-3-20').click(); // now big enough: reported
+      expect(refused).toEqual(['s-3-20']);
+    });
+
+    it('the default stays match mode: a sold seat is still shown as sold', () => {
+      const f = mount(900, seasonSeats());
+      expect(seatButton(f, 's-1-4').classList).toContain('kte-seat--sold');
+    });
+
+    it('match mode never reports unavailable seats and shows no ticketed state', () => {
+      const f = mount(900, seasonSeats());
+      const refused: string[] = [];
+      f.componentInstance.unavailableSeatTapped.subscribe((s) => refused.push(s.id));
+      for (let n = 1; n <= 8; n++) seatButton(f, `s-1-${n}`).click();
+      expect(refused).toEqual([]);
+      expect(el(f).querySelector('.kte-seat--ticketed')).toBeNull();
+      expect(text(el(f).querySelector('[data-testid="grid-legend"]'))).not.toContain('Közelgő meccsre');
+    });
+  });
+
   describe('selecting', () => {
     it('emits a free seat that is clicked, once', () => {
       const f = mount(900, sector(1, 4));

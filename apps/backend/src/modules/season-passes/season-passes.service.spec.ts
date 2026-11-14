@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import { SeasonPassesService } from './season-passes.service';
 import { STRIPE_CLIENT } from '../payments/stripe.provider';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
+import { SeasonPassHoldService } from '../../redis/season-pass-hold.service';
 import { EmailService } from '../email/email.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { QrService } from '../qr/qr.service';
@@ -73,6 +74,7 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
           useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
         },
         { provide: EmailService, useValue: { send: jest.fn() } },
+        { provide: SeasonPassHoldService, useValue: {} },
         {
           provide: LoyaltyService,
           useValue: {

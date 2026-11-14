@@ -34,8 +34,11 @@ import {
   zoomAt,
 } from './pan-zoom';
 
-/** What a seat looks like on the board. `selected` is the visitor's own seat (in their cart). */
-export type SeatVisual = 'free' | 'selected' | 'locked' | 'sold' | 'pass' | 'unusable';
+/**
+ * What a seat looks like on the board. `selected` is the visitor's own seat (in their cart).
+ * `ticketed` exists on the season board only: a ticket for an upcoming match is on the seat.
+ */
+export type SeatVisual = 'free' | 'selected' | 'locked' | 'sold' | 'pass' | 'ticketed' | 'unusable';
 
 interface SeatVm {
   readonly seat: SeatStatus;
@@ -60,12 +63,52 @@ export const SEAT_STATES: ReadonlyArray<{ readonly state: SeatVisual; readonly g
   { state: 'unusable', glyph: '–', name: 'Nem használható' },
 ];
 
+/**
+ * Season mode: the board of a season-pass purchase. There is no "sold" state (one match's
+ * sale says nothing about the season): a seat is free for the season, already someone's
+ * pass, ticketed for an upcoming match (so no pass can start on it), being paid for by
+ * another buyer right now, or not usable.
+ */
+export const SEASON_SEAT_STATES: ReadonlyArray<{ readonly state: SeatVisual; readonly glyph: string; readonly name: string }> = [
+  { state: 'free', glyph: '12', name: 'Szabad' },
+  { state: 'selected', glyph: '✓', name: 'Kiválasztott' },
+  { state: 'pass', glyph: 'B', name: 'Már bérlet tartozik rá' },
+  { state: 'ticketed', glyph: 'J', name: 'Közelgő meccsre már van jegy: nem váltható bérletre' },
+  { state: 'locked', glyph: '…', name: 'Másik vásárló épp fizet' },
+  { state: 'unusable', glyph: '–', name: 'Nem használható' },
+];
+
+/** The glyph of every state (the free seat shows its number instead). */
+const GLYPH: Readonly<Record<Exclude<SeatVisual, 'free'>, string>> = {
+  selected: '✓',
+  locked: '…',
+  sold: '×',
+  pass: 'B',
+  ticketed: 'J',
+  unusable: '–',
+};
+
+/** Which board: a single match (tickets) or the season (passes). */
+export type SeatGridMode = 'match' | 'season';
+
+const SEASON_STATE_TEXT: Record<SeatVisual, string> = {
+  free: 'szabad bérletes hely',
+  selected: 'kiválasztva',
+  locked: 'másik vásárló épp fizet érte',
+  sold: 'nem használható',
+  pass: 'már bérlet tartozik rá',
+  ticketed: 'közelgő meccsre már van jegy, bérletre nem választható',
+  unusable: 'nem használható',
+};
+
 const STATE_TEXT: Record<SeatVisual, string> = {
   free: 'szabad',
   selected: 'kiválasztva',
   locked: 'más épp foglalja',
   sold: 'elkelt',
   pass: 'bérletes hely',
+  // never produced on a match board; kept so the table is complete
+  ticketed: 'nem használható',
   unusable: 'nem használható',
 };
 
@@ -118,8 +161,8 @@ const MAX_PORT_HEIGHT_PX = 620;
               >
             }
           </h3>
-          <p>
-            Koppints egy szabad székre a kiválasztáshoz, még egyszer a visszavonáshoz.
+          <p data-testid="grid-help">
+            {{ helpText() }}
             @if (longestRun !== null) {
               <span class="kte-seat-grid__run" data-testid="grid-longest-run">{{ longestRunText() }}</span>
             }
@@ -164,11 +207,11 @@ const MAX_PORT_HEIGHT_PX = 620;
         </div>
 
         @if (rows().length === 0) {
-          <p class="kte-seat-grid__empty">Ebben a szektorban a szűrési feltételeknek megfelelően nincs szék.</p>
+          <p class="kte-seat-grid__empty">{{ emptyText() }}</p>
         }
 
         <ul class="kte-seat-grid__legend" aria-label="Jelmagyarázat" data-testid="grid-legend">
-          @for (item of legend; track item.state) {
+          @for (item of legend(); track item.state) {
             <li>
               <span class="kte-seat kte-seat--{{ item.state }} kte-seat--legend" aria-hidden="true">{{ item.glyph }}</span>
               {{ item.name }}
@@ -413,6 +456,20 @@ const MAX_PORT_HEIGHT_PX = 620;
         );
         cursor: not-allowed;
       }
+      /* ticketed for an upcoming match (season board only): dark red, a double border, level stripes, a J (jegy) */
+      .kte-seat--ticketed {
+        --seat-bg: var(--kte-seat-sold);
+        --seat-fg: #ffffff;
+        border: 4px double #ffffff;
+        background-image: repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.22) 0,
+          rgba(255, 255, 255, 0.22) 3px,
+          transparent 3px,
+          transparent 7px
+        );
+        cursor: not-allowed;
+      }
       /* unusable: an empty outline, a dash */
       .kte-seat--unusable {
         --seat-bg: transparent;
@@ -515,14 +572,24 @@ export class SeatGridComponent implements OnChanges, AfterViewChecked, OnDestroy
   @Input() chosenIds: ReadonlySet<string> = new Set();
   /** Seats whose lock or release is in flight: not clickable until it lands. */
   @Input() busyIds: ReadonlySet<string> = new Set();
+  /**
+   * 'match' (default): one match's board, with sold seats and prices. 'season': a season-pass
+   * board with no per-match state: any status other than free / pass / ticketed / locked is unusable.
+   */
+  @Input() mode: SeatGridMode = 'match';
   @Output() seatToggled = new EventEmitter<SeatStatus>();
+  /**
+   * Season mode only: a seat that cannot be chosen (already a pass, ticketed, being paid for,
+   * not usable) was tapped, so the page can say why. Not emitted on a match board, for a seat
+   * whose hold is in flight, or when the tap zoomed in instead (seats too small to hit).
+   */
+  @Output() unavailableSeatTapped = new EventEmitter<SeatStatus>();
 
   @ViewChild('port') private portRef?: ElementRef<HTMLElement>;
   @ViewChild('board') private boardRef?: ElementRef<HTMLElement>;
   /** The window element the gesture listeners are on now. */
   private attachedTo?: HTMLElement;
 
-  protected readonly legend = SEAT_STATES;
   protected readonly rows = signal<readonly RowVm[]>([]);
   protected readonly boardSize = signal<Size>({ w: 0, h: 0 });
 
@@ -544,7 +611,7 @@ export class SeatGridComponent implements OnChanges, AfterViewChecked, OnDestroy
   private raf = 0;
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['seats'] || changes['section'] || changes['aisles']) {
+    if (changes['seats'] || changes['section'] || changes['aisles'] || changes['mode']) {
       const next = this.buildRows(this.seats);
       this.rows.set(next);
       this.seatById = new Map(next.flatMap((r) => r.seats.map((vm) => [vm.seat.id, vm] as const)));
@@ -577,6 +644,21 @@ export class SeatGridComponent implements OnChanges, AfterViewChecked, OnDestroy
 
   protected visualOf(seat: SeatStatus): SeatVisual {
     if (this.chosenIds.has(seat.id)) return 'selected';
+    if (this.mode === 'season') {
+      switch (seat.status) {
+        case 'available':
+          return 'free';
+        case 'season_pass':
+          return 'pass';
+        case 'ticketed':
+          return 'ticketed';
+        case 'locked':
+          return 'locked';
+        default:
+          // 'sold', 'away', 'disabled' or anything new: a season board never shows a match sale
+          return 'unusable';
+      }
+    }
     switch (seat.status) {
       case 'available':
         return 'free';
@@ -602,7 +684,23 @@ export class SeatGridComponent implements OnChanges, AfterViewChecked, OnDestroy
 
   protected glyph(vm: SeatVm): string {
     const state = this.visualOf(vm.seat);
-    return state === 'free' ? String(vm.seat.number) : SEAT_STATES.find((s) => s.state === state)!.glyph;
+    return state === 'free' ? String(vm.seat.number) : GLYPH[state];
+  }
+
+  protected legend(): ReadonlyArray<{ readonly state: SeatVisual; readonly glyph: string; readonly name: string }> {
+    return this.mode === 'season' ? SEASON_SEAT_STATES : SEAT_STATES;
+  }
+
+  protected helpText(): string {
+    return this.mode === 'season'
+      ? 'Koppints egy szabad bérletes helyre: az egész szezonban ez lesz a helyed. Még egy koppintással elengeded.'
+      : 'Koppints egy szabad székre a kiválasztáshoz, még egyszer a visszavonáshoz.';
+  }
+
+  protected emptyText(): string {
+    return this.mode === 'season'
+      ? 'Ebben a szektorban nincs bérletes hely.'
+      : 'Ebben a szektorban a szűrési feltételeknek megfelelően nincs szék.';
   }
 
   protected isChosen(vm: SeatVm): boolean {
@@ -618,7 +716,8 @@ export class SeatGridComponent implements OnChanges, AfterViewChecked, OnDestroy
 
   protected ariaLabel(vm: SeatVm): string {
     const state = this.visualOf(vm.seat);
-    return `${vm.base}, ${STATE_TEXT[state]}${vm.seat.isAccessible ? ', akadálymentes' : ''}`;
+    const words = this.mode === 'season' ? SEASON_STATE_TEXT : STATE_TEXT;
+    return `${vm.base}, ${words[state]}${vm.seat.isAccessible ? ', akadálymentes' : ''}`;
   }
 
   protected longestRunText(): string {
@@ -662,6 +761,9 @@ export class SeatGridComponent implements OnChanges, AfterViewChecked, OnDestroy
     }
     if (this.isActionable(vm)) {
       this.seatToggled.emit(vm.seat);
+    } else if (this.mode === 'season' && !this.busyIds.has(vm.seat.id)) {
+      // free / selected seats are always actionable unless busy, so this is a seat that cannot be chosen
+      this.unavailableSeatTapped.emit(vm.seat);
     }
   }
 
@@ -934,7 +1036,11 @@ export class SeatGridComponent implements OnChanges, AfterViewChecked, OnDestroy
           .map((seat) => ({
             seat,
             aisleAfter: aisles.has(seat.number),
-            base: `${name}, ${seat.row}. sor, ${seat.number}. szék, ${this.huf.transform(seat.price)}`,
+            // a season board names the place only: the pass price is shown once, beside the board
+            base:
+              this.mode === 'season'
+                ? `${name}, ${seat.row}. sor, ${seat.number}. hely`
+                : `${name}, ${seat.row}. sor, ${seat.number}. szék, ${this.huf.transform(seat.price)}`,
           })),
       }));
   }

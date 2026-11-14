@@ -4,6 +4,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  NgZone,
   OnDestroy,
   OnInit,
   ViewChild,
@@ -17,29 +18,53 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
 import type { Stripe, StripeElements, StripePaymentElement } from '@stripe/stripe-js';
-import { firstValueFrom } from 'rxjs';
+import { Subscription, firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import {
   PurchaseSeasonPassResponse,
   SeasonHomeMatch,
   SeasonOverview,
   SeasonPassPrice,
+  SeasonPassSeatMap,
+  SeasonPassSector,
+  SeasonPassTierSectors,
+  SeasonSeatHold,
 } from '../../core/models/season-pass.models';
 import { SeasonPassesService } from '../../core/services/season-passes.service';
 import { StripeService } from '../../core/stripe/stripe.service';
+import { ARC_LABEL, SeatStatus, StadiumArc } from '../../shared/models/seat.model';
 import { HufCurrencyPipe } from '../../shared/pipes/huf-currency.pipe';
 import { extractApiErrorMessage } from '../../shared/utils/api-error';
+import { coverLabel } from '../../shared/utils/sector-cover';
+import { SeatGridComponent } from '../stadium/components/seat-grid/seat-grid.component';
+import { HeldSeatView, SeasonHoldSummaryComponent } from './components/season-hold-summary.component';
 import {
   Availability,
   availabilityOf,
+  formatCountdown,
+  holdDeadlineMs,
   isSoldOut,
   mostPopularSectionId,
   panelSector,
   perMatchEquivalent,
   savingsFor,
+  sectorFreeText,
+  sectorSoldOut,
+  seasonSeatConflict,
+  seasonSeatConflictMessage,
+  unavailableSeatReason,
 } from './season-pass.logic';
 
 const MAX_RETRY_ATTEMPTS = 3;
+
+/** The seat the buyer holds while paying. */
+interface HeldSeat {
+  readonly hold: SeasonSeatHold;
+  readonly seat: SeatStatus;
+  readonly sectorName: string;
+  /** When the hold ends, on this device's clock. */
+  readonly deadlineMs: number;
+}
 
 @Component({
   selector: 'kte-season-pass-page',
@@ -53,6 +78,8 @@ const MAX_RETRY_ATTEMPTS = 3;
     MatIconModule,
     MatProgressSpinnerModule,
     HufCurrencyPipe,
+    SeatGridComponent,
+    SeasonHoldSummaryComponent,
   ],
   template: `
     <section class="hero" aria-labelledby="pass-title">
@@ -100,8 +127,8 @@ const MAX_RETRY_ATTEMPTS = 3;
       <section class="block" aria-labelledby="sectors-title">
         <h2 id="sectors-title">Válassz árkategóriát</h2>
         <p class="block__note block__note--lead" data-testid="seat-assignment-note">
-          Három ár van: a felső ív, az alsó ív és a VIP. A pontos helyet vásárláskor osztjuk ki a
-          kiválasztott árkategórián belül, és az az egész szezonra a tiéd marad.
+          Három ár van: a felső ív, az alsó ív és a VIP. Az árkategórián belül te választod ki a
+          szektort és a helyet, és az az egész szezonra a tiéd marad.
         </p>
 
         @if (loading()) {
@@ -180,12 +207,129 @@ const MAX_RETRY_ATTEMPTS = 3;
         }
       </section>
 
-      @if (selectedPrice(); as sel) {
+      @if (selectedPrice(); as tier) {
+        <section #sectorsStep class="block" aria-labelledby="sector-step-title" data-testid="sector-step">
+          <h2 id="sector-step-title">Válassz szektort · {{ tier.sectionName }}</h2>
+          @if (sectorsLoading()) {
+            <div class="kte-season-pass__loader-row" role="status" aria-live="polite">
+              <mat-spinner diameter="32" />
+              <span>Szektorok betöltése…</span>
+            </div>
+          } @else if (sectorsError()) {
+            <div class="kte-season-pass__error" role="alert">
+              <p>{{ sectorsError() }}</p>
+              <button mat-stroked-button type="button" (click)="loadSectors(tier.sectionId)">Újra</button>
+            </div>
+          } @else if (tierSectors()) {
+            @if (tierSectors(); as ts) {
+            @if (ts.sectors.length === 0) {
+              <p class="block__note">Ebben az árkategóriában nincs bérletes szektor.</p>
+            } @else {
+              <ul class="picks" aria-label="Szektorok">
+                @for (s of ts.sectors; track s.section) {
+                  <li>
+                    <button
+                      type="button"
+                      class="pick"
+                      data-testid="sector-option"
+                      [class.pick--selected]="selectedSector() === s.section"
+                      [disabled]="isSectorSoldOut(s)"
+                      [attr.aria-pressed]="selectedSector() === s.section"
+                      (click)="selectSector(s)"
+                    >
+                      <span class="pick__name">{{ s.name }}</span>
+                      <span class="pick__facts">
+                        @if (arcLabel(s.arc); as a) {
+                          <span>{{ a }}</span>
+                        }
+                        @if (gateLabelOf(s.gate); as g) {
+                          <span>{{ g }}</span>
+                        }
+                        @if (coverOf(s.covered); as c) {
+                          <span>{{ c }}</span>
+                        }
+                      </span>
+                      <span
+                        class="pick__free"
+                        [class.pick__free--out]="isSectorSoldOut(s)"
+                        data-testid="sector-free"
+                        >{{ freeText(s) }}</span
+                      >
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+            }
+          }
+        </section>
+
+        @if (selectedSector()) {
+          <section class="block seat-step" aria-labelledby="seat-step-title" data-testid="seat-step">
+            <h2 id="seat-step-title" class="seat-step__title">Válaszd ki a helyed</h2>
+            <div class="seat-step__layout">
+              <div class="seat-step__board">
+                @if (seatMapLoading() && !seatMap()) {
+                  <div class="kte-season-pass__loader-row" role="status" aria-live="polite">
+                    <mat-spinner diameter="32" />
+                    <span>Ülésrend betöltése…</span>
+                  </div>
+                } @else if (seatMapError()) {
+                  <div class="kte-season-pass__error" role="alert">
+                    <p>{{ seatMapError() }}</p>
+                    <button mat-stroked-button type="button" (click)="reloadSeatMap()">Újra</button>
+                  </div>
+                } @else if (seatMap()) {
+                  @if (seatMap(); as map) {
+                  <!-- always in the DOM, so a screen reader announces the reason when it changes -->
+                  <p class="seat-step__reason" aria-live="polite" data-testid="seat-unavailable-reason">{{
+                    unavailableReason() ?? ''
+                  }}</p>
+                  <kte-seat-grid
+                    mode="season"
+                    [seats]="map.seats"
+                    [section]="map.section"
+                    [sectorName]="map.name"
+                    [arc]="map.arc"
+                    [gate]="map.gate"
+                    [covered]="map.covered"
+                    [aisles]="map.aisles"
+                    [longestRun]="null"
+                    [chosenIds]="chosenIds()"
+                    [busyIds]="busyIds()"
+                    (seatToggled)="onSeatToggled($event)"
+                    (unavailableSeatTapped)="onUnavailableSeat($event)"
+                  ></kte-seat-grid>
+                  }
+                }
+              </div>
+
+              <kte-season-hold-summary
+                [seat]="heldSeatView()"
+                [price]="tier.price"
+                [live]="liveHold()"
+                [countdown]="countdown()"
+                [expired]="holdExpired()"
+                [message]="seatMessage()"
+                [signedIn]="auth.isAuthenticated()"
+                (proceed)="scrollToCheckout()"
+              ></kte-season-hold-summary>
+            </div>
+          </section>
+        }
+      }
+
+      @if (checkoutVisible() && selectedPrice(); as sel) {
         <section #checkout class="block block--checkout" aria-labelledby="checkout-title">
           <mat-card appearance="outlined">
             <mat-card-header>
               <mat-card-title id="checkout-title">Fizetés</mat-card-title>
-              <mat-card-subtitle>{{ sel.sectionName }} · {{ sel.price | hufCurrency }}</mat-card-subtitle>
+              <mat-card-subtitle>
+                {{ sel.sectionName }} · {{ sel.price | hufCurrency }}
+                @if (hold(); as h) {
+                  · {{ h.sectorName }}, {{ h.seat.row }}. sor, {{ h.seat.number }}. hely
+                }
+              </mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
               @if (!auth.isAuthenticated()) {
@@ -285,7 +429,9 @@ const MAX_RETRY_ATTEMPTS = 3;
                   color="primary"
                   type="button"
                   class="kte-season-pass__pay"
+                  data-testid="pay"
                   [disabled]="
+                    !liveHold() ||
                     !clientSecret() ||
                     !paymentElementMounted() ||
                     processing() ||
@@ -339,7 +485,7 @@ const MAX_RETRY_ATTEMPTS = 3;
         <ul class="includes">
           <li>
             <mat-icon aria-hidden="true">event_seat</mat-icon>
-            <span>Ugyanaz a hely az egész szezonra – a vásárláskor kapott hely a tiéd marad.</span>
+            <span>Ugyanaz a hely az egész szezonra – az általad választott hely a tiéd marad.</span>
           </li>
           <li>
             <mat-icon aria-hidden="true">swap_horiz</mat-icon>
@@ -635,6 +781,94 @@ const MAX_RETRY_ATTEMPTS = 3;
         margin-top: 16px;
       }
 
+      /* ---------- Sector list of the chosen tier ---------- */
+      .picks {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+        gap: 12px;
+      }
+      .pick {
+        width: 100%;
+        min-height: 44px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        padding: 14px 16px;
+        font: inherit;
+        text-align: left;
+        color: var(--ink);
+        background: var(--surface);
+        border: 2px solid var(--border);
+        border-radius: var(--radius-card);
+        cursor: pointer;
+      }
+      .pick:focus-visible {
+        outline: 3px solid var(--brand-mid);
+        outline-offset: 2px;
+      }
+      .pick--selected {
+        border-color: var(--brand-deep);
+        box-shadow: inset 0 0 0 1px var(--brand-deep);
+      }
+      .pick:disabled {
+        cursor: not-allowed;
+        background: var(--page);
+        color: var(--faint);
+      }
+      .pick__name {
+        font-weight: 700;
+        font-size: 17px;
+      }
+      .pick__facts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .pick:disabled .pick__facts {
+        color: var(--faint);
+      }
+      .pick__free {
+        margin-top: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--brand-deep);
+      }
+      .pick__free--out {
+        color: var(--chip-expired);
+      }
+
+      /* ---------- Seat board + the held seat ---------- */
+      .seat-step__layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 24px;
+        align-items: start;
+      }
+      .seat-step__board {
+        min-width: 0;
+      }
+      .seat-step__reason {
+        margin: 0 0 12px;
+        padding: 10px 14px;
+        border-left: 4px solid var(--kte-seat-locked);
+        border-radius: var(--kte-radius);
+        background: var(--kte-surface);
+        color: var(--kte-ink);
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .seat-step__reason:empty {
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+
       /* ---------- Fixtures ---------- */
       .fixtures {
         list-style: none;
@@ -813,6 +1047,11 @@ const MAX_RETRY_ATTEMPTS = 3;
         .steps__list {
           grid-template-columns: minmax(0, 1fr);
         }
+        /* Phones: the held seat becomes a bar under the board (see the summary component). */
+        .seat-step__layout {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 0;
+        }
       }
       @media (max-width: 599px) {
         .hero__title {
@@ -840,6 +1079,7 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
   private readonly seasonPassApi = inject(SeasonPassesService);
   private readonly stripeService = inject(StripeService);
   private readonly router = inject(Router);
+  private readonly zone = inject(NgZone);
 
   protected readonly prices = signal<readonly SeasonPassPrice[]>([]);
   /** Fixtures and loyalty reward; null while loading or when they could not be loaded. */
@@ -860,6 +1100,48 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
   protected readonly holderEmail = signal('');
   /** The holder details were confirmed and the intent was (or is being) created with them. */
   protected readonly holderApplied = signal(false);
+
+  // ---- choosing the seat: tier -> sector -> seat ----
+  protected readonly tierSectors = signal<SeasonPassTierSectors | null>(null);
+  protected readonly sectorsLoading = signal(false);
+  protected readonly sectorsError = signal<string | null>(null);
+  protected readonly selectedSector = signal<string | null>(null);
+  protected readonly seatMap = signal<SeasonPassSeatMap | null>(null);
+  protected readonly seatMapLoading = signal(false);
+  protected readonly seatMapError = signal<string | null>(null);
+  /** The seat held for the buyer; null = none (or it ran out). */
+  protected readonly hold = signal<HeldSeat | null>(null);
+  /** The last hold ran out before payment. */
+  protected readonly holdExpired = signal(false);
+  /** A hold or release is in flight for this seat: no other seat can be tapped meanwhile. */
+  protected readonly holdBusySeatId = signal<string | null>(null);
+  protected readonly seatMessage = signal<string | null>(null);
+  /** Why the seat the buyer last tapped on the board cannot be chosen; null = nothing to explain. */
+  protected readonly unavailableReason = signal<string | null>(null);
+  private readonly nowMs = signal(Date.now());
+
+  protected readonly holdRemainingMs = computed(() => {
+    const h = this.hold();
+    return h ? Math.max(0, h.deadlineMs - this.nowMs()) : 0;
+  });
+  /** A hold that has not run out: the only state in which paying is possible. */
+  protected readonly liveHold = computed(() => this.hold() !== null && this.holdRemainingMs() > 0);
+  protected readonly countdown = computed(() => formatCountdown(this.holdRemainingMs()));
+  protected readonly chosenIds = computed<ReadonlySet<string>>(() => {
+    const h = this.hold();
+    return new Set(h ? [h.seat.id] : []);
+  });
+  protected readonly busyIds = computed<ReadonlySet<string>>(() => {
+    const id = this.holdBusySeatId();
+    return new Set(id ? [id] : []);
+  });
+  protected readonly heldSeatView = computed<HeldSeatView | null>(() => {
+    const h = this.hold();
+    return h ? { sectorName: h.sectorName, row: h.seat.row, number: h.seat.number } : null;
+  });
+  /** The payment card: only for a held seat (kept while a started payment finishes). */
+  protected readonly checkoutVisible = computed(() => this.hold() !== null || this.processing());
+
   protected readonly MAX_RETRY_ATTEMPTS = MAX_RETRY_ATTEMPTS;
   protected readonly supportEmail = 'jegy@kte.hu';
 
@@ -906,9 +1188,17 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
   @ViewChild('checkout', { static: false })
   private readonly checkoutRef?: ElementRef<HTMLElement>;
 
+  @ViewChild('sectorsStep', { static: false })
+  private readonly sectorsStepRef?: ElementRef<HTMLElement>;
+
   private stripe: Stripe | null = null;
   private elements: StripeElements | null = null;
   private paymentElement: StripePaymentElement | null = null;
+  private sectorsSub?: Subscription;
+  private seatMapSub?: Subscription;
+  private ticker: ReturnType<typeof setInterval> | null = null;
+  /** The pass was bought with the current hold: it is used up, not to be released. */
+  private holdConsumed = false;
 
   ngOnInit(): void {
     this.loadPrices();
@@ -917,6 +1207,14 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.disposePaymentElement();
+    this.stopTicker();
+    this.sectorsSub?.unsubscribe();
+    this.seatMapSub?.unsubscribe();
+    // Leaving the page with a held seat: let it go at once rather than block it for the rest of the hold.
+    const h = this.hold();
+    if (h && !this.holdConsumed && this.holdRemainingMs() > 0) {
+      this.seasonPassApi.releaseHold(h.seat.id, h.hold.holdToken).subscribe({ error: () => undefined });
+    }
   }
 
   protected reload(): void {
@@ -972,6 +1270,7 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** Step 1: the price tier. Opens the tier's sector list; a seat held in another tier is let go. */
   protected selectSection(price: SeasonPassPrice): void {
     if (this.processing() || isSoldOut(price)) {
       return;
@@ -979,23 +1278,241 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
     if (this.selectedSectionId() === price.sectionId) {
       return;
     }
+    this.releaseCurrentHold();
     this.selectedSectionId.set(price.sectionId);
-    this.paymentError.set(null);
-    this.initializationError.set(null);
-    this.failureCount.set(0);
-    this.disposePaymentElement();
-    this.clientSecret.set(null);
-    this.paymentIntentId.set(null);
-    if (this.auth.isAuthenticated() && (!this.forSomeoneElse() || this.holderApplied())) {
-      void this.initializeIntent(price);
-    }
-    this.scrollToCheckout();
+    this.selectedSector.set(null);
+    this.seatMapSub?.unsubscribe();
+    this.seatMap.set(null);
+    this.seatMapError.set(null);
+    this.seatMessage.set(null);
+    this.unavailableReason.set(null);
+    this.holdExpired.set(false);
+    this.resetPayment();
+    this.loadSectors(price.sectionId);
+    this.scrollTo('sectors');
   }
 
-  /** The checkout sits below the cards; bring it into view once it has rendered. */
-  private scrollToCheckout(): void {
+  protected loadSectors(tier: string): void {
+    this.sectorsSub?.unsubscribe();
+    this.sectorsLoading.set(true);
+    this.sectorsError.set(null);
+    this.tierSectors.set(null);
+    this.sectorsSub = this.seasonPassApi.listTierSectors(tier).subscribe({
+      next: (res) => {
+        this.tierSectors.set(res);
+        this.sectorsLoading.set(false);
+      },
+      error: (error: unknown) => {
+        this.sectorsError.set(extractApiErrorMessage(error, 'Nem sikerült betölteni a szektorokat.'));
+        this.sectorsLoading.set(false);
+      },
+    });
+  }
+
+  protected isSectorSoldOut(sector: SeasonPassSector): boolean {
+    return sectorSoldOut(sector);
+  }
+
+  protected freeText(sector: SeasonPassSector): string {
+    return sectorFreeText(sector);
+  }
+
+  protected arcLabel(arc: StadiumArc | null): string | null {
+    return arc ? ARC_LABEL[arc] : null;
+  }
+
+  protected gateLabelOf(gate: number | null): string | null {
+    return gateLabel(gate);
+  }
+
+  protected coverOf(covered: boolean | null): string | null {
+    return coverLabel(covered);
+  }
+
+  /** Step 2: the sector. Opens its season seat board. A seat already held elsewhere stays held until another is chosen. */
+  protected selectSector(sector: SeasonPassSector): void {
+    if (sectorSoldOut(sector) || this.selectedSector() === sector.section) {
+      return;
+    }
+    this.selectedSector.set(sector.section);
+    this.seatMessage.set(null);
+    this.unavailableReason.set(null);
+    this.seatMap.set(null);
+    this.loadSeatMap(sector.section);
+  }
+
+  protected reloadSeatMap(): void {
+    const section = this.selectedSector();
+    if (section) {
+      this.loadSeatMap(section);
+    }
+  }
+
+  private loadSeatMap(section: string): void {
+    this.seatMapSub?.unsubscribe();
+    this.seatMapLoading.set(true);
+    this.seatMapError.set(null);
+    this.seatMapSub = this.seasonPassApi.getSeatMap(section).subscribe({
+      next: (map) => {
+        this.seatMap.set(map);
+        this.seatMapLoading.set(false);
+      },
+      error: (error: unknown) => {
+        this.seatMapError.set(extractApiErrorMessage(error, 'Nem sikerült betölteni az ülésrendet.'));
+        this.seatMapLoading.set(false);
+      },
+    });
+  }
+
+  /**
+   * Step 3: the seat. A tap on a free seat holds it for the buyer (moving the choice
+   * from any seat held before: the server lets that one go); a tap on the held seat
+   * lets it go. Only one hold request is in flight at a time.
+   */
+  protected async onSeatToggled(seat: SeatStatus): Promise<void> {
+    if (this.holdBusySeatId() !== null || this.processing()) {
+      return;
+    }
+    this.unavailableReason.set(null);
+    if (!this.auth.isAuthenticated()) {
+      this.seatMessage.set('A hely kiválasztásához be kell jelentkezned.');
+      return;
+    }
+    const current = this.hold();
+    if (current && current.seat.id === seat.id) {
+      await this.letGo(current);
+      return;
+    }
+    this.holdBusySeatId.set(seat.id);
+    this.seatMessage.set(null);
+    try {
+      const hold = await firstValueFrom(this.seasonPassApi.holdSeat(seat.id));
+      if (current) {
+        // released by the server when the new hold was granted
+        this.markSeatFree(current.seat.id);
+      }
+      const map = this.seatMap();
+      this.hold.set({
+        hold,
+        seat,
+        sectorName: map?.section === seat.section ? map.name : seat.section,
+        deadlineMs: holdDeadlineMs(hold, Date.now()),
+      });
+      this.nowMs.set(Date.now());
+      this.holdExpired.set(false);
+      this.startTicker();
+      // the payment is bound to the seat: a new seat needs a new one
+      this.restartIntent();
+    } catch (error) {
+      const code = seasonSeatConflict(error);
+      this.seatMessage.set(
+        code ? seasonSeatConflictMessage(code) : extractApiErrorMessage(error, 'Nem sikerült lefoglalni a helyet.'),
+      );
+      if (code) {
+        this.reloadSeatMap();
+      }
+    } finally {
+      this.holdBusySeatId.set(null);
+    }
+  }
+
+  /** A seat that cannot be chosen was tapped: say why, next to the board. Nothing is requested from the server. */
+  protected onUnavailableSeat(seat: SeatStatus): void {
+    this.unavailableReason.set(unavailableSeatReason(seat.status));
+  }
+
+  private async letGo(current: HeldSeat): Promise<void> {
+    this.holdBusySeatId.set(current.seat.id);
+    try {
+      await firstValueFrom(this.seasonPassApi.releaseHold(current.seat.id, current.hold.holdToken));
+    } catch {
+      // The buyer let the seat go: if the release did not reach the server, the hold simply runs out.
+    } finally {
+      this.holdBusySeatId.set(null);
+    }
+    this.clearHold();
+    this.markSeatFree(current.seat.id);
+    this.resetPayment();
+  }
+
+  /** Lets go of the held seat without waiting for the answer (changing tier). */
+  private releaseCurrentHold(): void {
+    const h = this.hold();
+    if (!h) {
+      return;
+    }
+    this.seasonPassApi.releaseHold(h.seat.id, h.hold.holdToken).subscribe({ error: () => undefined });
+    this.clearHold();
+  }
+
+  private clearHold(): void {
+    this.stopTicker();
+    this.hold.set(null);
+  }
+
+  /** The hold ran out: say so, drop the payment prepared for it, and show the board as it is now. */
+  private onHoldExpired(): void {
+    this.stopTicker();
+    if (this.processing()) {
+      // a payment is being confirmed: its outcome decides, not the clock
+      return;
+    }
+    this.hold.set(null);
+    this.holdExpired.set(true);
+    this.resetPayment();
+    this.reloadSeatMap();
+  }
+
+  /** The hold was lost (taken, or gone on the server): same as running out, with the server's reason. */
+  private onHoldLost(message: string): void {
+    this.clearHold();
+    this.seatMessage.set(message);
+    this.resetPayment();
+    this.reloadSeatMap();
+  }
+
+  private markSeatFree(seatId: string): void {
+    const map = this.seatMap();
+    if (!map || !map.seats.some((s) => s.id === seatId)) {
+      return;
+    }
+    this.seatMap.set({
+      ...map,
+      seats: map.seats.map((s) => (s.id === seatId ? { ...s, status: 'available' } : s)),
+    });
+  }
+
+  private startTicker(): void {
+    this.stopTicker();
+    // Outside Angular, so a ticking clock does not keep the zone busy; each tick re-enters to repaint.
+    this.zone.runOutsideAngular(() => {
+      this.ticker = setInterval(() => {
+        this.zone.run(() => {
+          this.nowMs.set(Date.now());
+          if (this.hold() && this.holdRemainingMs() <= 0) {
+            this.onHoldExpired();
+          }
+        });
+      }, 1000);
+    });
+  }
+
+  private stopTicker(): void {
+    if (this.ticker !== null) {
+      clearInterval(this.ticker);
+      this.ticker = null;
+    }
+  }
+
+  /** "Tovább a fizetéshez": the payment card sits below the board. */
+  protected scrollToCheckout(): void {
+    this.scrollTo('checkout');
+  }
+
+  /** Brings a step into view once it has rendered (the element exists only after the next render). */
+  private scrollTo(step: 'sectors' | 'checkout'): void {
     setTimeout(() => {
-      const el = this.checkoutRef?.nativeElement;
+      const el = (step === 'checkout' ? this.checkoutRef : this.sectorsStepRef)?.nativeElement;
       if (!el || typeof el.scrollIntoView !== 'function') {
         return;
       }
@@ -1064,12 +1581,25 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
     this.paymentIntentId.set(null);
   }
 
+  /** Prepares a payment for the held seat, once the holder is settled. */
   private restartIntent(): void {
     this.resetPayment();
     const price = this.selectedPrice();
-    if (price && this.auth.isAuthenticated()) {
-      void this.initializeIntent(price);
+    const held = this.hold();
+    if (
+      price &&
+      held &&
+      this.liveHold() &&
+      this.auth.isAuthenticated() &&
+      (!this.forSomeoneElse() || this.holderApplied())
+    ) {
+      void this.initializeIntent(price, held);
     }
+  }
+
+  /** The seat part of the purchase payload. */
+  private seatPayload(held: HeldSeat): { seatId: string; holdToken: string } {
+    return { seatId: held.seat.id, holdToken: held.hold.holdToken };
   }
 
   /** Holder part of the purchase payload; empty = the buyer themself. */
@@ -1090,12 +1620,21 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
    * Element can collect card details. The actual server-side confirm
    * happens in {@link purchase} via Stripe.confirmPayment.
    */
-  private async initializeIntent(price: SeasonPassPrice): Promise<void> {
+  private async initializeIntent(price: SeasonPassPrice, held: HeldSeat): Promise<void> {
     this.intentLoading.set(true);
+    const stillCurrent = (): boolean => this.hold()?.hold.holdToken === held.hold.holdToken;
     try {
       const response = await firstValueFrom(
-        this.seasonPassApi.purchase({ sectionId: price.sectionId, ...this.holderPayload() }),
+        this.seasonPassApi.purchase({
+          sectionId: price.sectionId,
+          ...this.seatPayload(held),
+          ...this.holderPayload(),
+        }),
       );
+      if (!stillCurrent()) {
+        // another seat was chosen meanwhile: this payment belongs to the old one
+        return;
+      }
       if (!response.clientSecret) {
         this.initializationError.set('A fizetési felület előkészítése sikertelen.');
         return;
@@ -1108,6 +1647,15 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
         void this.mountStripeElement(response.clientSecret as string);
       }, 0);
     } catch (error) {
+      if (!stillCurrent()) {
+        return;
+      }
+      const code = seasonSeatConflict(error);
+      if (code !== null) {
+        // the seat is not the buyer's any more (taken, held by another, lost, unusable): pick again
+        this.onHoldLost(seasonSeatConflictMessage(code));
+        return;
+      }
       this.initializationError.set(this.normalizeError(error));
     } finally {
       this.intentLoading.set(false);
@@ -1150,7 +1698,8 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
       return;
     }
     const price = this.selectedPrice();
-    if (!price) {
+    const held = this.hold();
+    if (!price || !held || !this.liveHold()) {
       return;
     }
     this.processing.set(true);
@@ -1180,18 +1729,31 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
         let response: PurchaseSeasonPassResponse | null = null;
         try {
           response = await firstValueFrom(
-            this.seasonPassApi.purchase({ sectionId: price.sectionId, ...this.holderPayload() }),
+            this.seasonPassApi.purchase({
+              sectionId: price.sectionId,
+              ...this.seatPayload(held),
+              ...this.holderPayload(),
+            }),
           );
         } catch (err) {
+          if (seasonSeatConflict(err) === 'pass_not_issued_refunded') {
+            // Paid, but the seat went to someone else in the meantime: no pass, the money goes back.
+            this.holdConsumed = true;
+            this.onHoldLost(seasonSeatConflictMessage('pass_not_issued_refunded'));
+            return;
+          }
           // Best-effort: don't block the user from seeing the confirmation
           // page. The webhook (if configured) will finalize the SeasonPass.
           console.error('[SeasonPass] /purchase finalize failed:', err);
         }
+        this.holdConsumed = true;
+        this.stopTicker();
         void this.router.navigate(['/season-pass/confirmation'], {
           state: {
             paymentIntentId: paymentIntent.id,
             seasonPassId: response?.seasonPassId ?? null,
             sectionName: price.sectionName,
+            seatLabel: `${held.sectorName}, ${held.seat.row}. sor, ${held.seat.number}. hely`,
             seasonLabel: price.seasonLabel,
             amount: price.price,
           },
@@ -1206,6 +1768,10 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
       this.paymentError.set(this.normalizeError(error));
     } finally {
       this.processing.set(false);
+      // the hold ran out while the payment was being confirmed and the payment did not go through
+      if (!this.holdConsumed && this.hold() && this.holdRemainingMs() <= 0) {
+        this.onHoldExpired();
+      }
     }
   }
 

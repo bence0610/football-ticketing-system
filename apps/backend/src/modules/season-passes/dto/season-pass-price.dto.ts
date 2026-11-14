@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { SeasonPassSectorDto } from './season-pass-seats.dto';
 
 export class SeasonPassPriceDto {
   @ApiProperty({
@@ -29,7 +30,7 @@ export class SeasonPassPriceDto {
   @ApiProperty({
     example: 120,
     description:
-      'Ebben az árkategóriában jelenleg kiadható bérletes helyek száma (ugyanazzal a szabállyal, mint a vásárlásnál).',
+      'Ebben az árkategóriában jelenleg kiadható bérletes helyek száma (ugyanazzal a szabállyal, mint a vásárlásnál: egy meccsre eladott jegy nem számít, bármilyen állapotú bérletsor erre a szezonra igen).',
   })
   freeSeats!: number;
 
@@ -80,4 +81,11 @@ export class SeasonPassPriceDto {
       'null, ha a kategória helyeinek árszorzója nem egységes, vagy nincs hátralévő meccs.',
   })
   singleMatchTotal!: number | null;
+
+  @ApiProperty({
+    type: [SeasonPassSectorDto],
+    description:
+      'Az árkategória szektorai stadionsorrendben (vendégszektor nélkül), mindegyik a bérletre még kiadható helyek számával.',
+  })
+  sectors!: SeasonPassSectorDto[];
 }

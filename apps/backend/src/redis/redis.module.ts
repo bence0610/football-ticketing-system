@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 import { RedisConfig } from '../config';
 import { REDIS_CLIENT } from './redis.constants';
 import { SeatLockService } from './seat-lock.service';
+import { SeasonPassHoldService } from './season-pass-hold.service';
 
 const redisProvider: Provider = {
   provide: REDIS_CLIENT,
@@ -39,8 +40,8 @@ const redisProvider: Provider = {
 @Global()
 @Module({
   imports: [ConfigModule],
-  providers: [redisProvider, SeatLockService],
-  exports: [REDIS_CLIENT, SeatLockService],
+  providers: [redisProvider, SeatLockService, SeasonPassHoldService],
+  exports: [REDIS_CLIENT, SeatLockService, SeasonPassHoldService],
 })
 export class RedisModule implements OnApplicationShutdown {
   private readonly logger = new Logger(RedisModule.name);

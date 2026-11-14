@@ -1,13 +1,18 @@
 export type SeatCategory = 'standard' | 'premium' | 'vip' | 'standing';
 
-/** `away`: a seat in the away section, never for sale through the portal. */
+/**
+ * `away`: a seat in the away section, never for sale through the portal.
+ * `ticketed`: season map only: the seat has a ticket for an upcoming match of the season,
+ * so no pass can be bought for it (a match board never sends it).
+ */
 export type SeatAvailability =
   | 'available'
   | 'locked'
   | 'sold'
   | 'season_pass'
   | 'disabled'
-  | 'away';
+  | 'away'
+  | 'ticketed';
 
 export interface SeatStatus {
   readonly id: string;

@@ -61,6 +61,7 @@ describe('SeasonPassesService.cancelLoan after entry', () => {
       { revoke } as never,
       {} as never,
       { matchSummary: () => ({ title: 't', kickoffLabel: 'k' }) } as never,
+      {} as never, // SeasonPassHoldService: not used by cancelLoan
     );
     return svc;
   }

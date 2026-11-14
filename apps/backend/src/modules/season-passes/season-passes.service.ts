@@ -7,6 +7,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -47,10 +48,32 @@ import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { EmailService } from '../email/email.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { isHomeMatch } from '../matches/match-home';
+import { occupiesSeat } from '../tickets/ticket-occupancy';
 import { QrService } from '../qr/qr.service';
 import { STRIPE_CLIENT } from '../payments/stripe.provider';
-import { SQL_ROW_ORDER } from '../seats/seat-order';
+import { aislesAfter, GridSeat, longestRun, sectorWidth } from '../seats/best-seats';
+import { compareRows } from '../seats/seat-order';
 import { seatUnitPrice } from '../seats/seat-pricing';
+import {
+  SeasonPassHoldResult,
+  SeasonPassHoldService,
+} from '../../redis/season-pass-hold.service';
+import {
+  PASS_SEAT_FROM_SQL,
+  PASS_SEAT_SELECT_SQL,
+  PassSeatRefusal,
+  PassSeatRow,
+  SEAT_FREE_FOR_PASS_SQL,
+  passSeatRefusal,
+  passSeatStatus,
+  truthy,
+} from './season-pass-seat-rule';
+import {
+  SeasonPassHoldResponseDto,
+  SeasonPassSeatMapDto,
+  SeasonPassSectorDto,
+  SeasonPassTierSectorsDto,
+} from './dto/season-pass-seats.dto';
 import { TicketRendererService } from '../tickets/ticket-renderer.service';
 import { CancelLoanDto, CreateLoanDto } from './dto/create-loan.dto';
 import { PurchaseSeasonPassDto } from './dto/purchase-season-pass.dto';
@@ -110,7 +133,8 @@ interface PassHolder {
 
 const fullName = formatFullName;
 
-class NoFreeSeatError extends Error {}
+/** The chosen seat cannot carry this pass (finalisation): refund, never reassign. */
+class SeatNotIssuableError extends Error {}
 
 type PriceTier = 'vip' | 'upper' | 'lower';
 
@@ -118,15 +142,9 @@ type PriceTier = 'vip' | 'upper' | 'lower';
 const isPriceTier = (key: string): key is PriceTier =>
   key === 'vip' || key === 'upper' || key === 'lower';
 
-/**
- * The one definition of "this seat can still be issued as a season pass" for a
- * season (one `?` = the season label, alias `s` = seats). Purchase picks its
- * seat with it and the price list counts free seats with it, so the number the
- * page shows is the number the purchase honours.
- */
-const SEAT_FREE_FOR_PASS_SQL =
-  'NOT EXISTS (SELECT 1 FROM season_passes sp WHERE sp.seat_id = s.id AND sp.season_label = ?) ' +
-  "AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.seat_id = s.id AND t.status IN ('pending_payment', 'paid', 'used'))";
+// The season-pass seat rule (SEAT_FREE_FOR_PASS_SQL and friends) lives in
+// season-pass-seat-rule.ts: one predicate for the map, the counts, the hold
+// check, the purchase pre-check and the finalisation re-check.
 
 interface SectorSeatStats {
   total: number;
@@ -159,6 +177,8 @@ export class SeasonPassesService {
     private readonly qrService: QrService,
     private readonly loyaltyService: LoyaltyService,
     private readonly renderer: TicketRendererService,
+    // Last on purpose: the hand-built specs pass the earlier ones positionally.
+    private readonly holds: SeasonPassHoldService,
   ) {
     this.mailConfig = this.configService.getOrThrow<MailConfig>('mail');
     this.cronConfig = this.configService.getOrThrow<CronConfig>('cron');
@@ -238,7 +258,257 @@ export class SeasonPassesService {
         gate: sameValue(sectors.map(([, f]) => f.gate)),
         upcomingHomeMatches: upcoming.length,
         singleMatchTotal,
+        sectors: this.tierSectors(row.section as PriceTier, facts, stats),
       };
+    });
+  }
+
+  /**
+   * The sectors of a tier in stadium order (upper arc first, west to east),
+   * away section excluded, each with its season-rule free count. Sectors with
+   * no active seat are left out (nothing to choose there).
+   */
+  private tierSectors(
+    tier: PriceTier,
+    facts: ReadonlyMap<string, SectorFacts>,
+    stats: ReadonlyMap<string, SectorSeatStats>,
+  ): SeasonPassSectorDto[] {
+    return [...facts.entries()]
+      .filter(([code, f]) => !f.isAway && f.priceCategory === tier && stats.has(code))
+      .sort(
+        ([ca, a], [cb, b]) =>
+          (a.arc === b.arc ? 0 : a.arc === 'upper' ? -1 : 1) ||
+          (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER) ||
+          ca.localeCompare(cb, 'hu'),
+      )
+      .map(([code, f]) => {
+        const s = stats.get(code)!;
+        return {
+          section: code,
+          name: f.name ?? code,
+          arc: f.arc,
+          position: f.position,
+          gate: f.gate,
+          covered: f.covered,
+          total: s.total,
+          freeSeats: s.free,
+        };
+      });
+  }
+
+  /** `GET /season-passes/tiers/:tier/sectors`: the same sector list as in the price list. */
+  async listTierSectors(tier: string): Promise<SeasonPassTierSectorsDto> {
+    const priceRow = isPriceTier(tier) ? await this.findActivePriceRow(tier) : null;
+    if (!priceRow || !isPriceTier(priceRow.section)) {
+      throw new NotFoundException({
+        statusCode: 404,
+        message: 'Ehhez az árkategóriához nincs aktív bérletár.',
+        code: 'tier_not_found',
+      });
+    }
+    const [facts, stats] = await Promise.all([
+      this.loadSectorFacts(),
+      this.loadSectorSeatStats(ACTIVE_SEASON_LABEL),
+    ]);
+    return {
+      tier: priceRow.section,
+      seasonLabel: priceRow.seasonLabel,
+      price: Number(priceRow.price),
+      sectors: this.tierSectors(priceRow.section, facts, stats),
+    };
+  }
+
+  /**
+   * `GET /season-passes/seats?section=`: every seat of one sector with its
+   * season status (season-pass seat rule + the Redis hold overlay). Never says
+   * anything about single matches: a seat sold for one match is `available`.
+   */
+  async getSeasonSeatMap(section: string): Promise<SeasonPassSeatMapDto> {
+    const facts = (await this.loadSectorFacts()).get(section);
+    if (!facts) {
+      throw new NotFoundException({
+        statusCode: 404,
+        message: 'Nincs ilyen szektor.',
+        code: 'sector_not_found',
+      });
+    }
+    if (facts.isAway || facts.priceCategory === null) {
+      throw this.awaySectionError();
+    }
+    const priceRow = await this.findActivePriceRow(facts.priceCategory);
+    if (!priceRow) {
+      throw new NotFoundException({
+        statusCode: 404,
+        message: 'Ehhez a szektorhoz nincs aktív bérletár.',
+        code: 'tier_not_found',
+      });
+    }
+
+    const rows: PassSeatRow[] = await this.dataSource.query(
+      `${PASS_SEAT_SELECT_SQL} WHERE s.section = ?`,
+      [ACTIVE_SEASON_LABEL, ACTIVE_SEASON_LABEL, ACTIVE_SEASON_LABEL, ACTIVE_SEASON_LABEL, section],
+    );
+    const held = await this.holds.heldSeatIds(
+      ACTIVE_SEASON_LABEL,
+      rows.filter((r) => truthy(r.free)).map((r) => r.id),
+    );
+    const price = Number(priceRow.price);
+    const seats = rows
+      .map((r) => ({
+        id: r.id,
+        section: r.section,
+        row: String(r.row),
+        number: Number(r.number),
+        category: r.category as Seat['category'],
+        price,
+        status: passSeatStatus(r, held.has(r.id)),
+        isAccessible: truthy(r.isAccessible),
+      }))
+      .sort((a, b) => compareRows(a.row, b.row) || a.number - b.number);
+    const grid: GridSeat[] = seats.map((s) => ({
+      id: s.id,
+      row: s.row,
+      number: s.number,
+      free: s.status === 'available',
+    }));
+    const width = sectorWidth(grid);
+    return {
+      section,
+      name: facts.name ?? section,
+      arc: facts.arc,
+      gate: facts.gate,
+      covered: facts.covered,
+      tier: facts.priceCategory,
+      price,
+      seasonLabel: priceRow.seasonLabel,
+      aisles: aislesAfter(width),
+      longestRun: longestRun(grid, width),
+      seats,
+    };
+  }
+
+  private findActivePriceRow(tier: string): Promise<SeasonPassPrice | null> {
+    return this.seasonPassPriceRepository.findOne({
+      where: { section: tier, seasonLabel: ACTIVE_SEASON_LABEL, isActive: true },
+    });
+  }
+
+  private awaySectionError(): ForbiddenException {
+    return new ForbiddenException({
+      statusCode: 403,
+      message: 'A vendégszektorra nem váltható bérlet.',
+      code: 'away_section',
+    });
+  }
+
+  /** One seat under the season-pass seat rule (the shared predicate), or undefined. */
+  private async loadPassSeat(
+    manager: EntityManager,
+    seatId: string,
+    seasonLabel: string,
+  ): Promise<PassSeatRow | undefined> {
+    const rows: PassSeatRow[] = await manager.query(`${PASS_SEAT_SELECT_SQL} WHERE s.id = ?`, [
+      seasonLabel,
+      seasonLabel,
+      seasonLabel,
+      seasonLabel,
+      seatId,
+    ]);
+    return rows[0];
+  }
+
+  /** The HTTP error for a seat the rule refuses (hold and purchase pre-check). */
+  private seatRefusalError(refusal: PassSeatRefusal): HttpException {
+    switch (refusal) {
+      case 'missing':
+        return new NotFoundException({
+          statusCode: 404,
+          message: 'A hely nem található.',
+          code: 'seat_not_found',
+        });
+      case 'away':
+        return this.awaySectionError();
+      case 'taken':
+        return new ConflictException({
+          statusCode: 409,
+          message: 'Erre a helyre ebben a szezonban már szól bérlet. Válassz másik helyet.',
+          code: 'seat_taken',
+        });
+      case 'ticketed':
+        return new ConflictException({
+          statusCode: 409,
+          message:
+            'Erre a helyre már van jegy egy közelgő mérkőzésre, ezért nem váltható rá bérlet (a bérletes belépő arra a meccsre nem állítható ki). Válassz másik helyet.',
+          code: 'seat_ticketed',
+        });
+      case 'disabled':
+      default:
+        return new ConflictException({
+          statusCode: 409,
+          message: 'Ez a hely nem értékesíthető. Válassz másik helyet.',
+          code: 'seat_disabled',
+        });
+    }
+  }
+
+  /**
+   * `POST /season-passes/seats/:seatId/hold`. Checks the seat with the shared
+   * rule (404 unknown, 403 away, 409 seat_taken / seat_disabled), then takes the
+   * Redis hold atomically (409 seat_held if another buyer has it). The user's
+   * previous hold for the season is released in the same step.
+   */
+  async holdSeat(userId: string, seatId: string): Promise<SeasonPassHoldResponseDto> {
+    const refusal = passSeatRefusal(
+      await this.loadPassSeat(this.dataSource.manager, seatId, ACTIVE_SEASON_LABEL),
+    );
+    if (refusal) {
+      throw this.seatRefusalError(refusal);
+    }
+    let result: SeasonPassHoldResult;
+    try {
+      result = await this.holds.hold(ACTIVE_SEASON_LABEL, seatId, userId);
+    } catch (error) {
+      this.logger.error(
+        `[season-pass-hold] hold failed seat=${seatId} user=${userId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      throw this.holdUnavailableError();
+    }
+    if (result.kind === 'held_by_other') {
+      throw new ConflictException({
+        statusCode: 409,
+        message: 'Ezt a helyet épp egy másik vásárló foglalja. Válassz másik helyet.',
+        code: 'seat_held',
+      });
+    }
+    return {
+      seatId,
+      holdToken: result.holdToken,
+      ttlSeconds: result.ttlSeconds,
+      expiresAt: new Date(Date.now() + result.ttlSeconds * 1000).toISOString(),
+    };
+  }
+
+  /** `DELETE /season-passes/seats/:seatId/hold?holdToken=`: compare-and-delete, idempotent. */
+  async releaseSeatHold(userId: string, seatId: string, holdToken: string): Promise<void> {
+    try {
+      await this.holds.release(ACTIVE_SEASON_LABEL, seatId, userId, holdToken);
+    } catch (error) {
+      this.logger.error(
+        `[season-pass-hold] release failed seat=${seatId} user=${userId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      throw this.holdUnavailableError();
+    }
+  }
+
+  private holdUnavailableError(): ServiceUnavailableException {
+    return new ServiceUnavailableException({
+      statusCode: 503,
+      message: 'A helyfoglalás most nem érhető el. Próbáld újra néhány perc múlva.',
+      code: 'hold_unavailable',
     });
   }
 
@@ -295,8 +565,8 @@ export class SeasonPassesService {
       'SELECT s.section AS section, COUNT(*) AS total, ' +
         `SUM(CASE WHEN ${SEAT_FREE_FOR_PASS_SQL} THEN 1 ELSE 0 END) AS free, ` +
         'MIN(s.price_modifier) AS minMod, MAX(s.price_modifier) AS maxMod ' +
-        'FROM seats s WHERE s.is_active = 1 GROUP BY s.section',
-      [seasonLabel],
+        `${PASS_SEAT_FROM_SQL} WHERE s.is_active = 1 GROUP BY s.section`,
+      [seasonLabel, seasonLabel],
     );
     return new Map(
       rows.map((r) => [
@@ -355,12 +625,18 @@ export class SeasonPassesService {
    * Purchases a season pass for the given user + section using Stripe.
    *
    * Flow:
-   *   1. Look up the active season's price row for the section.
-   *   2. Create a PaymentIntent (idempotency-keyed per user+section+season)
-   *      and confirm it server-side with the supplied PaymentMethod.
-   *   3. On `succeeded`: persist a SeasonPass row, award +500 loyalty.
-   *   4. If the intent requires further action (3DS), return the
-   *      clientSecret so the frontend can drive the next step.
+   *   1. Look up the active season's price row for the tier (`sectionId`).
+   *   2. Before any money moves: the chosen seat (`seatId`) must pass the
+   *      season-pass seat rule and lie in that tier, the holder must not have a
+   *      pass yet, and the buyer must still hold the seat (`holdToken`, Redis).
+   *   3. Create a PaymentIntent (idempotency-keyed per
+   *      user+tier+season+holder+seat, `seatId` in its metadata) and confirm it
+   *      server-side with the supplied PaymentMethod; restart the hold's TTL.
+   *   4. On `succeeded`: persist the SeasonPass on exactly that seat (or
+   *      refund), award loyalty, release the hold.
+   *   5. If the intent requires further action (3DS), return the
+   *      clientSecret so the frontend can drive the next step; the webhook
+   *      finalises with the same rules.
    *
    * Idempotency guarantees:
    *   - The Stripe idempotency key prevents duplicate PaymentIntents on
@@ -401,16 +677,19 @@ export class SeasonPassesService {
     }
 
     const holder = await this.resolveHolder(user, dto);
-    await this.assertPassCanBeIssued(priceRow, holder, userId);
+    await this.assertPassCanBeIssued(priceRow, holder, userId, dto.seatId);
+    // The buyer must still hold the seat they chose, BEFORE any money moves.
+    await this.assertHoldOwned(priceRow.seasonLabel, dto.seatId, userId, dto.holdToken);
 
     // Resolve a per-attempt ID stored in Redis.
-    // Two rapid calls for the same (user, section, season) within the 5-minute
-    // window share the same attemptId → same Stripe idempotency key → one
-    // PaymentIntent (double-click / network-retry protection).
+    // Two rapid calls for the same (user, section, season, holder, seat) within
+    // the 5-minute window share the same attemptId → same Stripe idempotency
+    // key → one PaymentIntent (double-click / network-retry protection).
     // A card decline deletes the key so the next attempt is genuinely fresh
     // with a new PaymentIntent — no 24-hour Stripe block.
     // The holder is part of the attempt identity: three passes for three
-    // holders in one section are three purchases, not one retried click.
+    // holders in one section are three purchases, not one retried click. So is
+    // the seat: choosing another seat is another purchase.
     const holderKey = createHash('sha256')
       .update(`${holder.userId ?? ''}|${holder.name.toLowerCase()}`)
       .digest('hex')
@@ -420,6 +699,7 @@ export class SeasonPassesService {
       priceRow.section,
       priceRow.seasonLabel,
       holderKey,
+      dto.seatId,
     );
     let attemptId = await this.redis.get(attemptKey);
     if (!attemptId) {
@@ -451,6 +731,8 @@ export class SeasonPassesService {
         seasonLabel: priceRow.seasonLabel,
         holderName: holder.name,
         holderUserId: holder.userId ?? '',
+        // The seat the buyer chose; finalisation issues exactly this seat or refunds.
+        seatId: dto.seatId,
       },
     };
 
@@ -488,6 +770,18 @@ export class SeasonPassesService {
         `Season pass PaymentIntent create failed user=${userId} section=${priceRow.section}: ${stripeError?.message ?? String(error)}`,
       );
       throw new BadRequestException(stripeError?.message ?? 'A fizetés feldolgozása sikertelen.');
+    }
+
+    // The intent exists: give the buyer the full hold time for 3DS / confirmation.
+    // If the hold vanished in the meantime the payment still goes on; the
+    // unique index decides at finalisation and a lost seat is refunded.
+    const extended = await this.holds
+      .verifyAndExtend(priceRow.seasonLabel, dto.seatId, userId, dto.holdToken)
+      .catch(() => false);
+    if (!extended) {
+      this.logger.warn(
+        `[season-pass] hold for seat=${dto.seatId} not extended after PaymentIntent ${intent.id} (expired or Redis down)`,
+      );
     }
 
     if (intent.status === 'succeeded') {
@@ -563,19 +857,20 @@ export class SeasonPassesService {
   }
 
   /**
-   * Persists the SeasonPass row backed by a succeeded PaymentIntent and
-   * assigns the seat. Idempotent per `stripePaymentIntentId`.
+   * Persists the SeasonPass row backed by a succeeded PaymentIntent, on the
+   * seat the buyer chose (`intent.metadata.seatId`). Idempotent per
+   * `stripePaymentIntentId`.
    *
-   * Seat choice: the first free seat of the purchased tier, in stadium order
-   * (sector position on the arc, then row, then number), in a sector of the
-   * tier (never the away section) that is neither held by another pass this season nor occupied by
-   * a single-match ticket. Concurrent purchases may pick the same seat; the
-   * `uq_season_passes_seat_season` index rejects the loser, which retries with
-   * the next free seat.
+   * There is NO fallback to another seat: the buyer chose this one. The hold is
+   * not required to still exist (the money is already taken); the seat is
+   * re-checked with the season-pass seat rule inside the transaction and the
+   * `uq_season_passes_seat_season` index is the final word. If the seat is
+   * missing, inactive, away, no longer in the purchased tier, or already has a
+   * season_passes row (ANY status) for the season, or the holder account
+   * already holds a pass this season, the payment is refunded in full and
+   * `null` is returned.
    *
-   * Returns `null` when the pass could not be issued (section full, or the
-   * holder account already holds a pass this season). In that case the
-   * payment has already been refunded in full.
+   * Whatever the outcome, the buyer's hold on the seat is released afterwards.
    */
   private async persistSeasonPassFromIntent(
     intent: Stripe.PaymentIntent,
@@ -586,18 +881,45 @@ export class SeasonPassesService {
     const existing = await this.seasonPassRepository.findOne({
       where: { stripePaymentIntentId: intent.id },
     });
+    const seatId = intent.metadata?.seatId?.trim() ?? '';
     if (existing) {
+      if (seatId) await this.holds.releaseForOwner(priceRow.seasonLabel, seatId, userId);
       return existing;
     }
+    if (!seatId) {
+      // An intent created before seat choice existed, or tampered metadata:
+      // there is no seat the buyer chose, and we do not pick one for them.
+      await this.refundUnissuedPass(intent, 'no chosen seat in the PaymentIntent metadata');
+      return null;
+    }
 
-    const maxSeatAttempts = 8;
-    let failure = 'no free seat in tier';
-    for (let attempt = 0; attempt < maxSeatAttempts; attempt++) {
-      try {
+    // Released only once the payment has an outcome (pass or refund). On an
+    // unexpected error (DB down) the hold stays until its TTL so the webhook
+    // retry still finds the seat kept for this buyer.
+    const pass = await this.issueOnChosenSeat(intent, priceRow, userId, holder, seatId);
+    await this.holds.releaseForOwner(priceRow.seasonLabel, seatId, userId);
+    return pass;
+  }
+
+  private async issueOnChosenSeat(
+    intent: Stripe.PaymentIntent,
+    priceRow: SeasonPassPrice,
+    userId: string,
+    holder: PassHolder,
+    seatId: string,
+  ): Promise<SeasonPass | null> {
+    let failure: string;
+    try {
         return await this.dataSource.transaction(async (manager) => {
-          const seatId = await this.findFreeSeatId(manager, priceRow.section, priceRow.seasonLabel);
-          if (!seatId) {
-            throw new NoFreeSeatError();
+          const seat = await this.loadPassSeat(manager, seatId, priceRow.seasonLabel);
+          const refusal = passSeatRefusal(seat);
+          if (refusal) {
+            throw new SeatNotIssuableError(`chosen seat ${seatId} refused: ${refusal}`);
+          }
+          if (seat!.tier !== priceRow.section) {
+            throw new SeatNotIssuableError(
+              `chosen seat ${seatId} is in tier ${String(seat!.tier)}, not ${priceRow.section}`,
+            );
           }
           const repo = manager.getRepository(SeasonPass);
           return repo.save(
@@ -619,23 +941,27 @@ export class SeasonPassesService {
             }),
           );
         });
-      } catch (err: unknown) {
-        if (err instanceof NoFreeSeatError) {
-          break;
+    } catch (err: unknown) {
+      if (err instanceof SeatNotIssuableError) {
+        failure = err.message;
+      } else if (isDuplicateKeyError(err)) {
+        // The same intent finalised concurrently (webhook + confirm) collides on
+        // the very same seat and holder keys: if a pass for THIS intent exists,
+        // that is our pass, not a lost race. Must be checked before refunding.
+        const winner = await this.seasonPassRepository.findOne({
+          where: { stripePaymentIntentId: intent.id },
+        });
+        if (winner) return winner;
+        const kind = duplicateKind(err);
+        if (kind === 'seat') {
+          // Lost the race for the chosen seat to another pass: refund, never reassign.
+          failure = `chosen seat ${seatId} taken (uq_season_passes_seat_season)`;
+        } else if (kind === 'holder') {
+          failure = 'holder already holds a pass this season';
+        } else {
+          throw err;
         }
-        if (isDuplicateKeyError(err)) {
-          const kind = duplicateKind(err);
-          if (kind === 'seat') continue; // lost a race for the seat — pick the next one
-          if (kind === 'holder') {
-            failure = 'holder already holds a pass this season';
-            break;
-          }
-          // Same intent inserted concurrently (webhook + confirm): return the winner's row.
-          const winner = await this.seasonPassRepository.findOne({
-            where: { stripePaymentIntentId: intent.id },
-          });
-          if (winner) return winner;
-        }
+      } else {
         throw err;
       }
     }
@@ -677,22 +1003,6 @@ export class SeasonPassesService {
         }`,
       );
     }
-  }
-
-  /** First free seat of a price tier, in stadium order. */
-  private async findFreeSeatId(
-    manager: EntityManager,
-    tier: string,
-    seasonLabel: string,
-  ): Promise<string | null> {
-    const rows: Array<{ id: string }> = await manager.query(
-      'SELECT s.id FROM seats s JOIN sectors c ON c.code = s.section ' +
-        'WHERE c.price_category = ? AND c.is_away = 0 AND s.is_active = 1 ' +
-        `AND ${SEAT_FREE_FOR_PASS_SQL} ` +
-        `ORDER BY c.arc = 'lower', c.position, ${SQL_ROW_ORDER}, s.\`number\` LIMIT 1`,
-      [tier, seasonLabel],
-    );
-    return rows[0]?.id ?? null;
   }
 
   /** "D/1 szektor / 3. sor / 5. szék", with the sector's display name from the table. */
@@ -737,7 +1047,21 @@ export class SeasonPassesService {
     priceRow: SeasonPassPrice,
     holder: PassHolder,
     buyerId: string,
+    seatId: string,
   ): Promise<void> {
+    // The chosen seat, by the shared season-pass seat rule.
+    const seat = await this.loadPassSeat(this.dataSource.manager, seatId, priceRow.seasonLabel);
+    const refusal = passSeatRefusal(seat);
+    if (refusal) {
+      throw this.seatRefusalError(refusal);
+    }
+    if (seat!.tier !== priceRow.section) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: 'A választott hely nem ebbe az árkategóriába tartozik.',
+        code: 'seat_tier_mismatch',
+      });
+    }
     if (holder.userId) {
       const already = await this.seasonPassRepository.findOne({
         where: { holderUserId: holder.userId, seasonLabel: priceRow.seasonLabel },
@@ -754,16 +1078,32 @@ export class SeasonPassesService {
         });
       }
     }
-    const seatId = await this.findFreeSeatId(
-      this.dataSource.manager,
-      priceRow.section,
-      priceRow.seasonLabel,
-    );
-    if (!seatId) {
+  }
+
+  /** 409 `hold_lost` unless this user still holds the seat with this token (restarts its TTL). */
+  private async assertHoldOwned(
+    seasonLabel: string,
+    seatId: string,
+    userId: string,
+    holdToken: string,
+  ): Promise<void> {
+    let owned: boolean;
+    try {
+      owned = await this.holds.verifyAndExtend(seasonLabel, seatId, userId, holdToken);
+    } catch (error) {
+      this.logger.error(
+        `[season-pass] hold check failed seat=${seatId} user=${userId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      throw this.holdUnavailableError();
+    }
+    if (!owned) {
       throw new ConflictException({
         statusCode: 409,
-        message: 'Ebben az árkategóriában nincs több szabad bérletes hely.',
-        code: 'section_sold_out',
+        message:
+          'A helyfoglalásod lejárt vagy már nem érvényes. Válaszd ki újra a helyet a helytérképen.',
+        code: 'hold_lost',
       });
     }
   }
@@ -965,6 +1305,11 @@ export class SeasonPassesService {
         });
         if (existing) return existing;
 
+        // Guard: a single-match ticket already sits on (match, seat). See
+        // singleMatchTicketError: without this the insert below would hit
+        // uq_tickets_match_seat and surface as a raw 500.
+        await this.assertNoSingleMatchTicket(manager, matchId, seatId, pass.id);
+
         const ticket = ticketRepo.create({
           matchId,
           seatId,
@@ -990,6 +1335,53 @@ export class SeasonPassesService {
       }
       throw err;
     }
+  }
+
+  /**
+   * Season passes are sold without looking at single matches (see
+   * season-pass-seat-rule.ts), so a pass seat can already carry a SINGLE
+   * ticket for some match, sold before the pass. `uq_tickets_match_seat
+   * (match_id, seat_id)` ignores status, so that row blocks the pass holder's
+   * SEASON_PASS ticket and any LOAN ticket for that one match:
+   *   - occupying ticket (pending_payment / paid / used): the match was sold to
+   *     someone else first; they keep it. 409 `seat_sold_for_match`.
+   *   - void ticket (cancelled / refunded / expired): nobody else has the
+   *     right, but the dead row still holds the unique slot. We do NOT delete
+   *     it (it is the record of a payment/refund); 409 `seat_slot_blocked`,
+   *     logged as an error for staff to clear.
+   * Every other match of the season is unaffected.
+   */
+  private async assertNoSingleMatchTicket(
+    manager: EntityManager,
+    matchId: string,
+    seatId: string,
+    passId: string,
+  ): Promise<void> {
+    const single = await manager.getRepository(Ticket).findOne({
+      where: { matchId, seatId, source: TicketSource.SINGLE },
+      select: ['id', 'status'],
+    });
+    if (!single) return;
+    if (occupiesSeat(single.status)) {
+      this.logger.warn(
+        `[season-pass] pass=${passId} match=${matchId} seat=${seatId}: seat sold as single ticket ${single.id} for this match`,
+      );
+      throw new ConflictException({
+        statusCode: 409,
+        message:
+          'Erre a mérkőzésre a helyedet még a bérlet megvásárlása előtt egyedi jegyként eladták, ezért ezen a meccsen nem állítható ki rá belépő. Keresd az ügyfélszolgálatot.',
+        code: 'seat_sold_for_match',
+      });
+    }
+    this.logger.error(
+      `[season-pass] pass=${passId} match=${matchId} seat=${seatId}: void single ticket ${single.id} (${single.status}) blocks uq_tickets_match_seat; manual action required`,
+    );
+    throw new ConflictException({
+      statusCode: 409,
+      message:
+        'Erre a mérkőzésre a helyedhez egy korábbi, érvénytelen jegy tartozik, ezért a belépő most nem állítható ki. Keresd az ügyfélszolgálatot.',
+      code: 'seat_slot_blocked',
+    });
   }
 
   async createLoan(passId: string, lenderUserId: string, dto: CreateLoanDto): Promise<PassLoan> {
@@ -1021,6 +1413,15 @@ export class SeasonPassesService {
     }
     if (match.kickoffAt.getTime() < Date.now()) {
       throw new BadRequestException('Cannot create a loan for a match that has already started');
+    }
+    // Nothing to lend for a match whose seat went to a single-match ticket.
+    if (pass.seatId) {
+      await this.assertNoSingleMatchTicket(
+        this.dataSource.manager,
+        dto.matchId,
+        pass.seatId,
+        pass.id,
+      );
     }
 
     // Reject overlapping pending/accepted loans for the same match.
@@ -1197,6 +1598,11 @@ export class SeasonPassesService {
         }
         await ticketRepo.delete(ownerTicket.id);
       }
+
+      // A single-match ticket on (match, seat) would make the LOAN insert hit
+      // uq_tickets_match_seat; refuse cleanly instead (the whole transaction,
+      // incl. the ACCEPTED status above, rolls back: the loan stays PENDING).
+      await this.assertNoSingleMatchTicket(manager, loan.matchId, pass.seatId, pass.id);
 
       // Create the borrower's LOAN Ticket — the single right of entry for
       // this (match, seat) from this point forward.

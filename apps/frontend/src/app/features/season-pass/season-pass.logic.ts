@@ -1,4 +1,107 @@
-import type { SeasonPassPrice } from '../../core/models/season-pass.models';
+import { HttpErrorResponse } from '@angular/common/http';
+import type {
+  SeasonPassPrice,
+  SeasonPassSector,
+  SeasonSeatHold,
+} from '../../core/models/season-pass.models';
+import type { SeatAvailability } from '../../shared/models/seat.model';
+
+// ---------------------------------------------------------------------------------------
+// Choosing the seat
+// ---------------------------------------------------------------------------------------
+
+/** "N szabad bérletes hely", or "elfogyott" when none is left. */
+export function sectorFreeText(sector: SeasonPassSector): string {
+  return sector.freeSeats > 0 ? `${sector.freeSeats} szabad bérletes hely` : 'elfogyott';
+}
+
+export function sectorSoldOut(sector: SeasonPassSector): boolean {
+  return sector.freeSeats <= 0;
+}
+
+/** The 409 codes of the seat hold and the purchase that the page words itself. */
+export type SeasonSeatConflict =
+  | 'seat_taken'
+  | 'seat_ticketed'
+  | 'seat_held'
+  | 'seat_disabled'
+  | 'hold_lost'
+  | 'pass_not_issued_refunded'
+  | 'section_sold_out';
+
+const CONFLICT_MESSAGE: Readonly<Record<SeasonSeatConflict, string>> = {
+  seat_taken: 'Erre a helyre közben már valaki bérletet vett. Válassz másik helyet.',
+  seat_ticketed:
+    'Erre a helyre már van jegy egy közelgő mérkőzésre, ezért nem váltható rá bérlet (a bérletes belépő arra a meccsre nem állítható ki). Válassz másik helyet.',
+  seat_held:
+    'Ezt a helyet épp egy másik vásárló fizeti ki. Válassz másik helyet, vagy nézz vissza pár perc múlva.',
+  seat_disabled: 'Ez a hely nem használható. Válassz másik helyet.',
+  hold_lost: 'A helyfoglalásod megszűnt, mielőtt fizettél volna. Válaszd ki újra a helyet.',
+  pass_not_issued_refunded:
+    'A bérletet nem tudtuk kiállítani, mert a hely közben elkelt. A kifizetett összeget visszatérítjük.',
+  section_sold_out: 'Ebben az árkategóriában elfogyott a bérletes hely.',
+};
+
+/** The machine-readable `code` of a 409, when it is one this page knows. */
+export function seasonSeatConflict(error: unknown): SeasonSeatConflict | null {
+  if (!(error instanceof HttpErrorResponse) || error.status !== 409) {
+    return null;
+  }
+  const body: unknown = error.error;
+  const code = body && typeof body === 'object' && 'code' in body ? (body as { code: unknown }).code : null;
+  return typeof code === 'string' && code in CONFLICT_MESSAGE ? (code as SeasonSeatConflict) : null;
+}
+
+export function seasonSeatConflictMessage(code: SeasonSeatConflict): string {
+  return CONFLICT_MESSAGE[code];
+}
+
+/**
+ * Why a tapped seat of the season board cannot be chosen, in plain words; null for a seat
+ * that can be (free). Any status the season board does not know is "not for sale".
+ */
+export function unavailableSeatReason(status: SeatAvailability): string | null {
+  switch (status) {
+    case 'available':
+      return null;
+    case 'season_pass':
+      return 'Erre a helyre már szól bérlet ebben a szezonban.';
+    case 'ticketed':
+      return 'Erre a helyre már van jegy egy közelgő mérkőzésre, ezért nem váltható bérletre.';
+    case 'locked':
+      return 'Másik vásárló épp fizet erre a helyre.';
+    default:
+      return 'Ez a hely nem értékesíthető.';
+  }
+}
+
+/** A clock difference above this between the server's `expiresAt` and `now + ttl` is the visitor's clock being off. */
+const CLOCK_SKEW_TOLERANCE_MS = 5000;
+
+/**
+ * When the hold ends, on the visitor's clock. The server's `expiresAt` is used as is,
+ * unless it disagrees with `ttlSeconds` by more than a few seconds: then the device's
+ * clock is off, and counting `ttlSeconds` from now is the truth the visitor can see.
+ */
+export function holdDeadlineMs(hold: SeasonSeatHold, nowMs: number): number {
+  const fromTtl = hold.ttlSeconds > 0 ? nowMs + hold.ttlSeconds * 1000 : null;
+  const parsed = Date.parse(hold.expiresAt);
+  if (Number.isNaN(parsed)) {
+    return fromTtl ?? nowMs;
+  }
+  if (fromTtl !== null && Math.abs(parsed - fromTtl) > CLOCK_SKEW_TOLERANCE_MS) {
+    return fromTtl;
+  }
+  return parsed;
+}
+
+/** "9:05" for the hold countdown. */
+export function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 /**
  * How many pass seats are left in a sector, as shown by the coloured dot.

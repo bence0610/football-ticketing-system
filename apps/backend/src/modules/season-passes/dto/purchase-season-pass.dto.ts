@@ -1,16 +1,32 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class PurchaseSeasonPassDto {
   @ApiProperty({
     example: 'upper',
     description:
-      'A vásárolt árkategória azonosítója (megegyezik a `season_pass_prices.section` mezővel: `vip`, `lower`, `upper`). A helyet a szerver osztja ki az árkategórián belül.',
+      'A vásárolt árkategória azonosítója (megegyezik a `season_pass_prices.section` mezővel: `vip`, `lower`, `upper`). A választott hely szektorának ebbe az árkategóriába kell tartoznia.',
   })
   @IsString()
   @MinLength(1)
   @MaxLength(32)
   sectionId!: string;
+
+  @ApiProperty({
+    format: 'uuid',
+    description: 'A vevő által a bérlet-helytérképen választott szék.',
+  })
+  @IsUUID('all', { message: 'Érvényes helyazonosító szükséges.' })
+  seatId!: string;
+
+  @ApiProperty({
+    description:
+      'A `POST /season-passes/seats/:seatId/hold` által visszaadott foglalási azonosító.',
+  })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  holdToken!: string;
 
   @ApiProperty({
     example: 'pm_card_visa',

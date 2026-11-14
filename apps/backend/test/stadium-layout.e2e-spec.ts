@@ -241,10 +241,20 @@ describe('Stadium layout (E2E)', () => {
       expect(list.status).toBe(200);
       expect((list.body as Array<{ sectionId: string }>).map((p) => p.sectionId)).toEqual(['upper']);
 
+      const awaySeat = await ctx.dataSource
+        .getRepository(Seat)
+        .findOneOrFail({ where: { section: 'VENDÉG' } });
+
+      const hold = await request(server)
+        .post(`/api/season-passes/seats/${awaySeat.id}/hold`)
+        .set('Authorization', `Bearer ${fan.token}`)
+        .send();
+      expect(hold.status).toBe(403);
+
       const buy = await request(server)
         .post('/api/season-passes/purchase')
         .set('Authorization', `Bearer ${fan.token}`)
-        .send({ sectionId: 'VENDÉG' });
+        .send({ sectionId: 'VENDÉG', seatId: awaySeat.id, holdToken: 'forged-token' });
       expect(buy.status).toBe(403);
       expect(ctx.stripeStub.paymentIntentsCreateMock).not.toHaveBeenCalled();
     });
@@ -302,16 +312,27 @@ describe('Stadium layout (E2E)', () => {
       expect(sectors).toEqual(['D/1', 'K']);
     });
 
-    it('gives a season pass the first free seat by row number (row 2, not row 10)', async () => {
-      await seat('K', '10', 1);
+    it('lists the season map in row order (row 2 before row 10) and issues exactly the chosen seat', async () => {
+      const ten = await seat('K', '10', 1);
       const two = await seat('K', '2', 1);
       const row = await priceRow('lower', 30000);
       const fan = await user(UserRole.FAN);
 
+      const map = await request(server).get('/api/season-passes/seats').query({ section: 'K' });
+      expect(map.status).toBe(200);
+      expect((map.body.seats as Array<{ row: string }>).map((s) => s.row)).toEqual(['2', '10']);
+
+      // The buyer picks the row-10 seat, not the first one by order: that is the seat issued.
+      const hold = await request(server)
+        .post(`/api/season-passes/seats/${ten.id}/hold`)
+        .set('Authorization', `Bearer ${fan.token}`)
+        .send();
+      expect(hold.status).toBe(201);
+
       const buy = await request(server)
         .post('/api/season-passes/purchase')
         .set('Authorization', `Bearer ${fan.token}`)
-        .send({ sectionId: 'lower' });
+        .send({ sectionId: 'lower', seatId: ten.id, holdToken: hold.body.holdToken });
       expect(buy.status).toBe(201);
       const stored = ctx.stripeStub.getStoredIntent(buy.body.paymentIntentId as string)!;
       expect(stored.metadata.priceRowId).toBe(row.id);
@@ -345,9 +366,10 @@ describe('Stadium layout (E2E)', () => {
         .set('Authorization', `Bearer ${fan.token}`);
       expect(mine.status).toBe(200);
       expect(mine.body.length).toBe(1);
-      expect(mine.body[0].seatLabel).toBe('K szektor / 2. sor / 1. szék');
+      expect(mine.body[0].seatLabel).toBe('K szektor / 10. sor / 1. szék');
       const pass = await ctx.dataSource.query('SELECT seat_id AS seatId FROM season_passes');
-      expect(pass[0].seatId).toBe(two.id);
+      expect(pass[0].seatId).toBe(ten.id);
+      expect(pass[0].seatId).not.toBe(two.id);
     });
   });
 

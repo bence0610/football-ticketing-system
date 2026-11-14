@@ -1,11 +1,81 @@
-import type { SeasonPassPrice } from '../../core/models/season-pass.models';
+import { HttpErrorResponse } from '@angular/common/http';
+import type { SeasonPassPrice, SeasonPassSector } from '../../core/models/season-pass.models';
 import {
   availabilityOf,
+  formatCountdown,
+  holdDeadlineMs,
   mostPopularSectionId,
   panelSector,
   perMatchEquivalent,
   savingsFor,
+  sectorFreeText,
+  sectorSoldOut,
+  seasonSeatConflict,
+  seasonSeatConflictMessage,
+  unavailableSeatReason,
 } from './season-pass.logic';
+
+describe('choosing the seat: helpers', () => {
+  const sector = (freeSeats: number): SeasonPassSector => ({
+    section: 'D/1', name: 'D/1 szektor', arc: 'lower', position: 1, gate: 3, covered: true, total: 100, freeSeats,
+  });
+
+  it('words the free pass seats of a sector, "elfogyott" at zero', () => {
+    expect(sectorFreeText(sector(7))).toBe('7 szabad bérletes hely');
+    expect(sectorFreeText(sector(0))).toBe('elfogyott');
+    expect(sectorSoldOut(sector(0))).toBeTrue();
+    expect(sectorSoldOut(sector(1))).toBeFalse();
+  });
+
+  it('reads the 409 code it knows, and nothing else', () => {
+    const conflict = (code: string, status = 409): HttpErrorResponse =>
+      new HttpErrorResponse({ status, error: { code, message: 'x' } });
+    expect(seasonSeatConflict(conflict('seat_taken'))).toBe('seat_taken');
+    expect(seasonSeatConflict(conflict('seat_held'))).toBe('seat_held');
+    expect(seasonSeatConflict(conflict('hold_lost'))).toBe('hold_lost');
+    expect(seasonSeatConflict(conflict('seat_disabled'))).toBe('seat_disabled');
+    expect(seasonSeatConflict(conflict('pass_not_issued_refunded'))).toBe('pass_not_issued_refunded');
+    expect(seasonSeatConflict(conflict('holder_already_has_pass'))).toBeNull();
+    expect(seasonSeatConflict(conflict('seat_taken', 400))).toBeNull();
+    expect(seasonSeatConflict(new Error('x'))).toBeNull();
+  });
+
+  it('knows seat_ticketed and words it as the server does', () => {
+    const err = new HttpErrorResponse({ status: 409, error: { code: 'seat_ticketed', message: 'x' } });
+    expect(seasonSeatConflict(err)).toBe('seat_ticketed');
+    expect(seasonSeatConflictMessage('seat_ticketed')).toBe(
+      'Erre a helyre már van jegy egy közelgő mérkőzésre, ezért nem váltható rá bérlet (a bérletes belépő arra a meccsre nem állítható ki). Válassz másik helyet.',
+    );
+  });
+
+  it('says in plain words why a board seat cannot be chosen', () => {
+    expect(unavailableSeatReason('available')).toBeNull();
+    expect(unavailableSeatReason('season_pass')).toBe('Erre a helyre már szól bérlet ebben a szezonban.');
+    expect(unavailableSeatReason('ticketed')).toBe(
+      'Erre a helyre már van jegy egy közelgő mérkőzésre, ezért nem váltható bérletre.',
+    );
+    expect(unavailableSeatReason('locked')).toBe('Másik vásárló épp fizet erre a helyre.');
+    expect(unavailableSeatReason('disabled')).toBe('Ez a hely nem értékesíthető.');
+    // a status the season board does not know is not for sale either
+    expect(unavailableSeatReason('sold')).toBe('Ez a hely nem értékesíthető.');
+    expect(unavailableSeatReason('away')).toBe('Ez a hely nem értékesíthető.');
+  });
+
+  it('counts the hold down from expiresAt, or from the ttl when the device clock is off', () => {
+    const now = Date.parse('2026-11-14T12:00:00Z');
+    const onTime = { seatId: 's', holdToken: 't', ttlSeconds: 600, expiresAt: '2026-11-14T12:10:00Z' };
+    expect(holdDeadlineMs(onTime, now)).toBe(Date.parse('2026-11-14T12:10:00Z'));
+    // the phone is an hour ahead: expiresAt would already be past
+    expect(holdDeadlineMs(onTime, now + 3_600_000)).toBe(now + 3_600_000 + 600_000);
+    expect(holdDeadlineMs({ ...onTime, expiresAt: 'nonsense' }, now)).toBe(now + 600_000);
+  });
+
+  it('formats the countdown as m:ss', () => {
+    expect(formatCountdown(600_000)).toBe('10:00');
+    expect(formatCountdown(65_400)).toBe('1:06');
+    expect(formatCountdown(-5)).toBe('0:00');
+  });
+});
 
 function price(over: Partial<SeasonPassPrice> = {}): SeasonPassPrice {
   return {

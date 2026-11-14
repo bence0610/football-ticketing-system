@@ -24,10 +24,19 @@ export const RedisKeys = {
   // Season-pass purchase — per-attempt idempotency record (TTL 300 s)
   // `holderKey` identifies who the pass is for, so buying for several holders
   // in one section yields separate attempts (and separate PaymentIntents).
+  // `seatId` is part of it too: a different chosen seat is a different purchase.
   seasonPassAttempt: (
     userId: string,
     section: string,
     seasonLabel: string,
     holderKey: string,
-  ): string => `seasonpass-attempt:${userId}:${section}:${seasonLabel}:${holderKey}`,
+    seatId: string,
+  ): string => `seasonpass-attempt:${userId}:${section}:${seasonLabel}:${holderKey}:${seatId}`,
+  // Season-pass seat hold while the buyer pays (value = the hold token only,
+  // never the user id, so the holder cannot be read back from the seat).
+  seasonPassHold: (seasonLabel: string, seatId: string): string =>
+    `seasonpass-hold:${seasonLabel}:${seatId}`,
+  // The one seat a user holds for a season: value `${seatId}|${holdToken}`.
+  seasonPassHoldOwner: (seasonLabel: string, userId: string): string =>
+    `seasonpass-hold-owner:${seasonLabel}:${userId}`,
 } as const;

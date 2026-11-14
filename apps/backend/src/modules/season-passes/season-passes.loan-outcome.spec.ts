@@ -70,6 +70,7 @@ describe('SeasonPassesService.completeLoan', () => {
       { revoke } as never,
       { award, getConfig: () => ({ passLoanPoints: 25 }) } as never,
       {} as never,
+      {} as never, // SeasonPassHoldService: not used by completeLoan
     );
   });
 

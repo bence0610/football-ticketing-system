@@ -85,6 +85,10 @@ const PUBLIC_ROUTES: Record<string, string> = {
   'POST webhooks/stripe': 'authenticated by the Stripe signature, not a JWT',
   'GET season-passes/prices': 'public price list',
   'GET season-passes/season': 'public home fixture list and loyalty reward of the season',
+  'GET season-passes/tiers/:tier/sectors':
+    'public sector list of a price tier with free season-pass seat counts',
+  'GET season-passes/seats':
+    'public season seat map; statuses only (available/season_pass/locked/disabled), never who holds or owns a seat',
   'GET season-passes/loans/preview/:token':
     'invitation link; possession of the secret token is the credential',
   'GET users/count': 'deliberately public registration counter',
@@ -191,6 +195,15 @@ describe('backend route protection', () => {
     );
     expect(exposed).toEqual([]);
   });
+
+  it.each(['POST season-passes/seats/:seatId/hold', 'DELETE season-passes/seats/:seatId/hold'])(
+    '%s exists and requires a JWT (a hold is bound to the account)',
+    (key) => {
+      const route = ROUTES.find((r) => r.key === key);
+      expect(route).toBeDefined();
+      expect(route!.authenticated).toBe(true);
+    },
+  );
 
   it('every entry on the public list is a real route, and really is unauthenticated', () => {
     const byKey = new Map(ROUTES.map((r) => [r.key, r]));

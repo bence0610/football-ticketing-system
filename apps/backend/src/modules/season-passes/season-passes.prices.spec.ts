@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { SeasonPassesService } from './season-passes.service';
 import { STRIPE_CLIENT } from '../payments/stripe.provider';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
+import { SeasonPassHoldService } from '../../redis/season-pass-hold.service';
 import { EmailService } from '../email/email.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { QrService } from '../qr/qr.service';
@@ -48,25 +49,10 @@ function match(id: string, homeTeam: string, offsetDays: number, basePrice: stri
 
 describe('SeasonPassesService – price list and season overview', () => {
   let service: SeasonPassesService;
-  const priceRepo = { find: jest.fn() };
+  const priceRepo = { find: jest.fn(), findOne: jest.fn() };
   const matchRepo = { find: jest.fn() };
   const dataSource = { query: jest.fn(), transaction: jest.fn(), getRepository: jest.fn() };
-
-  /** What the three raw SQL reads return, keyed by a fragment of the statement. */
-  function stubSql(opts: {
-    stats: Array<{ section: string; total: number; free: number; minMod: string; maxMod: string }>;
-    sold?: Array<{ section: string; sold: number }>;
-    sectors?: Array<{ code: string; covered: number }>;
-  }): void {
-    dataSource.query.mockImplementation((sql: string) => {
-      if (sql.includes('GROUP BY s.section') && sql.includes('MIN(s.price_modifier)')) {
-        return Promise.resolve(opts.stats);
-      }
-      if (sql.includes('FROM season_passes sp')) return Promise.resolve(opts.sold ?? []);
-      if (sql.includes('FROM sectors')) return Promise.resolve(opts.sectors ?? []);
-      return Promise.reject(new Error(`unexpected SQL: ${sql}`));
-    });
-  }
+  const holds = { heldSeatIds: jest.fn() };
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -82,6 +68,7 @@ describe('SeasonPassesService – price list and season overview', () => {
         { provide: STRIPE_CLIENT, useValue: {} },
         { provide: REDIS_CLIENT, useValue: {} },
         { provide: EmailService, useValue: {} },
+        { provide: SeasonPassHoldService, useValue: holds },
         { provide: LoyaltyService, useValue: {} },
         { provide: QrService, useValue: {} },
         { provide: TicketRendererService, useValue: {} },
@@ -338,6 +325,160 @@ describe('SeasonPassesService – price list and season overview', () => {
 
     expect(vip.passesSold).toBe(7);
     expect(vip.freeSeats).toBe(217);
+  });
+
+  describe('season seat rule (map, counts)', () => {
+    /** A seat row as PASS_SEAT_SELECT_SQL returns it. */
+    const seatRow = (
+      id: string,
+      row: string,
+      number: number,
+      opts: { free?: 0 | 1; taken?: 0 | 1; ticketed?: 0 | 1; isActive?: 0 | 1 } = {},
+    ) => ({
+      id,
+      section: 'D/1',
+      row,
+      number,
+      category: 'standard',
+      isAccessible: 0,
+      isActive: opts.isActive ?? 1,
+      sectorCode: 'D/1',
+      isAway: 0,
+      tier: 'upper',
+      free: opts.free ?? 1,
+      taken: opts.taken ?? 0,
+      ticketed: opts.ticketed ?? 0,
+    });
+
+    function stubMap(rows: ReturnType<typeof seatRow>[]): void {
+      dataSource.query.mockImplementation((sql: string) => {
+        if (sql.includes('WHERE s.section = ?')) return Promise.resolve(rows);
+        if (sql.includes('FROM sectors')) return Promise.resolve(SECTORS);
+        return Promise.reject(new Error(`unexpected SQL: ${sql}`));
+      });
+    }
+
+    it('the free count excludes seats ticketed for an UPCOMING match of the season, and only those', async () => {
+      priceRepo.find.mockResolvedValue([tierPrice('upper', 22000)]);
+      matchRepo.find.mockResolvedValue([]);
+      stubTiers({
+        stats: [{ section: 'D/1', total: 216, free: 216, minMod: '1.00', maxMod: '1.00' }],
+      });
+
+      const [upper] = await service.listPrices();
+
+      const statsSql = (dataSource.query.mock.calls as Array<[string]>)
+        .map(([sql]) => sql)
+        .find((sql) => sql.includes('MIN(s.price_modifier)'))!;
+      // a ticket (any status) for a pass-eligible, uncancelled match that kicks off after now
+      // and before the season's end blocks; a match already played does not
+      expect(statsSql).toMatch(/FROM tickets t JOIN matches m/);
+      expect(statsSql).toContain('m.kickoff_at > NOW()');
+      expect(statsSql).toContain('m.kickoff_at < (SELECT DATE_ADD(MAX(spp.valid_until)');
+      expect(statsSql).not.toMatch(/t\.status/);
+      // any season_passes row of the season blocks, whatever its status: no status filter
+      expect(statsSql).toContain('sp.season_label = ?');
+      expect(statsSql).not.toMatch(/sp\.status/);
+      expect(statsSql).toContain('c.is_away = 0');
+      expect(upper.freeSeats).toBe(216);
+    });
+
+    it('each tier carries its sectors in stadium order, away excluded, with name/arc/position/gate/covered/total/freeSeats', async () => {
+      priceRepo.find.mockResolvedValue([tierPrice('lower', 30000)]);
+      matchRepo.find.mockResolvedValue([]);
+      stubTiers({
+        stats: [
+          { section: 'F', total: 234, free: 34, minMod: '1.40', maxMod: '1.40' },
+          { section: 'K', total: 280, free: 100, minMod: '1.40', maxMod: '1.40' },
+          { section: 'VENDÉG', total: 280, free: 0, minMod: '1.00', maxMod: '1.00' },
+        ],
+      });
+
+      const [lower] = await service.listPrices();
+
+      expect(lower.sectors).toEqual([
+        { section: 'K', name: 'K szektor', arc: 'lower', position: 5, gate: 2, covered: false, total: 280, freeSeats: 100 },
+        { section: 'F', name: 'F szektor', arc: 'lower', position: 10, gate: 1, covered: false, total: 234, freeSeats: 34 },
+      ]);
+    });
+
+    it('GET tiers/:tier/sectors returns the same list with the tier price', async () => {
+      priceRepo.findOne.mockResolvedValue(tierPrice('upper', 22000));
+      stubTiers({
+        stats: [
+          { section: 'A/2', total: 200, free: 5, minMod: '1.00', maxMod: '1.00' },
+          { section: 'D/1', total: 216, free: 40, minMod: '1.00', maxMod: '1.00' },
+        ],
+      });
+
+      const res = await service.listTierSectors('upper');
+
+      expect(res).toMatchObject({ tier: 'upper', seasonLabel: '2026/2027', price: 22000 });
+      expect(res.sectors.map((s) => [s.section, s.freeSeats])).toEqual([
+        ['D/1', 40],
+        ['A/2', 5],
+      ]);
+      await expect(service.listTierSectors('VENDÉG')).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('the map shows the tier price on every seat and maps the rule to available / season_pass / locked / disabled', async () => {
+      priceRepo.findOne.mockResolvedValue(tierPrice('upper', 22000));
+      stubMap([
+        seatRow('s2', '1', 2), // free (a ticket for a match already played does not matter)
+        seatRow('s6', '1', 6, { free: 0, ticketed: 1 }), // a ticket for an upcoming match
+        seatRow('s1', '1', 1, { free: 0, taken: 1 }), // a pass row (any status) for the season
+        seatRow('s3', '1', 3), // held by another buyer
+        seatRow('s4', '1', 4, { free: 0, isActive: 0 }),
+        seatRow('s10', '10', 1),
+        seatRow('s5', '2', 1),
+      ]);
+      holds.heldSeatIds.mockResolvedValue(new Set(['s3']));
+
+      const map = await service.getSeasonSeatMap('D/1');
+
+      expect(map).toMatchObject({
+        section: 'D/1',
+        name: 'D/1 szektor',
+        arc: 'upper',
+        gate: 2,
+        covered: true,
+        tier: 'upper',
+        price: 22000,
+        seasonLabel: '2026/2027',
+        aisles: [],
+      });
+      expect(map.seats.map((s) => [s.id, s.status])).toEqual([
+        ['s1', 'season_pass'],
+        ['s2', 'available'],
+        ['s3', 'locked'],
+        ['s4', 'disabled'],
+        ['s6', 'ticketed'],
+        ['s5', 'available'], // row 2 before row 10: numeric row order
+        ['s10', 'available'],
+      ]);
+      expect(new Set(map.seats.map((s) => s.price))).toEqual(new Set([22000]));
+      expect(map.seats.map((s) => s.status)).not.toContain('sold');
+      // only seat 2 is free and unheld in row 1; rows 2 and 10 have one each
+      expect(map.longestRun).toBe(1);
+      // only seats the rule calls free are looked up in Redis
+      expect(holds.heldSeatIds).toHaveBeenCalledWith('2026/2027', ['s2', 's3', 's10', 's5']); // never a ticketed seat
+      const mapSql = (dataSource.query.mock.calls as Array<[string]>)
+        .map(([sql]) => sql)
+        .find((sql) => sql.includes('WHERE s.section = ?'))!;
+      expect(mapSql).toContain('AS ticketed');
+    });
+
+    it('the away section is refused with 403, an unknown sector with 404', async () => {
+      stubMap([]);
+      await expect(service.getSeasonSeatMap('VENDÉG')).rejects.toMatchObject({
+        status: 403,
+        response: { code: 'away_section' },
+      });
+      await expect(service.getSeasonSeatMap('NOPE')).rejects.toMatchObject({
+        status: 404,
+        response: { code: 'sector_not_found' },
+      });
+    });
   });
 
   it('overview lists only our home matches and reports the configured loyalty reward', async () => {

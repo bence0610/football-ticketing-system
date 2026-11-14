@@ -1,0 +1,1 @@
+- [Season seat choice](project_season_seat_choice.md) — buyer-chosen pass seat: any-status pass row blocks, Redis hold not pending row, single-ticket 409 codes

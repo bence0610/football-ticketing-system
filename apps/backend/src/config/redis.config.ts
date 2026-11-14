@@ -7,6 +7,11 @@ export interface RedisConfig {
   db: number;
   keyPrefix: string;
   seatLockTtlSeconds: number;
+  /**
+   * How long a season-pass buyer's chosen seat stays held while they pay.
+   * Longer than the 5-minute match lock: a 3DS challenge can take minutes.
+   */
+  seasonPassHoldTtlSeconds: number;
 }
 
 export default registerAs(
@@ -18,5 +23,6 @@ export default registerAs(
     db: parseInt(process.env.REDIS_DB ?? '0', 10),
     keyPrefix: process.env.REDIS_KEY_PREFIX ?? 'kte:',
     seatLockTtlSeconds: parseInt(process.env.SEAT_LOCK_TTL_SECONDS ?? '300', 10),
+    seasonPassHoldTtlSeconds: parseInt(process.env.SEASON_PASS_HOLD_TTL_SECONDS ?? '900', 10),
   }),
 );

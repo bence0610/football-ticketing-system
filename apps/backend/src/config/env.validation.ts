@@ -30,6 +30,8 @@ export const envValidationSchema = Joi.object({
 
   // Seat lock
   SEAT_LOCK_TTL_SECONDS: Joi.number().integer().min(30).default(300),
+  // Season-pass seat hold while the buyer pays (3DS can take minutes)
+  SEASON_PASS_HOLD_TTL_SECONDS: Joi.number().integer().min(60).default(900),
 
   // JWT
   JWT_ACCESS_SECRET: Joi.string().min(16).required(),

@@ -11,6 +11,8 @@ interface ConfirmationState {
   readonly paymentIntentId: string;
   readonly seasonPassId: string | null;
   readonly sectionName: string;
+  /** "D/1 szektor, 5. sor, 12. hely": the seat the buyer chose. */
+  readonly seatLabel?: string;
   readonly seasonLabel: string;
   readonly amount: number;
 }
@@ -50,8 +52,12 @@ interface ConfirmationState {
             <mat-divider />
 
             <dl class="kte-season-pass-confirmation__grid">
-              <dt>Szektor</dt>
+              <dt>Árkategória</dt>
               <dd>{{ confirmation.sectionName }}</dd>
+              @if (confirmation.seatLabel) {
+                <dt>Hely</dt>
+                <dd>{{ confirmation.seatLabel }}</dd>
+              }
               <dt>Szezon</dt>
               <dd>{{ confirmation.seasonLabel }}</dd>
               <dt>Fizetett összeg</dt>
