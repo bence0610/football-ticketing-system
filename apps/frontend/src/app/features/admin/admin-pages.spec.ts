@@ -44,6 +44,7 @@ function overview(over: Partial<Overview> = {}): Overview {
       scannedTickets: 6,
       playedTickets: 10,
     },
+    seasonPasses: { basis: 'season', revenue: 0, passCount: 0, byTier: [] },
     matches: [
       match({ matchId: 'm1', occupancyPercent: 100, revenue: 35000 }),
       match({ matchId: 'm2', awayTeam: 'Paksi FC', occupancyPercent: 30, revenue: 12500 }),
@@ -186,6 +187,77 @@ describe('RevenueStatsPageComponent', async () => {
     const button = el.querySelector('[data-testid="csv-export"]') as HTMLButtonElement;
     expect(button.disabled).toBe(false);
     expect(el.querySelector('[data-testid="period-select"]')).not.toBeNull();
+  });
+
+  describe('season-pass revenue', () => {
+    const passes: Overview['seasonPasses'] = {
+      basis: 'season',
+      revenue: 690000,
+      passCount: 9,
+      byTier: [
+        { tier: 'vip', label: 'VIP', passCount: 2, revenue: 300000 },
+        { tier: 'lower', label: 'Alsó karéj', passCount: 4, revenue: 260000 },
+        { tier: 'upper', label: 'Felső karéj', passCount: 3, revenue: 130000 },
+      ],
+    };
+
+    it('shows its own section with total, count, per-tier rows and the separation note', async () => {
+      const el = await render(overview({ seasonPasses: passes }));
+      const section = el.querySelector('[data-testid="season-passes"]');
+      expect(section).not.toBeNull();
+      expect(text(section?.querySelector('#passes-title'))).toBe('Bérletbevétel');
+      expect(text(section?.querySelector('[data-testid="passes-note"]'))).toBe(
+        'Egy bérlet egyetlen fizetés az egész szezonra, ezért nem osztjuk szét meccsekre.',
+      );
+      expect(text(section?.querySelector('[data-testid="passes-basis"]'))).toBe('Az aktív szezon összes bérlete');
+      expect(text(section?.querySelector('[data-testid="passes-revenue"]'))).toContain('690 000');
+      expect(text(section?.querySelector('[data-testid="passes-count"]'))).toContain('9');
+      const rows = Array.from(section?.querySelectorAll('[data-testid="pass-tier-row"]') ?? []);
+      expect(rows.length).toBe(3);
+      expect(text(rows[0])).toContain('VIP');
+      expect(text(rows[0])).toContain('2');
+      expect(text(rows[0])).toContain('300 000');
+      expect(text(rows[2])).toContain('Felső karéj');
+      expect(text(rows[2])).toContain('130 000');
+      expect(section?.querySelector('[data-testid="passes-empty"]')).toBeNull();
+    });
+
+    it('leaves the match revenue card, rows and bars untouched when passes are present', async () => {
+      const el = await render(overview({ seasonPasses: passes }));
+      const revenueValue = text(el.querySelector('[data-testid="metric-revenue"] [data-testid="metric-value"]'));
+      expect(revenueValue).toContain('62 500');
+      expect(revenueValue).not.toContain('752 500');
+      expect(el.querySelectorAll('.metric').length).toBe(4);
+      const rows = Array.from(el.querySelectorAll('[data-testid="match-row"]'));
+      expect(rows.length).toBe(3);
+      expect(text(rows[0])).toContain('35 000');
+      expect(text(rows[1])).toContain('12 500');
+      expect(text(rows[2])).toContain('15 000');
+      // the season-pass section is not inside the match table
+      expect(el.querySelector('[data-testid="matches-table"] [data-testid="pass-tier-row"]')).toBeNull();
+      expect(el.querySelectorAll('[data-testid="revenue-bar"]').length).toBe(3);
+    });
+
+    it('says no pass was sold, and draws no tier table, when the count is zero', async () => {
+      const el = await render(overview());
+      const section = el.querySelector('[data-testid="season-passes"]');
+      expect(text(section?.querySelector('[data-testid="passes-empty"]'))).toBe(
+        'Ebben az időszakban nem adtak el bérletet.',
+      );
+      expect(section?.querySelector('[data-testid="passes-table"]')).toBeNull();
+      expect(section?.querySelector('[data-testid="passes-revenue"]')).toBeNull();
+      // the separation note stays, so the admin knows why passes are never in the match figures
+      expect(section?.querySelector('[data-testid="passes-note"]')).not.toBeNull();
+    });
+
+    it('explains the different basis for a 30/90-day period', async () => {
+      const el = await render(
+        overview({ period: '30d', seasonPasses: { ...passes, basis: 'purchased_in_period' } }),
+      );
+      expect(text(el.querySelector('[data-testid="passes-basis"]'))).toBe(
+        'Az időszakban megvásárolt bérletek (a meccsbevétel a mérkőzés időpontja szerint számít, ezért a két összeg alapja eltérő)',
+      );
+    });
   });
 });
 

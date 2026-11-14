@@ -34,11 +34,40 @@ export interface OverviewMetrics {
   readonly playedTickets: number;
 }
 
+/**
+ * 'season': every pass of the active season. 'purchased_in_period': passes bought
+ * in the last 30/90 days - a different basis from match revenue, which counts by kickoff.
+ */
+export type SeasonPassRevenueBasis = 'season' | 'purchased_in_period';
+
+export type SeasonPassRevenueTier = 'vip' | 'lower' | 'upper' | 'unknown';
+
+export interface SeasonPassTierRevenue {
+  readonly tier: SeasonPassRevenueTier;
+  readonly label: string;
+  readonly passCount: number;
+  /** HUF actually charged. */
+  readonly revenue: number;
+}
+
+/**
+ * Season-pass revenue. One payment covers a whole season, so it is never attributed
+ * to a match and is kept apart from `OverviewMetrics.revenue` (match tickets).
+ */
+export interface OverviewSeasonPasses {
+  readonly basis: SeasonPassRevenueBasis;
+  readonly revenue: number;
+  readonly passCount: number;
+  readonly byTier: readonly SeasonPassTierRevenue[];
+}
+
 export interface Overview {
   readonly season: OverviewSeason | null;
   readonly period: OverviewPeriod;
   readonly generatedAt: string;
+  /** Match tickets only. */
   readonly metrics: OverviewMetrics;
+  readonly seasonPasses: OverviewSeasonPasses;
   readonly matches: readonly OverviewMatch[];
 }
 

@@ -1,23 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Match, Ticket, TicketStatus } from '../../database/entities';
+import { Match, SeasonPass, Ticket, TicketSource, TicketStatus } from '../../database/entities';
+import { PASS_REVENUE_STATUSES, passRevenueByTier, sumTiers } from './season-pass-revenue';
 import {
   RevenueByMatchDto,
   RevenueDailyPointDto,
   RevenueStatsDto,
   RevenueSummaryDto,
+  SeasonPassDailyPointDto,
+  SeasonPassRevenueDto,
 } from './dto/revenue-stats.dto';
 
 const REVENUE_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.USED];
 
 @Injectable()
 export class AdminRevenueService {
-  constructor(@InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>) {}
+  constructor(
+    @InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>,
+    @InjectRepository(SeasonPass) private readonly passRepository: Repository<SeasonPass>,
+  ) {}
 
   /**
-   * Aggregates revenue stats for the admin dashboard. The dataset is bound
-   * to PAID + USED tickets — pending and refunded entries are excluded.
+   * Aggregates revenue stats for the admin dashboard. `summary`, `daily` and
+   * `byMatch` are bound to PAID + USED SINGLE tickets (pending and refunded
+   * entries excluded; pass and loan entries carry no price of their own).
+   * Season-pass revenue is reported in `seasonPasses`, separately: a pass is one
+   * payment for a whole season and is not allocated to matches.
    */
   async getStats(daysWindow = 30): Promise<RevenueStatsDto> {
     const now = new Date();
@@ -25,11 +34,12 @@ export class AdminRevenueService {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const windowStart = new Date(todayStart.getTime() - (daysWindow - 1) * 86_400_000);
 
-    const [todayAgg, monthAgg, daily, byMatch] = await Promise.all([
+    const [todayAgg, monthAgg, daily, byMatch, seasonPasses] = await Promise.all([
       this.aggregateBetween(todayStart, endOfDay(now)),
       this.aggregateBetween(monthStart, endOfDay(now)),
       this.dailySeries(windowStart, endOfDay(now)),
       this.byMatch(10),
+      this.seasonPassRevenue(todayStart, monthStart, windowStart, now),
     ]);
 
     const summary: RevenueSummaryDto = {
@@ -40,7 +50,52 @@ export class AdminRevenueService {
       topMatch: byMatch[0],
     };
 
-    return { summary, daily, byMatch };
+    return { summary, daily, byMatch, seasonPasses };
+  }
+
+  private async seasonPassRevenue(
+    todayStart: Date,
+    monthStart: Date,
+    windowStart: Date,
+    now: Date,
+  ): Promise<SeasonPassRevenueDto> {
+    const [today, month, byTier, dailyRows] = await Promise.all([
+      passRevenueByTier(this.passRepository, { createdBetween: { from: todayStart, to: endOfDay(now) } }),
+      passRevenueByTier(this.passRepository, { createdBetween: { from: monthStart, to: endOfDay(now) } }),
+      passRevenueByTier(this.passRepository, {}),
+      this.passRepository
+        .createQueryBuilder('sp')
+        .select("DATE_FORMAT(sp.createdAt, '%Y-%m-%d')", 'date')
+        .addSelect('COALESCE(SUM(sp.pricePaid), 0)', 'amount')
+        .addSelect('COUNT(sp.id)', 'passCount')
+        .where('sp.status IN (:...statuses)', { statuses: PASS_REVENUE_STATUSES })
+        .andWhere('sp.createdAt BETWEEN :from AND :to', { from: windowStart, to: endOfDay(now) })
+        .groupBy('date')
+        .getRawMany<{ date: string; amount: string | number; passCount: string | number }>(),
+    ]);
+    const byDate = new Map(dailyRows.map((r) => [r.date, r]));
+    const daily: SeasonPassDailyPointDto[] = [];
+    const cursor = new Date(windowStart);
+    while (cursor <= endOfDay(now)) {
+      const key = formatDate(cursor);
+      const row = byDate.get(key);
+      daily.push({
+        date: key,
+        amount: row ? Math.round(Number(row.amount)) : 0,
+        passCount: row ? Number(row.passCount) : 0,
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    const t = sumTiers(today);
+    const m = sumTiers(month);
+    return {
+      todayRevenue: t.revenue,
+      monthRevenue: m.revenue,
+      todayPassCount: t.passCount,
+      monthPassCount: m.passCount,
+      daily,
+      byTier,
+    };
   }
 
   private async aggregateBetween(
@@ -52,6 +107,7 @@ export class AdminRevenueService {
       .select('COALESCE(SUM(t.pricePaid), 0)', 'amount')
       .addSelect('COUNT(t.id)', 'ticketCount')
       .where('t.status IN (:...statuses)', { statuses: REVENUE_STATUSES })
+      .andWhere('t.source = :single', { single: TicketSource.SINGLE })
       .andWhere('t.createdAt BETWEEN :from AND :to', { from, to })
       .getRawOne<{ amount: string | number; ticketCount: string | number }>();
     return {
@@ -67,6 +123,7 @@ export class AdminRevenueService {
       .addSelect('COALESCE(SUM(t.pricePaid), 0)', 'amount')
       .addSelect('COUNT(t.id)', 'ticketCount')
       .where('t.status IN (:...statuses)', { statuses: REVENUE_STATUSES })
+      .andWhere('t.source = :single', { single: TicketSource.SINGLE })
       .andWhere('t.createdAt BETWEEN :from AND :to', { from, to })
       .groupBy('date')
       .orderBy('date', 'ASC')
@@ -102,6 +159,7 @@ export class AdminRevenueService {
       .addSelect('COUNT(t.id)', 'ticketCount')
       .addSelect('COALESCE(SUM(t.pricePaid), 0)', 'revenue')
       .where('t.status IN (:...statuses)', { statuses: REVENUE_STATUSES })
+      .andWhere('t.source = :single', { single: TicketSource.SINGLE })
       .groupBy('t.matchId')
       .addGroupBy('m.homeTeam')
       .addGroupBy('m.awayTeam')

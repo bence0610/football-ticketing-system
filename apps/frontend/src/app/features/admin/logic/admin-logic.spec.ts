@@ -8,6 +8,7 @@ import {
   niceMax,
   occupancyTone,
   periodOptions,
+  seasonPassBasisText,
   sectionSummaries,
   takenPercent,
 } from './admin-logic';
@@ -44,6 +45,15 @@ describe('header text', () => {
     expect(headerSubtitle(null, null)).toBe('Nincs aktív szezon');
     expect(headerSubtitle('2026/2027', '2026-11-13T13:32:00.000Z')).toMatch(
       /^2026\/2027 szezon · frissítve \d{2}:\d{2}$/,
+    );
+  });
+});
+
+describe('seasonPassBasisText', () => {
+  it('names what the season-pass figure counts, and warns when its basis differs', () => {
+    expect(seasonPassBasisText('season')).toBe('Az aktív szezon összes bérlete');
+    expect(seasonPassBasisText('purchased_in_period')).toBe(
+      'Az időszakban megvásárolt bérletek (a meccsbevétel a mérkőzés időpontja szerint számít, ezért a két összeg alapja eltérő)',
     );
   });
 });

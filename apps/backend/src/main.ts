@@ -22,6 +22,10 @@ async function bootstrap(): Promise<void> {
   const configService = app.get(ConfigService);
   const appConfig = configService.getOrThrow<AppConfig>('app');
 
+  // Behind a reverse proxy `req.ip` is the proxy's address unless told how many hops to believe;
+  // the IP-based rate limits depend on it. From TRUST_PROXY, default false (see config/trust-proxy.ts).
+  app.set('trust proxy', appConfig.trustProxy);
+
   app.setGlobalPrefix('api', { exclude: ['health'] });
 
   // Stripe requires the *raw* request body to verify webhook signatures.

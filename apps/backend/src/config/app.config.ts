@@ -1,4 +1,5 @@
 import { registerAs } from '@nestjs/config';
+import { parseTrustProxy, TrustProxySetting } from './trust-proxy';
 
 export interface AppConfig {
   nodeEnv: string;
@@ -9,6 +10,8 @@ export interface AppConfig {
   corsOrigins: string[];
   logLevel: string;
   homeTeamName: string;
+  /** Express `trust proxy`, from TRUST_PROXY (see trust-proxy.ts). Default false: not behind a proxy. */
+  trustProxy: TrustProxySetting;
 }
 
 export default registerAs(
@@ -25,5 +28,6 @@ export default registerAs(
       .filter(Boolean),
     logLevel: process.env.LOG_LEVEL ?? 'info',
     homeTeamName: process.env.HOME_TEAM_NAME ?? 'Kecskeméti TE',
+    trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   }),
 );

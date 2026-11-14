@@ -51,12 +51,41 @@ export class OverviewMetricsDto {
   playedTickets!: number;
 }
 
+export class SeasonPassTierRevenueDto {
+  @ApiProperty({ enum: ['vip', 'lower', 'upper', 'unknown'], description: "Price tier of the pass's seat; 'unknown' for a pass without a seat." })
+  tier!: 'vip' | 'lower' | 'upper' | 'unknown';
+  @ApiProperty({ example: 'Felső ív' }) label!: string;
+  @ApiProperty() passCount!: number;
+  @ApiProperty({ description: 'HUF actually charged (sum of season_passes.price_paid).' })
+  revenue!: number;
+}
+
+/**
+ * Season-pass revenue, kept APART from match ticket revenue. A pass is one payment
+ * for a whole season; it is not split over matches and no per-match share is
+ * invented, so none of it appears in `metrics.revenue` or in any match row.
+ */
+export class OverviewSeasonPassesDto {
+  @ApiProperty({
+    enum: ['season', 'purchased_in_period'],
+    description:
+      "'season': every pass of the active season (period=season). 'purchased_in_period': passes bought in the last 30/90 days. Note the basis differs from match revenue, which is by kickoff date.",
+  })
+  basis!: 'season' | 'purchased_in_period';
+  @ApiProperty({ description: 'HUF actually charged for the passes counted (active or expired; pending and cancelled excluded).' })
+  revenue!: number;
+  @ApiProperty() passCount!: number;
+  @ApiProperty({ type: [SeasonPassTierRevenueDto] }) byTier!: SeasonPassTierRevenueDto[];
+}
+
 export class OverviewDto {
   @ApiPropertyOptional({ type: OverviewSeasonDto, nullable: true })
   season!: OverviewSeasonDto | null;
   @ApiProperty({ enum: OVERVIEW_PERIODS }) period!: OverviewPeriod;
   @ApiProperty({ format: 'date-time' }) generatedAt!: string;
   @ApiProperty({ type: OverviewMetricsDto }) metrics!: OverviewMetricsDto;
+  @ApiProperty({ type: OverviewSeasonPassesDto, description: 'Season-pass revenue, separate from `metrics.revenue` (match tickets).' })
+  seasonPasses!: OverviewSeasonPassesDto;
   @ApiProperty({ type: [OverviewMatchDto] }) matches!: OverviewMatchDto[];
 }
 

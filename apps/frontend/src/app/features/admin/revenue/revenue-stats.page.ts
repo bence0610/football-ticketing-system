@@ -16,6 +16,7 @@ import {
   matchesCsv,
   occupancyTone,
   periodOptions,
+  seasonPassBasisText,
 } from '../logic/admin-logic';
 
 type State =
@@ -155,6 +156,61 @@ const percentText = (value: number | null): string => (value === null ? '—' : 
                 </div>
               }
             </section>
+
+            <section class="passes" aria-labelledby="passes-title" data-testid="season-passes">
+              <header class="passes__head">
+                <h2 id="passes-title" class="passes__title">Bérletbevétel</h2>
+                <p class="passes__basis" data-testid="passes-basis">{{ basisText(d.seasonPasses.basis) }}</p>
+                <p class="passes__note" data-testid="passes-note">
+                  Egy bérlet egyetlen fizetés az egész szezonra, ezért nem osztjuk szét meccsekre.
+                </p>
+              </header>
+
+              @if (d.seasonPasses.passCount === 0) {
+                <div class="card">
+                  <p class="card__fine card__fine--flush" data-testid="passes-empty">
+                    Ebben az időszakban nem adtak el bérletet.
+                  </p>
+                </div>
+              } @else {
+                <div class="passes__cards">
+                  <article class="card" data-testid="passes-revenue">
+                    <p class="metric__label">Bérletbevétel</p>
+                    <p class="metric__value">{{ d.seasonPasses.revenue | hufCurrency }}</p>
+                    <p class="metric__context">a ténylegesen terhelt összeg</p>
+                  </article>
+                  <article class="card" data-testid="passes-count">
+                    <p class="metric__label">Eladott bérlet</p>
+                    <p class="metric__value">{{ d.seasonPasses.passCount }}</p>
+                    <p class="metric__context">{{ d.seasonPasses.byTier.length }} kategóriában</p>
+                  </article>
+                </div>
+
+                <div class="card">
+                  <h3 class="card__title">Kategóriánként</h3>
+                  <div class="table-wrap">
+                    <table class="table" data-testid="passes-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Kategória</th>
+                          <th scope="col" class="num">Bérletek</th>
+                          <th scope="col" class="num">Bevétel</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (t of d.seasonPasses.byTier; track t.tier) {
+                          <tr data-testid="pass-tier-row">
+                            <th scope="row">{{ t.label }}</th>
+                            <td class="num">{{ t.passCount }}</td>
+                            <td class="num">{{ t.revenue | hufCurrency }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              }
+            </section>
           }
         }
       }
@@ -283,6 +339,45 @@ const percentText = (value: number | null): string => (value === null ? '—' : 
         color: var(--muted);
       }
 
+      .card__fine--flush {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      .passes {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: 12px;
+        padding-top: 24px;
+        border-top: 2px solid var(--border);
+      }
+
+      .passes__title {
+        margin: 0;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 20px;
+      }
+
+      .passes__basis {
+        margin: 6px 0 0;
+        font-size: 14px;
+        color: var(--ink);
+      }
+
+      .passes__note {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .passes__cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
       .table-wrap {
         overflow-x: auto;
       }
@@ -376,7 +471,8 @@ const percentText = (value: number | null): string => (value === null ? '—' : 
       }
 
       @media (max-width: 479px) {
-        .cards {
+        .cards,
+        .passes__cards {
           grid-template-columns: minmax(0, 1fr);
         }
       }
@@ -447,6 +543,7 @@ export class RevenueStatsPageComponent {
 
   protected readonly fixture = fixtureLabel;
   protected readonly tone = occupancyTone;
+  protected readonly basisText = seasonPassBasisText;
 
   constructor() {
     toObservable(this.period)

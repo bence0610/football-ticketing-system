@@ -16,6 +16,7 @@ import {
 import { compareSeats } from '../seats/seat-order';
 import { compareSectors } from '../seats/sector-catalogue.service';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
+import { passRevenueByTier, sumTiers } from './season-pass-revenue';
 import {
   OverviewDto,
   OverviewMatchDto,
@@ -173,10 +174,27 @@ export class AdminOverviewService {
       if (r.status === TicketStatus.USED) scannedTickets += Number(r.n);
     }
 
+    // Season-pass money, apart from match revenue: one payment per season, never split over matches.
+    const passTiers =
+      period === 'season'
+        ? season
+          ? await passRevenueByTier(this.passRepository, { seasonLabel: season.label })
+          : []
+        : await passRevenueByTier(this.passRepository, {
+            createdSince: new Date(now.getTime() - (period === '90d' ? 90 : 30) * DAY_MS),
+          });
+    const passTotals = sumTiers(passTiers);
+
     return {
       season: seasonDto(season),
       period,
       generatedAt: now.toISOString(),
+      seasonPasses: {
+        basis: period === 'season' ? 'season' : 'purchased_in_period',
+        revenue: passTotals.revenue,
+        passCount: passTotals.passCount,
+        byTier: passTiers,
+      },
       metrics: {
         revenue: rows.reduce((a, r) => a + r.revenue, 0),
         ticketsSold: rows.reduce((a, r) => a + r.ticketCount, 0),

@@ -1,5 +1,6 @@
 import * as Joi from 'joi';
 import { DEFAULT_ANTHROPIC_MODEL } from './anthropic.config';
+import { parseTrustProxy } from './trust-proxy';
 
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
@@ -11,6 +12,19 @@ export const envValidationSchema = Joi.object({
   FRONTEND_URL: Joi.string().uri().required(),
   CORS_ORIGINS: Joi.string().required(),
   HOME_TEAM_NAME: Joi.string().default('Kecskeméti TE'),
+  // Express `trust proxy`: unset/false (no proxy), a hop count, or a list of proxy addresses. Not `true`.
+  TRUST_PROXY: Joi.string()
+    .allow('')
+    .default('false')
+    .custom((value: string, helpers) => {
+      try {
+        parseTrustProxy(value);
+        return value;
+      } catch (error) {
+        return helpers.error('any.invalid', { message: (error as Error).message });
+      }
+    })
+    .messages({ 'any.invalid': '{{#message}}' }),
 
   // Database
   DB_HOST: Joi.string().required(),

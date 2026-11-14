@@ -1,6 +1,7 @@
 import {
   OverviewMatch,
   OverviewPeriod,
+  SeasonPassRevenueBasis,
   SeatSale,
   SeatSaleSector,
 } from '../../../shared/models/admin.model';
@@ -39,6 +40,13 @@ export function headerSubtitle(seasonLabel: string | null, generatedAt: string |
   if (Number.isNaN(when.getTime())) return season;
   const time = when.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
   return `${season} · frissítve ${time}`;
+}
+
+/** What the season-pass figure counts; the period basis differs from match revenue. */
+export function seasonPassBasisText(basis: SeasonPassRevenueBasis): string {
+  return basis === 'season'
+    ? 'Az aktív szezon összes bérlete'
+    : 'Az időszakban megvásárolt bérletek (a meccsbevétel a mérkőzés időpontja szerint számít, ezért a két összeg alapja eltérő)';
 }
 
 export function fixtureLabel(match: Pick<OverviewMatch, 'homeTeam' | 'awayTeam'>): string {

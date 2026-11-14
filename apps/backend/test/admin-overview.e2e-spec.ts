@@ -10,6 +10,9 @@ import {
   Match,
   MatchStatus,
   Seat,
+  SeasonPass,
+  SeasonPassPrice,
+  SeasonPassStatus,
   SeatCategory,
   Ticket,
   TicketSource,
@@ -209,5 +212,134 @@ describe('Admin overview (E2E)', () => {
         .send({});
       expect(res.status).toBe(404);
     }
+  });
+
+  describe('season-pass revenue', () => {
+    /** Passes in three tiers' real sectors: 2 counted (22 000 upper, 45 000 vip), 2 not (pending, cancelled). */
+    async function seedPasses(buyerId: string): Promise<void> {
+      const seatRepo = ctx.dataSource.getRepository(Seat);
+      const passRepo = ctx.dataSource.getRepository(SeasonPass);
+      const priceRepo = ctx.dataSource.getRepository(SeasonPassPrice);
+      await priceRepo.save(
+        priceRepo.create({
+          section: 'upper',
+          sectionLabel: 'Felső ív',
+          seasonLabel: '2026/2027',
+          price: 22000,
+          currency: 'HUF',
+          validFrom: new Date('2026-07-01'),
+          validUntil: new Date('2027-06-30'),
+          isActive: true,
+        }),
+      );
+      const seat = (section: string, n: number): Promise<Seat> =>
+        seatRepo.save(
+          seatRepo.create({
+            section,
+            row: 'P',
+            number: n,
+            category: SeatCategory.STANDARD,
+            priceModifier: '1.00',
+            isAccessible: false,
+            isActive: true,
+          }),
+        );
+      const pass = (s: Seat, status: SeasonPassStatus, paid: string): SeasonPass =>
+        passRepo.create({
+          userId: buyerId,
+          holderName: 'Bérletes Teszt',
+          seatId: s.id,
+          seasonLabel: '2026/2027',
+          validFrom: new Date('2026-07-01'),
+          validUntil: new Date('2027-06-30'),
+          status,
+          pricePaid: paid,
+          currency: 'HUF',
+          qrCode: `KTE-SP-${randomUUID()}`,
+        });
+      await passRepo.save([
+        pass(await seat('D/1', 1), SeasonPassStatus.ACTIVE, '22000.00'),
+        pass(await seat('VIP', 1), SeasonPassStatus.ACTIVE, '45000.00'),
+        pass(await seat('D/1', 2), SeasonPassStatus.PENDING_PAYMENT, '22000.00'),
+        pass(await seat('D/1', 3), SeasonPassStatus.CANCELLED, '22000.00'),
+      ]);
+    }
+
+    it('reports pass money in its own block and leaves match revenue exactly as it was', async () => {
+      const admin = await createUser(UserRole.ADMIN);
+      const fan = await createUser(UserRole.FAN);
+      const { m1, m2 } = await seed(fan.id);
+      await seedPasses(fan.id);
+
+      const res = await request(server)
+        .get('/api/admin/overview?period=season')
+        .set('Authorization', `Bearer ${admin.token}`);
+      expect(res.status).toBe(200);
+
+      // match tickets: unchanged, no pass money, no per-match share
+      expect(res.body.metrics.revenue).toBe(2833 + 4667 + 5000);
+      const matches = res.body.matches as Array<{ matchId: string; revenue: number }>;
+      expect(matches.find((m) => m.matchId === m1.id)!.revenue).toBe(7500);
+      expect(matches.find((m) => m.matchId === m2.id)!.revenue).toBe(5000);
+
+      expect(res.body.seasonPasses).toMatchObject({ basis: 'season', revenue: 67000, passCount: 2 });
+      const tiers = res.body.seasonPasses.byTier as Array<{ tier: string; passCount: number; revenue: number }>;
+      expect(tiers.map((t) => [t.tier, t.passCount, t.revenue])).toEqual([
+        ['vip', 1, 45000],
+        ['upper', 1, 22000],
+      ]);
+    });
+
+    it('counts passes bought in the window for the 30 day period, and says so', async () => {
+      const admin = await createUser(UserRole.ADMIN);
+      const fan = await createUser(UserRole.FAN);
+      await seed(fan.id);
+      await seedPasses(fan.id);
+
+      const res = await request(server)
+        .get('/api/admin/overview?period=30d')
+        .set('Authorization', `Bearer ${admin.token}`);
+      expect(res.body.seasonPasses).toMatchObject({ basis: 'purchased_in_period', revenue: 67000, passCount: 2 });
+    });
+
+    it('is zero, not an error, when no pass was sold', async () => {
+      const admin = await createUser(UserRole.ADMIN);
+      const res = await request(server)
+        .get('/api/admin/overview?period=season')
+        .set('Authorization', `Bearer ${admin.token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.seasonPasses).toMatchObject({ revenue: 0, passCount: 0, byTier: [] });
+    });
+
+    it('/admin/revenue keeps ticket revenue and pass revenue apart', async () => {
+      const admin = await createUser(UserRole.ADMIN);
+      const fan = await createUser(UserRole.FAN);
+      await seed(fan.id);
+      await seedPasses(fan.id);
+
+      const res = await request(server)
+        .get('/api/admin/revenue')
+        .set('Authorization', `Bearer ${admin.token}`);
+      expect(res.status).toBe(200);
+
+      // tickets only: 2833 + 4667 + 5000 were created today, the passes are not in here
+      expect(res.body.summary.todayRevenue).toBe(12500);
+      expect(res.body.summary.todayTicketCount).toBe(3);
+      const byMatchTotal = (res.body.byMatch as Array<{ revenue: number }>).reduce((a, m) => a + m.revenue, 0);
+      expect(byMatchTotal).toBe(12500);
+      const dailyTotal = (res.body.daily as Array<{ amount: number }>).reduce((a, d) => a + d.amount, 0);
+      expect(dailyTotal).toBe(12500);
+
+      expect(res.body.seasonPasses).toMatchObject({
+        todayRevenue: 67000,
+        monthRevenue: 67000,
+        todayPassCount: 2,
+        monthPassCount: 2,
+      });
+      const passDaily = (res.body.seasonPasses.daily as Array<{ amount: number; passCount: number }>);
+      expect(passDaily.reduce((a, d) => a + d.amount, 0)).toBe(67000);
+      expect(passDaily.reduce((a, d) => a + d.passCount, 0)).toBe(2);
+      expect((res.body.seasonPasses.byTier as Array<{ tier: string }>).map((t) => t.tier)).toEqual(['vip', 'upper']);
+    });
   });
 });
