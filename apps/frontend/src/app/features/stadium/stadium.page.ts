@@ -3,17 +3,16 @@ import {
   Component,
   DestroyRef,
   OnInit,
+  ViewChild,
+  computed,
   inject,
   signal,
 } from '@angular/core';
 import { AsyncPipe, NgIf } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { Store } from '@ngrx/store';
 import { combineLatest, distinctUntilChanged, filter, map } from 'rxjs';
-import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
-import { MatBottomSheet, MatBottomSheetModule, MatBottomSheetRef } from '@angular/material/bottom-sheet';
-import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
@@ -26,31 +25,24 @@ import {
 import {
   SeatsActions,
   selectAccessibleOnly,
-  selectActiveLock,
-  selectLockExpiresAtMs,
-  selectLocking,
   selectSeats,
   selectSeatsError,
   selectSeatsForSelectedSector,
   selectSeatsLoading,
   selectSectorSummary,
-  selectSelectedSeat,
   selectSelectedSection,
 } from '../../state/seats';
-import { LockSeatResponse, SeatStatus, SectorSummary } from '../../shared/models/seat.model';
+import { SeatStatus, SectorSummary } from '../../shared/models/seat.model';
 import { CartFacade } from '../../core/cart/cart.facade';
 import { MatchListItem } from '../../shared/models/match.model';
 import { MatchSelectorComponent } from './components/match-selector/match-selector.component';
 import { StadiumMapComponent } from './components/stadium-map/stadium-map.component';
 import { SeatGridComponent } from './components/seat-grid/seat-grid.component';
-import { SeatDetailPanelComponent } from './components/seat-detail-panel/seat-detail-panel.component';
 import { SectorSummaryComponent } from './components/sector-summary/sector-summary.component';
 import { AccessibilityToggleComponent } from './components/accessibility-toggle/accessibility-toggle.component';
 import { ColorLegendComponent } from './components/color-legend/color-legend.component';
-import {
-  SeatDetailBottomSheetComponent,
-  SeatDetailBottomSheetData,
-} from './components/seat-detail-bottom-sheet/seat-detail-bottom-sheet.component';
+import { BestSeatsPanelComponent, BestSeatsPlaced } from './components/best-seats-panel/best-seats-panel.component';
+import { SeatSummaryComponent } from './components/seat-summary/seat-summary.component';
 import { WaitlistJoinButtonComponent } from './components/waitlist-join-button/waitlist-join-button.component';
 import { lockErrorMessage } from '../../shared/utils/lock-error';
 import { hasKickedOff, purchasableMatches } from '../../shared/utils/match-sale';
@@ -62,15 +54,14 @@ import { hasKickedOff, purchasableMatches } from '../../shared/utils/match-sale'
   imports: [
     AsyncPipe,
     NgIf,
-    MatSidenavModule,
-    MatBottomSheetModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
     MatIconModule,
     MatchSelectorComponent,
     StadiumMapComponent,
     SeatGridComponent,
-    SeatDetailPanelComponent,
+    BestSeatsPanelComponent,
+    SeatSummaryComponent,
     SectorSummaryComponent,
     AccessibilityToggleComponent,
     ColorLegendComponent,
@@ -124,68 +115,71 @@ import { hasKickedOff, purchasableMatches } from '../../shared/utils/match-sale'
             Ülésrend betöltése…
           </span>
 
-          <mat-sidenav-container class="kte-stadium__container" autosize>
-            <mat-sidenav
-              #sidenav
-              mode="side"
-              position="end"
-              [opened]="!isMobile() && (selectedSeat$ | async) !== null"
-              [disableClose]="true"
-              class="kte-stadium__sidenav"
-            >
-              <kte-seat-detail-panel
-                [seat]="(selectedSeat$ | async) ?? null"
-                [covered]="(selectedSeatCovered$ | async) ?? null"
-                [sectorName]="(selectedSeatSector$ | async)?.name ?? null"
-                [gate]="(selectedSeatSector$ | async)?.gate ?? null"
-                [activeLock]="(activeLock$ | async) ?? null"
-                [lockExpiresAtMs]="(lockExpiresAtMs$ | async) ?? null"
-                [locking]="(locking$ | async) ?? false"
-                (lock)="onLockSeat($event)"
-                (release)="onReleaseLock()"
-                (closed)="onClosePanel()"
-              ></kte-seat-detail-panel>
-            </mat-sidenav>
-
-            <mat-sidenav-content class="kte-stadium__content">
-              <!-- The map first: it is what people came for. -->
-              <div class="kte-stadium__map-wrapper">
-                <kte-stadium-map
-                  [sectorSummary]="(summaries$ | async) ?? []"
-                  [selectedSection]="(selectedSection$ | async) ?? null"
-                  (sectorSelected)="onSectorSelected($event)"
-                ></kte-stadium-map>
-                <div class="kte-stadium__legend">
-                  <kte-color-legend></kte-color-legend>
-                </div>
-              </div>
-
-              <!-- The fallback below it: the same choice as a list, for keyboard and screen readers. -->
-              <kte-sector-summary
-                [summaries]="(summaries$ | async) ?? []"
+          <div class="kte-stadium__content">
+            <!-- The map first: it is what people came for. -->
+            <div class="kte-stadium__map-wrapper">
+              <kte-stadium-map
+                [sectorSummary]="(summaries$ | async) ?? []"
                 [selectedSection]="(selectedSection$ | async) ?? null"
                 (sectorSelected)="onSectorSelected($event)"
-              ></kte-sector-summary>
-
-              <div class="kte-stadium__toolbar">
-                <kte-accessibility-toggle
-                  [checked]="(accessibleOnly$ | async) ?? false"
-                  (changed)="onAccessibilityToggle()"
-                ></kte-accessibility-toggle>
+              ></kte-stadium-map>
+              <div class="kte-stadium__legend">
+                <kte-color-legend></kte-color-legend>
               </div>
+            </div>
 
-              <kte-seat-grid
-                [seats]="(seatsForSector$ | async) ?? []"
-                [section]="(selectedSection$ | async) ?? null"
-                [sectorName]="(selectedSector$ | async)?.name ?? null"
-                [arc]="(selectedSector$ | async)?.arc ?? null"
-                [gate]="(selectedSector$ | async)?.gate ?? null"
-                [covered]="(selectedSectorCovered$ | async) ?? null"
-                [selectedSeat]="(selectedSeat$ | async) ?? null"
-                (seatSelected)="onSeatSelected($event)"
-              ></kte-seat-grid>
-            </mat-sidenav-content>
-          </mat-sidenav-container>
+            <!-- The fallback below it: the same choice as a list, for keyboard and screen readers. -->
+            <kte-sector-summary
+              [summaries]="(summaries$ | async) ?? []"
+              [selectedSection]="(selectedSection$ | async) ?? null"
+              (sectorSelected)="onSectorSelected($event)"
+            ></kte-sector-summary>
+
+            <div class="kte-stadium__toolbar">
+              <kte-accessibility-toggle
+                [checked]="(accessibleOnly$ | async) ?? false"
+                (changed)="onAccessibilityToggle()"
+              ></kte-accessibility-toggle>
+            </div>
+
+            <ng-container *ngIf="selectedMatch$ | async as activeMatch">
+              <div class="kte-stadium__board">
+                <div class="kte-stadium__main">
+                  <ng-container *ngIf="selectedSector$ | async as sector">
+                    <kte-best-seats-panel
+                      *ngIf="!sector.isAway"
+                      [section]="sector.section"
+                      [sectorName]="sector.name"
+                      [longestRun]="sector.longestRun"
+                      [match]="activeMatch"
+                      (placed)="onBestSeatsPlaced($event)"
+                    ></kte-best-seats-panel>
+                  </ng-container>
+
+                  <kte-seat-grid
+                    [seats]="(seatsForSector$ | async) ?? []"
+                    [section]="(selectedSection$ | async) ?? null"
+                    [sectorName]="(selectedSector$ | async)?.name ?? null"
+                    [arc]="(selectedSector$ | async)?.arc ?? null"
+                    [gate]="(selectedSector$ | async)?.gate ?? null"
+                    [covered]="(selectedSectorCovered$ | async) ?? null"
+                    [aisles]="(selectedSector$ | async)?.aisles ?? []"
+                    [longestRun]="(selectedSector$ | async)?.longestRun ?? null"
+                    [chosenIds]="chosenIds()"
+                    [busyIds]="busyIds()"
+                    (seatToggled)="onSeatToggled($event)"
+                  ></kte-seat-grid>
+                </div>
+
+                <kte-seat-summary
+                  [items]="chosenItems()"
+                  [busy]="busyIds().size > 0"
+                  (remove)="onRemoveChosen($event)"
+                  (proceed)="onProceed()"
+                ></kte-seat-summary>
+              </div>
+            </ng-container>
+          </div>
         </ng-container>
       </ng-container>
 
@@ -246,24 +240,30 @@ import { hasKickedOff, purchasableMatches } from '../../shared/utils/match-sale'
         font-size: 13px;
       }
 
-      .kte-stadium__container {
-        background: transparent;
-        min-height: 600px;
-      }
-
-      .kte-stadium__sidenav {
-        width: 360px;
-        max-width: 90vw;
-        background: transparent;
-        border: none;
-        padding: 16px;
-      }
-
       .kte-stadium__content {
         display: flex;
         flex-direction: column;
         gap: var(--kte-spacing-6);
-        padding-right: var(--kte-spacing-4);
+        min-width: 0;
+      }
+
+      /* Grid on the left, summary on the right; stacked (summary glued to the bottom edge) on phones. */
+      .kte-stadium__board {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--kte-spacing-4);
+        align-items: start;
+      }
+      .kte-stadium__main {
+        display: flex;
+        flex-direction: column;
+        gap: var(--kte-spacing-4);
+        min-width: 0;
+      }
+      @media (min-width: 900px) {
+        .kte-stadium__board {
+          grid-template-columns: minmax(0, 1fr) 340px;
+        }
       }
 
       .kte-stadium__map-wrapper {
@@ -353,10 +353,6 @@ import { hasKickedOff, purchasableMatches } from '../../shared/utils/match-sale'
           align-items: stretch;
         }
 
-        .kte-stadium__sidenav {
-          display: none;
-        }
-
         .kte-stadium__legend {
           position: static;
           margin-top: 12px;
@@ -370,8 +366,6 @@ export class StadiumPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
-  private readonly bottomSheet = inject(MatBottomSheet);
-  private readonly breakpointObserver = inject(BreakpointObserver);
   private readonly destroyRef = inject(DestroyRef);
   private readonly cart = inject(CartFacade);
 
@@ -394,36 +388,36 @@ export class StadiumPageComponent implements OnInit {
   protected readonly seatsLoading$ = this.store.select(selectSeatsLoading);
   protected readonly seatsError$ = this.store.select(selectSeatsError);
   protected readonly selectedSection$ = this.store.select(selectSelectedSection);
-  protected readonly selectedSeat$ = this.store.select(selectSelectedSeat);
   protected readonly accessibleOnly$ = this.store.select(selectAccessibleOnly);
-  protected readonly activeLock$ = this.store.select(selectActiveLock);
-  protected readonly lockExpiresAtMs$ = this.store.select(selectLockExpiresAtMs);
-  protected readonly locking$ = this.store.select(selectLocking);
   protected readonly seatsForSector$ = this.store.select(selectSeatsForSelectedSector);
 
-  /** Coverage of the selected sector / seat, from the seat map's sector summary. */
+  /** Coverage of the selected sector, from the seat map's sector summary. */
   protected readonly selectedSectorCovered$ = combineLatest([this.selectedSection$, this.summaries$]).pipe(
     map(([section, sums]) => sums.find((s) => s.section === section)?.covered ?? null),
   );
-  protected readonly selectedSeatCovered$ = combineLatest([this.selectedSeat$, this.summaries$]).pipe(
-    map(([seat, sums]) => (seat ? sums.find((s) => s.section === seat.section)?.covered ?? null : null)),
-  );
 
-  /** The selected sector / the sector of the selected seat, from the seat map's sector summary. */
+  /** The selected sector, from the seat map's sector summary. */
   protected readonly selectedSector$ = combineLatest([this.selectedSection$, this.summaries$]).pipe(
     map(([section, sums]) => sums.find((s) => s.section === section) ?? null),
   );
-  protected readonly selectedSeatSector$ = combineLatest([this.selectedSeat$, this.summaries$]).pipe(
-    map(([seat, sums]) => (seat ? sums.find((s) => s.section === seat.section) ?? null : null)),
-  );
 
-  protected readonly isMobile = signal<boolean>(false);
+  private readonly matchIdSignal = toSignal(this.matchId$, { initialValue: null });
+
+  /** The visitor's picks for the match on screen: the cart, since picking a seat locks it. */
+  protected readonly chosenItems = computed(() =>
+    this.cart.items().filter((item) => item.matchId === this.matchIdSignal()),
+  );
+  protected readonly chosenIds = computed<ReadonlySet<string>>(
+    () => new Set(this.chosenItems().map((item) => item.seatId)),
+  );
+  /** Seats whose lock or release is in flight. */
+  protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
+
+  @ViewChild(SeatGridComponent) private grid?: SeatGridComponent;
 
   private latestSummaries: readonly SectorSummary[] = [];
   private currentMatchId: string | null = null;
   private currentMatch: MatchListItem | null = null;
-  private currentLock: LockSeatResponse | null = null;
-  private mobileSheetRef: MatBottomSheetRef<SeatDetailBottomSheetComponent> | null = null;
   private lastSnackbarError: string | null = null;
 
   ngOnInit(): void {
@@ -449,44 +443,13 @@ export class StadiumPageComponent implements OnInit {
         this.currentMatchId = matchId;
       });
 
-    this.activeLock$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((lock) => {
-        this.currentLock = lock;
-      });
-
     this.selectedMatch$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((match) => {
         this.currentMatch = match ?? null;
       });
 
-    // Mobile / desktop detection — drives bottom-sheet vs side-nav.
-    this.breakpointObserver
-      .observe([Breakpoints.Handset, '(max-width: 768px)'])
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((state) => {
-        this.isMobile.set(state.matches);
-      });
-
     this.summaries$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((s) => (this.latestSummaries = s));
-
-    // Mobile bottom-sheet for the selected seat.
-    combineLatest([
-      this.selectedSeat$,
-      this.activeLock$,
-      this.lockExpiresAtMs$,
-      this.locking$,
-    ])
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(([seat, activeLock, lockExpiresAtMs, locking]) => {
-        if (this.isMobile() && seat) {
-          this.openMobileSheet(seat, activeLock, lockExpiresAtMs, locking ?? false);
-        } else if (!seat && this.mobileSheetRef) {
-          this.mobileSheetRef.dismiss();
-          this.mobileSheetRef = null;
-        }
-      });
 
     // Surface lock-flow errors via snackbar.
     this.seatsError$
@@ -527,16 +490,20 @@ export class StadiumPageComponent implements OnInit {
     this.store.dispatch(SeatsActions.setSelectedSector({ section }));
   }
 
-  protected onSeatSelected(seat: SeatStatus): void {
-    this.store.dispatch(SeatsActions.setSelectedSeat({ seat }));
-  }
-
   protected onAccessibilityToggle(): void {
     this.store.dispatch(SeatsActions.toggleAccessibilityFilter());
   }
 
-  protected async onLockSeat(seat: SeatStatus): Promise<void> {
-    if (!this.currentMatchId || !this.currentMatch) {
+  /**
+   * A tap on a seat picks it (locks it and puts it in the cart) or, on one of the
+   * visitor's own seats, puts it back. The summary and the board both follow the cart.
+   */
+  protected async onSeatToggled(seat: SeatStatus): Promise<void> {
+    if (!this.currentMatchId || !this.currentMatch || this.busyIds().has(seat.id)) {
+      return;
+    }
+    if (this.cart.has(seat.id)) {
+      await this.onRemoveChosen(seat.id);
       return;
     }
     if (hasKickedOff(this.currentMatch)) {
@@ -544,17 +511,10 @@ export class StadiumPageComponent implements OnInit {
       return;
     }
     if (this.cart.isFull()) {
-      this.snackBar.open(
-        'Egy kosárba legfeljebb 6 jegy vehető fel.',
-        'Bezárás',
-        { duration: 4000 },
-      );
+      this.snackBar.open('Egy kosárba legfeljebb 6 jegy vehető fel.', 'Bezárás', { duration: 4000 });
       return;
     }
-    if (this.cart.has(seat.id)) {
-      this.snackBar.open('Ez a szék már a kosaradban van.', 'Bezárás', { duration: 3000 });
-      return;
-    }
+    this.markBusy(seat.id, true);
     try {
       const item = await this.cart.add(seat, {
         matchId: this.currentMatch.id,
@@ -563,94 +523,63 @@ export class StadiumPageComponent implements OnInit {
         kickoffAt: this.currentMatch.kickoffAt,
         sectorName: this.latestSummaries.find((s) => s.section === seat.section)?.name,
       });
-      // Reflect the new lock in the seats slice so the UI repaints the seat as locked.
+      // Repaint the seat as held in the seats slice (the board shows it as the visitor's own).
       this.store.dispatch(
         SeatsActions.lockSeatSuccess({
           lock: {
             matchId: item.matchId,
             seatId: item.seatId,
             ownerToken: item.ownerToken,
-            ttlSeconds: Math.max(
-              0,
-              Math.round((item.lockExpiresAtMs - Date.now()) / 1000),
-            ),
+            ttlSeconds: Math.max(0, Math.round((item.lockExpiresAtMs - Date.now()) / 1000)),
             expiresAt: new Date(item.lockExpiresAtMs).toISOString(),
           },
         }),
       );
-      this.snackBar.open('A szék hozzáadva a kosárhoz.', 'Kosár', {
-        duration: 4000,
-      });
     } catch (error) {
       this.snackBar.open(lockErrorMessage(error), 'Bezárás', { duration: 5000 });
+      // Someone else was quicker: reload so the seat shows as held rather than free.
+      this.store.dispatch(SeatsActions.loadSeatsForMatch({ matchId: this.currentMatchId }));
+    } finally {
+      this.markBusy(seat.id, false);
     }
   }
 
-  protected async onReleaseLock(): Promise<void> {
-    if (!this.currentLock) {
-      return;
-    }
-    const seatId = this.currentLock.seatId;
-    if (this.cart.has(seatId)) {
+  protected async onRemoveChosen(seatId: string): Promise<void> {
+    this.markBusy(seatId, true);
+    try {
       await this.cart.remove(seatId);
       this.store.dispatch(SeatsActions.unlockSeatSuccess({ seatId }));
-      return;
+    } finally {
+      this.markBusy(seatId, false);
     }
-    this.store.dispatch(
-      SeatsActions.unlockSeat({
-        matchId: this.currentLock.matchId,
-        seatId,
-        ownerToken: this.currentLock.ownerToken,
-      }),
-    );
   }
 
-  protected onClosePanel(): void {
-    this.store.dispatch(SeatsActions.setSelectedSeat({ seat: null }));
+  /** The finder has locked seats and put them in the cart: repaint them and show where they are. */
+  protected onBestSeatsPlaced(placed: BestSeatsPlaced): void {
+    for (const seat of placed.seats) {
+      this.store.dispatch(
+        SeatsActions.lockSeatSuccess({
+          lock: {
+            matchId: placed.response.matchId,
+            seatId: seat.id,
+            ownerToken: placed.response.ownerToken,
+            ttlSeconds: placed.response.ttlSeconds,
+            expiresAt: placed.response.expiresAt,
+          },
+        }),
+      );
+    }
+    this.grid?.reveal(placed.seats.map((s) => s.id));
   }
 
-  private openMobileSheet(
-    seat: SeatStatus,
-    activeLock: LockSeatResponse | null,
-    lockExpiresAtMs: number | null,
-    locking: boolean,
-  ): void {
-    // If the sheet is already open for the same seat, leave it as-is.
-    // The seat-detail-panel ticks its own countdown via timer(0,1000),
-    // so we only need to re-create on seat changes.
-    if (this.mobileSheetRef && this.mobileSheetRef.instance.seat?.id === seat.id) {
-      return;
-    }
-    if (this.mobileSheetRef) {
-      this.mobileSheetRef.dismiss();
-      this.mobileSheetRef = null;
-    }
+  protected onProceed(): void {
+    void this.router.navigate(['/cart']);
+  }
 
-    const sector = this.latestSummaries.find((s) => s.section === seat.section);
-    const covered = sector?.covered ?? null;
-    const data: SeatDetailBottomSheetData = {
-      seat,
-      covered,
-      sectorName: sector?.name ?? null,
-      gate: sector?.gate ?? null,
-      activeLock,
-      lockExpiresAtMs,
-      locking,
-    };
-    this.mobileSheetRef = this.bottomSheet.open(SeatDetailBottomSheetComponent, {
-      data,
-      panelClass: 'kte-bottom-sheet',
-    });
-
-    const instance = this.mobileSheetRef.instance;
-    instance.lock.subscribe((s: SeatStatus) => this.onLockSeat(s));
-    instance.release.subscribe(() => this.onReleaseLock());
-    instance.closed.subscribe(() => {
-      this.mobileSheetRef?.dismiss();
-      this.onClosePanel();
-    });
-    this.mobileSheetRef.afterDismissed().subscribe(() => {
-      this.mobileSheetRef = null;
-    });
+  private markBusy(seatId: string, busy: boolean): void {
+    const next = new Set(this.busyIds());
+    if (busy) next.add(seatId);
+    else next.delete(seatId);
+    this.busyIds.set(next);
   }
 }

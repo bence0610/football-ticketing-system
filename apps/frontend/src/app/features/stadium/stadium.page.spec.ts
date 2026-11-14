@@ -1,4 +1,7 @@
 import { registerLocaleData } from '@angular/common';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import localeHu from '@angular/common/locales/hu';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -53,6 +56,8 @@ const sector = (section: string, arc: 'upper' | 'lower', position: number): Sect
   occupancyRatio: 0.2,
   minPrice: 2800,
   maxPrice: 2800,
+  longestRun: 6,
+  aisles: [],
 });
 
 const MATCHES = [match('past', -DAY), match('live', -60_000), match('next', 3 * DAY), match('later', 9 * DAY)];
@@ -66,12 +71,19 @@ describe('StadiumPageComponent', () => {
       imports: [StadiumPageComponent],
       providers: [
         provideNoopAnimations(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         provideStore({ [MATCHES_FEATURE_KEY]: matchesReducer, [SEATS_FEATURE_KEY]: seatsReducer }),
         { provide: ActivatedRoute, useValue: { queryParamMap: params$ } },
         { provide: Router, useValue: { navigate: () => Promise.resolve(true) } },
         {
           provide: CartFacade,
-          useValue: { isFull: () => false, has: () => false, add: () => Promise.reject(new Error('no')) },
+          useValue: {
+            items: signal([]),
+            isFull: () => false,
+            has: () => false,
+            add: () => Promise.reject(new Error('no')),
+          },
         },
       ],
     });
@@ -110,6 +122,36 @@ describe('StadiumPageComponent', () => {
     const { el } = render('next');
     expect(el.querySelectorAll('kte-sector-summary select').length).toBe(1);
     expect(el.querySelector('kte-sector-summary mat-card')).toBeNull();
+  });
+
+  it('puts the sticky summary beside the grid, and the finder above the grid once a sector is open', () => {
+    const { el, fixture } = render('next');
+    const board = el.querySelector('.kte-stadium__board')!;
+    expect(board.querySelector('kte-seat-grid')).not.toBeNull();
+    expect(board.querySelector('kte-seat-summary')).not.toBeNull();
+    expect(el.querySelector('kte-best-seats-panel')).toBeNull(); // no sector yet
+
+    TestBed.inject(Store).dispatch(SeatsActions.setSelectedSector({ section: 'K' }));
+    fixture.detectChanges();
+    const kids = Array.from(el.querySelectorAll('.kte-stadium__main > *')).map((n) => n.tagName.toLowerCase());
+    expect(kids).toEqual(['kte-best-seats-panel', 'kte-seat-grid']);
+    expect((el.querySelector('[data-testid="finder-longest-run"]')?.textContent ?? '')).toContain('6 hely');
+  });
+
+  it('offers no finder in the away section', () => {
+    const { el, fixture } = render('next');
+    TestBed.inject(Store).dispatch(
+      SeatsActions.loadSeatsSuccess({
+        response: {
+          matchId: 'next',
+          seats: [],
+          sectorSummary: [{ ...sector('VENDÉG', 'lower', 1), isAway: true, longestRun: 0 }],
+        },
+      }),
+    );
+    TestBed.inject(Store).dispatch(SeatsActions.setSelectedSector({ section: 'VENDÉG' }));
+    fixture.detectChanges();
+    expect(el.querySelector('kte-best-seats-panel')).toBeNull();
   });
 
   it('opens the seat map of a match that has not started', () => {

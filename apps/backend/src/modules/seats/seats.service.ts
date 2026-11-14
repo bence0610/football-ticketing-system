@@ -6,6 +6,7 @@ import { In, Repository } from 'typeorm';
 import { Match, Seat, SeasonPass, SeasonPassStatus, Sector, Ticket } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
+import { aislesAfter, GridSeat, halfwayWithin, longestRun, sectorWidth } from './best-seats';
 import { compareSeats } from './seat-order';
 import { seatUnitPrice } from './seat-pricing';
 import { compareSectors } from './sector-catalogue.service';
@@ -109,6 +110,71 @@ export class SeatsService {
       seats: seatStatuses,
       sectorSummary,
     };
+  }
+
+  /**
+   * One sector as the best-seats finder needs it: every seat with its current
+   * availability (the same rules as the seat map, so the away section, season-pass
+   * seats, holds and sales are all excluded the same way), the sector's row width,
+   * and where the pitch's halfway line falls along its rows.
+   *
+   * Returns null if no sector has that code.
+   */
+  async loadSectorForFinder(
+    matchId: string,
+    sectionCode: string,
+  ): Promise<{
+    sector: Sector;
+    seats: Array<SeatStatusDto & { free: boolean }>;
+    width: number;
+    ideal: number;
+  } | null> {
+    const sectors = await this.loadSectors();
+    const sector = sectors.get(sectionCode);
+    if (!sector) {
+      return null;
+    }
+    const match = await this.matchRepository.findOne({ where: { id: matchId } });
+    if (!match) {
+      throw new NotFoundException(`Match ${matchId} not found`);
+    }
+
+    const rows = await this.seatRepository.find({
+      where: { section: sectionCode },
+      select: ['id', 'section', 'row', 'number', 'category', 'priceModifier', 'isAccessible', 'isActive'],
+    });
+    const tickets = await this.ticketRepository.find({
+      where: { matchId, seatId: In(rows.map((r) => r.id)), status: In([...OCCUPYING_TICKET_STATUSES]) },
+      select: ['seatId'],
+    });
+    const soldSeatIds = new Set(tickets.map((t) => t.seatId));
+    const lockedSeatIds = await this.fetchLockedSeatIds(matchId, rows.map((r) => r.id));
+    const seasonPassSeatIds = await this.fetchSeasonPassSeatIds();
+    const awaySections = this.awaySectionsOf(sectors);
+    const basePrice = Number(match.basePrice);
+
+    const seats = rows.map((seat) => {
+      const dto = this.toSeatStatus(seat, basePrice, soldSeatIds, lockedSeatIds, seasonPassSeatIds, awaySections);
+      return { ...dto, free: dto.status === SeatAvailability.AVAILABLE };
+    });
+
+    // Where the halfway line falls: the sectors of this arc, in order, each as wide as its rows.
+    const widthRows = await this.seatRepository
+      .createQueryBuilder('s')
+      .select('s.section', 'section')
+      .addSelect('MAX(s.number)', 'width')
+      .groupBy('s.section')
+      .getRawMany<{ section: string; width: string }>();
+    const widthOf = new Map(widthRows.map((r) => [r.section, Number(r.width)]));
+    const arc = [...sectors.values()]
+      .filter((s) => s.arc === sector.arc)
+      .sort((a, b) => a.position - b.position);
+    const ideal = halfwayWithin(
+      arc.map((s) => widthOf.get(s.code) ?? 0),
+      arc.findIndex((s) => s.code === sectionCode),
+    );
+
+    return { sector, seats, width: widthOf.get(sectionCode) ?? sectorWidth(seats), ideal };
   }
 
   /**
@@ -297,6 +363,7 @@ export class SeatsService {
     sectors: ReadonlyMap<string, Sector> = new Map(),
   ): SectorSummaryDto[] {
     const map = new Map<string, SectorSummaryDto>();
+    const gridBySection = new Map<string, GridSeat[]>();
 
     for (const seat of seats) {
       let summary = map.get(seat.section);
@@ -319,9 +386,22 @@ export class SeatsService {
           occupancyRatio: 0,
           minPrice: seat.price,
           maxPrice: seat.price,
+          longestRun: 0,
+          aisles: [],
         };
         map.set(seat.section, summary);
       }
+      let grid = gridBySection.get(seat.section);
+      if (!grid) {
+        grid = [];
+        gridBySection.set(seat.section, grid);
+      }
+      grid.push({
+        id: seat.id,
+        row: seat.row,
+        number: seat.number,
+        free: seat.status === SeatAvailability.AVAILABLE,
+      });
       summary.total += 1;
       summary.minPrice = Math.min(summary.minPrice, seat.price);
       summary.maxPrice = Math.max(summary.maxPrice, seat.price);
@@ -341,6 +421,16 @@ export class SeatsService {
     }
 
     return Array.from(map.values())
+      .map((summary) => {
+        const grid = gridBySection.get(summary.section) ?? [];
+        const width = sectorWidth(grid);
+        return {
+          ...summary,
+          // The away section is never offered, so it has no run to show.
+          longestRun: summary.isAway ? 0 : longestRun(grid, width),
+          aisles: aislesAfter(width),
+        };
+      })
       .map((summary) => ({
         ...summary,
         occupancyRatio:

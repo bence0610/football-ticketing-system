@@ -111,6 +111,45 @@ export class CartFacade {
   }
 
   /**
+   * Puts seats the server has ALREADY locked for this visitor (the best-seats finder
+   * locks them itself) into the cart, without another lock call. All of them share
+   * the one owner token the server issued. Fails, adding nothing, if they would not
+   * all fit.
+   */
+  addLocked(
+    seats: readonly SeatStatus[],
+    lock: { ownerToken: string; ttlSeconds: number },
+    match: MatchContext,
+  ): readonly CartItem[] {
+    const fresh = seats.filter((s) => !this.has(s.id));
+    if (this.items().length + fresh.length > MAX_CART_ITEMS) {
+      throw new Error(`Egy kosárba legfeljebb ${MAX_CART_ITEMS} jegy vehető fel.`);
+    }
+    const lockExpiresAtMs = lockExpiryFromTtl(lock.ttlSeconds);
+    const added = fresh.map<CartItem>((seat) => ({
+      seatId: seat.id,
+      matchId: match.matchId,
+      homeTeam: match.homeTeam,
+      awayTeam: match.awayTeam,
+      kickoffAt: match.kickoffAt,
+      section: seat.section,
+      sectorName: match.sectorName,
+      row: seat.row,
+      seatNumber: seat.number,
+      category: seat.category,
+      price: seat.price,
+      ownerToken: lock.ownerToken,
+      lockExpiresAtMs,
+      lockTtlSeconds: lock.ttlSeconds,
+      addedAtMs: Date.now(),
+    }));
+    for (const item of added) {
+      this.store.dispatch(CartActions.addItem({ item }));
+    }
+    return added;
+  }
+
+  /**
    * Tries to lock an expired seat again. Goes through the same `add()` (and so
    * the same lock call and errors) as picking the seat on the map. On failure the
    * expired entry stays, so the user can still discard it.

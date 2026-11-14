@@ -30,6 +30,8 @@ const sector = (
   occupancyRatio: 0,
   minPrice: 3500,
   maxPrice: 3500,
+  longestRun: 6,
+  aisles: [],
   ...over,
 });
 

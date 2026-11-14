@@ -47,6 +47,63 @@ else
 end
 `;
 
+/**
+ * Lua script behind {@link SeatLockService.acquireFirstFreeGroup}.
+ *
+ * Redis runs a script start to finish without serving any other command, so
+ * "is this whole group free?" and "take it" cannot be interleaved with another
+ * client's. That is the whole race-safety argument of the best-seats finder.
+ *
+ *   KEYS[1]      the user's lock-owner hash (always passed; used only if ARGV[3] = '1')
+ *   KEYS[2..]    the seat lock keys of every candidate group, group after group
+ *   ARGV[1]      owner token (the value written to every key)
+ *   ARGV[2]      TTL in seconds
+ *   ARGV[3]      '1' to record the seats in the owner hash
+ *   ARGV[4]      number of candidate groups n
+ *   ARGV[5..4+n] size of each group
+ *   ARGV[5+n..]  the seat ids, in the same order as KEYS[2..]
+ *
+ * Takes the FIRST group (the caller lists them best first) in which no seat is
+ * locked, locks all of its seats, and returns its 1-based index; 0 if none was free.
+ */
+const ACQUIRE_FIRST_FREE_GROUP_LUA = `
+local n = tonumber(ARGV[4])
+local keyAt = 2
+local idAt = 5 + n
+for c = 1, n do
+  local size = tonumber(ARGV[4 + c])
+  local free = true
+  for j = 0, size - 1 do
+    if redis.call('EXISTS', KEYS[keyAt + j]) == 1 then
+      free = false
+      break
+    end
+  end
+  if free then
+    for j = 0, size - 1 do
+      redis.call('SET', KEYS[keyAt + j], ARGV[1], 'EX', ARGV[2])
+      if ARGV[3] == '1' then
+        redis.call('HSET', KEYS[1], ARGV[idAt + j], ARGV[1])
+      end
+    end
+    if ARGV[3] == '1' then
+      redis.call('EXPIRE', KEYS[1], ARGV[2])
+    end
+    return c
+  end
+  keyAt = keyAt + size
+  idAt = idAt + size
+end
+return 0
+`;
+
+export interface GroupLock {
+  /** 0-based index into the candidate list that was locked. */
+  index: number;
+  ownerToken: string;
+  ttlSeconds: number;
+}
+
 @Injectable()
 export class SeatLockService {
   private readonly logger = new Logger(SeatLockService.name);
@@ -93,6 +150,48 @@ export class SeatLockService {
 
     this.logger.debug(`Acquired seat lock ${key} (ttl=${ttlSeconds}s)`);
     return { matchId, seatId, ownerToken, ttlSeconds, userId };
+  }
+
+  /**
+   * Atomically locks the first candidate group whose seats are all free, in ONE
+   * Redis round trip (a Lua script, so no other client can lock a seat of the
+   * group between the check and the lock). Candidates are seat-id lists, best
+   * first; every seat of the chosen group gets the same owner token.
+   *
+   * Returns which candidate was locked, or `null` if every one had a seat taken.
+   */
+  async acquireFirstFreeGroup(
+    matchId: string,
+    candidates: ReadonlyArray<readonly string[]>,
+    options: { userId?: string; ttlSeconds?: number } = {},
+  ): Promise<GroupLock | null> {
+    if (candidates.length === 0) {
+      return null;
+    }
+    const ttlSeconds = options.ttlSeconds ?? this.defaultTtlSeconds;
+    const ownerToken = randomUUID();
+    const userId = options.userId;
+    const ownerKey = RedisKeys.seatLockOwner(matchId, userId ?? 'anonymous');
+    const keys = candidates.flatMap((group) => group.map((id) => RedisKeys.seatLock(matchId, id)));
+    const ids = candidates.flatMap((group) => [...group]);
+
+    const result = (await this.redis.eval(
+      ACQUIRE_FIRST_FREE_GROUP_LUA,
+      1 + keys.length,
+      ownerKey,
+      ...keys,
+      ownerToken,
+      String(ttlSeconds),
+      userId ? '1' : '0',
+      String(candidates.length),
+      ...candidates.map((group) => String(group.length)),
+      ...ids,
+    )) as number;
+
+    if (result === 0) {
+      return null;
+    }
+    return { index: result - 1, ownerToken, ttlSeconds };
   }
 
   /**

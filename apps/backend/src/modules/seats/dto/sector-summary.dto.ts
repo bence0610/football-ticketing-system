@@ -79,4 +79,19 @@ export class SectorSummaryDto {
     description: 'Foglaltsági arány 0..1 között ((locked + sold) / total).',
   })
   occupancyRatio!: number;
+
+  @ApiProperty({
+    example: 6,
+    description:
+      'A leghosszabb egymás melletti szabad székek száma egy sorban (átjáró nem szakítja meg: a két oldalán lévő székek nem szomszédosak). 0: nincs szabad szék; a vendégszektornál mindig 0.',
+  })
+  longestRun!: number;
+
+  @ApiProperty({
+    type: [Number],
+    example: [14],
+    description:
+      'Azok a székszámok, amelyek után átjáró van a sorban. Az ülésrács ezekből rajzolja a réseket, a legjobb-helyek kereső ezeket tartja tiszteletben.',
+  })
+  aisles!: number[];
 }

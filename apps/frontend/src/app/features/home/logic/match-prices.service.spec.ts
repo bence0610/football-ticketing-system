@@ -20,6 +20,8 @@ const sector = (section: string, minPrice: number, over: Partial<SectorSummary> 
   occupancyRatio: 0.5,
   minPrice,
   maxPrice: minPrice,
+  longestRun: 6,
+  aisles: [],
   ...over,
 });
 

@@ -50,6 +50,10 @@ export interface SectorSummary {
   /** Lowest / highest seat price in the sector (HUF). Sent by the API. */
   readonly minPrice: number;
   readonly maxPrice: number;
+  /** Longest stretch of side-by-side free seats in one row, an aisle breaking it; 0 = none, always 0 for the away section. */
+  readonly longestRun: number;
+  /** Seat numbers after which an aisle sits in the rows of this sector. */
+  readonly aisles: readonly number[];
 }
 
 export interface MatchSeatsResponse {
@@ -79,3 +83,39 @@ export const PRICE_CATEGORY_LABEL: Readonly<Record<PriceCategory, string>> = {
   lower: 'Alsó ív',
   upper: 'Felső ív',
 };
+
+/** One request to the best-seats finder. */
+export interface BestSeatsRequest {
+  readonly section: string;
+  readonly count: number;
+  /** Accept two shorter runs when no single run is long enough. */
+  readonly allowSplit?: boolean;
+}
+
+export interface BestSeatsRun {
+  readonly row: string;
+  readonly seats: readonly SeatStatus[];
+}
+
+/** The seats are locked by the time this arrives; every one carries the same owner token. */
+export interface BestSeatsResponse {
+  readonly matchId: string;
+  readonly section: string;
+  readonly kind: 'together' | 'split';
+  readonly runs: readonly BestSeatsRun[];
+  readonly ownerToken: string;
+  readonly ttlSeconds: number;
+  readonly expiresAt: string;
+}
+
+/** Body of the finder's 409: what is not possible, and what the server can deliver instead. */
+export interface BestSeatsRefusal {
+  readonly code: 'no_adjacent_run' | 'not_enough_seats' | 'contended' | 'match_started';
+  readonly message: string;
+  readonly requested?: number;
+  readonly longestRun?: number;
+  readonly freeSeats?: number;
+  readonly alternative?: {
+    readonly runs: ReadonlyArray<{ row: string; firstNumber: number; lastNumber: number; length: number }>;
+  } | null;
+}

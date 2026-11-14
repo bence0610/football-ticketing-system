@@ -1,4 +1,5 @@
 import {
+  Body,
   ConflictException,
   ForbiddenException,
   Controller,
@@ -27,7 +28,14 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import { SeatsService } from './seats.service';
-import { LockSeatResponseDto, MatchSeatsResponseDto, SeatAvailability } from './dto';
+import { BestSeatsService } from './best-seats.service';
+import {
+  BestSeatsRequestDto,
+  BestSeatsResponseDto,
+  LockSeatResponseDto,
+  MatchSeatsResponseDto,
+  SeatAvailability,
+} from './dto';
 
 @ApiTags('Seats')
 @Controller('matches/:matchId/seats')
@@ -35,6 +43,7 @@ export class MatchSeatsController {
   constructor(
     private readonly seatsService: SeatsService,
     private readonly seatLockService: SeatLockService,
+    private readonly bestSeatsService: BestSeatsService,
   ) {}
 
   @Get()
@@ -49,6 +58,31 @@ export class MatchSeatsController {
     @Param('matchId', new ParseUUIDPipe()) matchId: string,
   ): Promise<MatchSeatsResponseDto> {
     return this.seatsService.findSeatsForMatch(matchId);
+  }
+
+  @Post('best')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'A legjobb egymás melletti szabad székek megkeresése és zárolása',
+    description:
+      'Egyetlen szerveroldali művelet: a rangsorolt elhelyezések közül a Redis (Lua szkript) az első teljesen szabadot zárolja, egy lépésben, ezért két egyidejű kérés nem kaphatja ugyanazt a sort. Soha nem ad vendégszektorbeli széket. Ha nincs elég hosszú sor, 409 `no_adjacent_run` (vagy `not_enough_seats`) a válasz a leghosszabb sorral és a felajánlható két rövidebb sorral; `allowSplit: true` esetén ezt zárolja is.',
+  })
+  @ApiOkResponse({ type: BestSeatsResponseDto })
+  @ApiConflictResponse({ description: '`no_adjacent_run`, `not_enough_seats`, `contended` vagy `match_started`.' })
+  findBestSeats(
+    @Param('matchId', new ParseUUIDPipe()) matchId: string,
+    @Body() body: BestSeatsRequestDto,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+  ): Promise<BestSeatsResponseDto> {
+    return this.bestSeatsService.findAndLock({
+      matchId,
+      section: body.section,
+      count: body.count,
+      allowSplit: body.allowSplit ?? false,
+      userId: user?.id,
+    });
   }
 
   @Post(':seatId/lock')

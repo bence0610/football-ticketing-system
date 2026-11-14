@@ -2,7 +2,12 @@ import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { SKIP_ERROR_SNACKBAR } from '../../core/interceptors/error.interceptor';
-import { LockSeatResponse, MatchSeatsResponse } from '../models/seat.model';
+import {
+  BestSeatsRequest,
+  BestSeatsResponse,
+  LockSeatResponse,
+  MatchSeatsResponse,
+} from '../models/seat.model';
 
 // Every caller of the lock endpoint (seat map, cart re-book) words a failure
 // itself via lockErrorMessage(), so the global snackbar - which would show the
@@ -30,6 +35,17 @@ export class SeatsApiService {
       {},
       { context: OWN_ERROR_MESSAGE },
     );
+  }
+
+  /**
+   * POST /matches/:matchId/seats/best - finds the best run of adjacent free seats in a sector
+   * and locks it, in one server operation. A refusal is a 409 whose body is a
+   * `BestSeatsRefusal`; the caller words it, so the global snackbar stays out.
+   */
+  findBestSeats(matchId: string, request: BestSeatsRequest): Observable<BestSeatsResponse> {
+    return this.http.post<BestSeatsResponse>(`/matches/${matchId}/seats/best`, request, {
+      context: OWN_ERROR_MESSAGE,
+    });
   }
 
   /**

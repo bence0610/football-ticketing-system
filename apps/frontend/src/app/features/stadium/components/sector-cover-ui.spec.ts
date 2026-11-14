@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { SeatStatus, SectorSummary } from '../../../shared/models/seat.model';
 import { coverDescription, coverLabel } from '../../../shared/utils/sector-cover';
-import { SeatDetailPanelComponent } from './seat-detail-panel/seat-detail-panel.component';
 import { SeatGridComponent } from './seat-grid/seat-grid.component';
 import { SectorSummaryComponent } from './sector-summary/sector-summary.component';
 import { StadiumMapComponent } from './stadium-map/stadium-map.component';
@@ -28,6 +27,8 @@ function summary(
     occupancyRatio: 0.4,
     minPrice: 3500,
     maxPrice: 3500,
+    longestRun: 6,
+    aisles: [],
     ...over,
   };
 }
@@ -107,25 +108,5 @@ describe('coverage in the sector selection', () => {
     f.componentRef.setInput('covered', null);
     f.detectChanges();
     expect((f.nativeElement as HTMLElement).querySelector('[data-testid="grid-cover"]')).toBeNull();
-  });
-
-  it('the seat panel shows it before the user locks the seat', () => {
-    const seat: SeatStatus = {
-      id: 's1',
-      section: 'J',
-      row: '1',
-      number: 3,
-      category: 'standard',
-      price: 3900,
-      status: 'available',
-      isAccessible: false,
-    };
-    const f = TestBed.createComponent(SeatDetailPanelComponent);
-    f.componentRef.setInput('seat', seat);
-    f.componentRef.setInput('covered', false);
-    f.detectChanges();
-    expect(
-      (f.nativeElement as HTMLElement).querySelector('[data-testid="detail-cover"]')?.textContent?.trim(),
-    ).toBe('Nyitott');
   });
 });

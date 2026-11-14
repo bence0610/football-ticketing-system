@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MatchSeatsController } from './match-seats.controller';
+import { BestSeatsService } from './best-seats.service';
 import { SeatsService } from './seats.service';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import {
@@ -200,6 +201,7 @@ describe('MatchSeatsController – integration', () => {
       controllers: [MatchSeatsController],
       providers: [
         SeatsService,
+        { provide: BestSeatsService, useValue: {} },
         { provide: getRepositoryToken(Seat), useValue: seatRepoMock },
         { provide: getRepositoryToken(Ticket), useValue: ticketRepoMock },
         { provide: getRepositoryToken(Match), useValue: matchRepoMock },
@@ -506,6 +508,48 @@ describe('MatchSeatsController – integration', () => {
         position: 7,
         gate: 1,
         priceCategory: 'vip',
+      });
+    });
+
+    describe('longest free run (sector panel)', () => {
+      const idOf = (n: number): string => `run-${n}`;
+
+      it('is the longest stretch of side-by-side free seats in one row', async () => {
+        // row 1: seats 1-6, seat 3 sold, seat 6 held -> runs 1-2 and 4-5; row 2: seats 1-3 free -> 3
+        const seats = [
+          ...[1, 2, 3, 4, 5, 6].map((n) => makeSeat(idOf(n), 'K', '1', n)),
+          ...[1, 2, 3].map((n) => makeSeat(`r2-${n}`, 'K', '2', n)),
+        ];
+        setData(makeMatch(), seats, [makeTicket(MATCH_ID, idOf(3), TicketStatus.PAID)], [idOf(6)]);
+
+        const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+        const k = res.body.sectorSummary.find((s: { section: string }) => s.section === 'K');
+        expect(k.longestRun).toBe(3);
+      });
+
+      it('is not extended across the aisle, and the aisle is reported', async () => {
+        const seats = Array.from({ length: 28 }, (_, i) => makeSeat(`w-${i + 1}`, 'K', '1', i + 1));
+        setData(makeMatch(), seats);
+
+        const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+        const k = res.body.sectorSummary.find((s: { section: string }) => s.section === 'K');
+        expect(k.aisles).toEqual([14]);
+        expect(k.longestRun).toBe(14);
+      });
+
+      it('is 0 in the away section and when nothing is free', async () => {
+        setData(makeMatch(), [
+          makeSeat('v-1', 'VENDÉG', '1', 1),
+          makeSeat('v-2', 'VENDÉG', '1', 2),
+          makeSeat('s-1', 'K', '1', 1, { isActive: false }),
+        ]);
+
+        const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+        const by = Object.fromEntries(
+          res.body.sectorSummary.map((s: Record<string, unknown>) => [s.section, s]),
+        );
+        expect(by['VENDÉG'].longestRun).toBe(0);
+        expect(by.K.longestRun).toBe(0);
       });
     });
 

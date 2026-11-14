@@ -36,6 +36,8 @@ const sector = (section: string, over: Partial<SectorSummary>): SectorSummary =>
   occupancyRatio: 0.5,
   minPrice: 3920,
   maxPrice: 3920,
+  longestRun: 6,
+  aisles: [],
   ...over,
 });
 

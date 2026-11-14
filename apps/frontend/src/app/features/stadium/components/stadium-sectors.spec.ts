@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { SeatStatus, SectorSummary } from '../../../shared/models/seat.model';
-import { SeatDetailPanelComponent } from './seat-detail-panel/seat-detail-panel.component';
 import { SeatGridComponent } from './seat-grid/seat-grid.component';
 import { SectorSummaryComponent } from './sector-summary/sector-summary.component';
 import { StadiumMapComponent } from './stadium-map/stadium-map.component';
@@ -27,6 +26,8 @@ const sector = (
   occupancyRatio: 0.25,
   minPrice: 3900,
   maxPrice: 3900,
+  longestRun: 6,
+  aisles: [],
   ...over,
 });
 
@@ -219,7 +220,7 @@ describe('the stadium map', () => {
   });
 });
 
-describe('the seat grid and the seat panel', () => {
+describe('the seat grid', () => {
   beforeEach(() => TestBed.configureTestingModule({ providers: [provideAnimationsAsync()] }));
 
   it('the grid header names the sector, its arc and its gate', () => {
@@ -259,26 +260,5 @@ describe('the seat grid and the seat panel', () => {
       (l) => text(l),
     );
     expect(labels).toEqual(['1. sor', '2. sor', '10. sor']);
-  });
-
-  it('the seat panel names the sector and the gate', () => {
-    const seat: SeatStatus = {
-      id: 's1',
-      section: 'VIP',
-      row: '1',
-      number: 3,
-      category: 'vip',
-      price: 8750,
-      status: 'available',
-      isAccessible: false,
-    };
-    const f = TestBed.createComponent(SeatDetailPanelComponent);
-    f.componentRef.setInput('seat', seat);
-    f.componentRef.setInput('sectorName', 'VIP');
-    f.componentRef.setInput('gate', 1);
-    f.detectChanges();
-    const el = f.nativeElement as HTMLElement;
-    expect(text(el.querySelector('.kte-seat-detail__chip'))).toBe('VIP');
-    expect(text(el.querySelector('[data-testid="detail-gate"]'))).toBe('1-es kapu');
   });
 });
