@@ -69,6 +69,8 @@ const PUBLIC_ROUTES: Record<string, string> = {
     'checks an emailed reset link; the secret one-time token is the credential',
   'POST auth/password-reset/confirm':
     'sets the new password; authorised by the secret one-time token from the email',
+  'POST auth/confirm-email-change':
+    'confirms a new e-mail address from that mailbox, possibly in another browser; authorised by the secret one-time token from the email, rate limited per IP',
   'POST chatbot/message':
     'guests may chat; OptionalJwtAuthGuard binds the conversation to the identity',
   'GET health': 'liveness probe, returns only up/down',
@@ -80,7 +82,8 @@ const PUBLIC_ROUTES: Record<string, string> = {
   'POST matches/:matchId/seats/:seatId/lock': 'guest carts; proves ownership with ownerToken',
   'POST matches/:matchId/seats/:seatId/lock/extend': 'guest carts; requires the ownerToken',
   'DELETE matches/:matchId/seats/:seatId/lock': 'guest carts; releases only with the ownerToken',
-  'POST matches/:matchId/seats/best': 'guest carts like the single-seat lock; it only locks, and the ownerToken it returns is the proof of ownership',
+  'POST matches/:matchId/seats/best':
+    'guest carts like the single-seat lock; it only locks, and the ownerToken it returns is the proof of ownership',
   'GET seats': 'static seat catalogue',
   'POST webhooks/stripe': 'authenticated by the Stripe signature, not a JWT',
   'GET season-passes/prices': 'public price list',
@@ -198,6 +201,15 @@ describe('backend route protection', () => {
 
   it.each(['POST season-passes/seats/:seatId/hold', 'DELETE season-passes/seats/:seatId/hold'])(
     '%s exists and requires a JWT (a hold is bound to the account)',
+    (key) => {
+      const route = ROUTES.find((r) => r.key === key);
+      expect(route).toBeDefined();
+      expect(route!.authenticated).toBe(true);
+    },
+  );
+
+  it.each(['POST auth/change-password', 'POST users/me/email-change', 'PATCH users/me'])(
+    '%s exists and requires a JWT (an account operation of the signed-in user)',
     (key) => {
       const route = ROUTES.find((r) => r.key === key);
       expect(route).toBeDefined();

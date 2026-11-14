@@ -9,7 +9,7 @@ import { CronConfig, JwtConfig, MailConfig } from '../../config';
 import { SlidingWindowLimiter } from '../../common/rate-limit/sliding-window.limiter';
 import { PasswordResetToken, User } from '../../database/entities';
 import { EmailService } from '../email/email.service';
-import { ClientInfo, describeClient } from './client-info';
+import { ClientInfo, describeClient, formatNoticeTime } from './client-info';
 import { RefreshTokenStore } from './refresh-token.store';
 
 /** At most this many reset emails per address per hour - counted whether or not the address has an account. */
@@ -20,6 +20,9 @@ export const RESET_REQUESTED_MESSAGE_PREFIX =
   'Ha ez az e-mail-cím regisztrálva van, elküldtük a jelszó-visszaállító linket.';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
+
+/** How a password was changed: with an emailed reset link, or signed in on the profile page. */
+export type PasswordChangeChannel = 'reset' | 'settings';
 
 /**
  * Password reset, built the way pass invitations are: a long random token
@@ -186,32 +189,29 @@ export class PasswordResetService {
 
   /**
    * Tells the owner their password changed: when, and roughly from where. It never
-   * carries the new password or any token.
+   * carries the new password or any token. `via` picks the sentence saying how it
+   * changed: with a reset link, or on the profile page while signed in
+   * (PasswordChangeService).
    */
-  async notifyPasswordChanged(user: User, when: Date, client?: ClientInfo): Promise<void> {
+  async notifyPasswordChanged(
+    user: User,
+    when: Date,
+    client?: ClientInfo,
+    via: PasswordChangeChannel = 'reset',
+  ): Promise<void> {
     await this.emailService.send({
       to: user.email,
       subject: 'A jelszavad megváltozott - KTE Jegyportál',
       template: 'password-changed',
       context: {
         recipientName: user.firstName,
-        changedAtLabel: this.formatWhen(when),
+        changedAtLabel: formatNoticeTime(when, this.timezone),
+        viaSettings: via === 'settings',
         clientLabel: describeClient(client),
         supportEmail: this.mailConfig.supportEmail,
       },
       correlationId: `password-changed:${user.id}:${when.getTime()}`,
     });
-  }
-
-  private formatWhen(when: Date): string {
-    return new Intl.DateTimeFormat('hu-HU', {
-      timeZone: this.timezone,
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(when);
   }
 
   private async loadUsableToken(token: string): Promise<{ row: PasswordResetToken; user: User }> {

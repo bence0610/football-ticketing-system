@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsWithinBcryptLimit, PASSWORD_BYTES_AT_LOGIN_MESSAGE } from './password.decorator';
 
 export class LoginDto {
   @ApiProperty({ example: 'fan@kte.hu' })
@@ -10,6 +11,7 @@ export class LoginDto {
   @ApiProperty({ example: 'StrongPass123' })
   @IsString({ message: 'A jelszó szöveg típusú érték legyen.' })
   @MinLength(8, { message: 'A jelszónak legalább 8 karakteresnek kell lennie.' })
-  @MaxLength(72, { message: 'A jelszó legfeljebb 72 karakter lehet.' })
+  // Over 72 bytes bcrypt would compare only a prefix: refuse instead, and say how to recover.
+  @IsWithinBcryptLimit({ message: PASSWORD_BYTES_AT_LOGIN_MESSAGE })
   password!: string;
 }

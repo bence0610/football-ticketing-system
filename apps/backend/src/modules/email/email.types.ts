@@ -12,7 +12,10 @@ export type EmailTemplateName =
   | 'waitlist-notification'
   | 'seat-refund'
   | 'password-reset'
-  | 'password-changed';
+  | 'password-changed'
+  | 'email-change-confirm'
+  | 'email-change-requested'
+  | 'email-changed';
 
 export interface TicketConfirmationContext {
   recipientName: string;
@@ -101,6 +104,36 @@ export interface PasswordChangedContext {
   /** "Chrome, Windows · 84.2.51.x" - only what is known; absent when nothing is. */
   clientLabel?: string;
   supportEmail: string;
+  /** True when it was changed signed in, on the profile page; false/absent: with a reset link. */
+  viaSettings?: boolean;
+}
+
+/** Sent to the NEW address: the link that makes the change happen. */
+export interface EmailChangeConfirmContext {
+  recipientName: string;
+  newEmail: string;
+  confirmUrl: string;
+  /** "60 perc" / "1 óra". */
+  validForLabel: string;
+}
+
+/** Sent to the CURRENT address when a change is asked for; nothing has changed yet. */
+export interface EmailChangeRequestedContext {
+  recipientName: string;
+  /** The requested address, masked: "j***@d***.hu". */
+  maskedNewEmail: string;
+  requestedAtLabel: string;
+  clientLabel?: string;
+  supportEmail: string;
+}
+
+/** Sent to the OLD address once the new one is confirmed. Carries no token. */
+export interface EmailChangedContext {
+  recipientName: string;
+  maskedNewEmail: string;
+  changedAtLabel: string;
+  clientLabel?: string;
+  supportEmail: string;
 }
 
 export type EmailContextMap = {
@@ -113,6 +146,9 @@ export type EmailContextMap = {
   'seat-refund': SeatRefundContext;
   'password-reset': PasswordResetContext;
   'password-changed': PasswordChangedContext;
+  'email-change-confirm': EmailChangeConfirmContext;
+  'email-change-requested': EmailChangeRequestedContext;
+  'email-changed': EmailChangedContext;
 };
 
 export interface SendEmailRequest<T extends EmailTemplateName = EmailTemplateName> {

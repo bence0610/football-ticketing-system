@@ -17,6 +17,16 @@ export class ProfileDto {
   @ApiPropertyOptional({ example: '+36301234567' })
   phoneNumber?: string;
 
+  @ApiPropertyOptional({ example: '1990-01-15', format: 'date', description: 'ÉÉÉÉ-HH-NN' })
+  dateOfBirth?: string;
+
+  @ApiPropertyOptional({
+    example: 'uj.cim@pelda.hu',
+    description:
+      'Megerősítésre váró új e-mail-cím, ha van érvényes, fel nem használt kérés. Az `email` addig a régi cím.',
+  })
+  pendingEmail?: string;
+
   @ApiProperty({ enum: UserRole })
   role!: UserRole;
 

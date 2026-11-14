@@ -377,6 +377,18 @@ export function untilLabel(kickoffIso: string, now: number): string {
                   <dd>{{ user.createdAt | date: 'yyyy. MMMM' : '' : 'hu-HU' }}</dd>
                 </div>
               </dl>
+              <nav class="acct-links" aria-label="Fiókbeállítások" data-testid="account-links">
+                <a class="acct-link" routerLink="/profile/details">
+                  <mat-icon aria-hidden="true">badge</mat-icon>
+                  <span>Adataim szerkesztése</span>
+                  <mat-icon class="acct-link__chev" aria-hidden="true">chevron_right</mat-icon>
+                </a>
+                <a class="acct-link" routerLink="/profile/password">
+                  <mat-icon aria-hidden="true">lock</mat-icon>
+                  <span>Jelszó módosítása</span>
+                  <mat-icon class="acct-link__chev" aria-hidden="true">chevron_right</mat-icon>
+                </a>
+              </nav>
               <button mat-stroked-button type="button" class="full" (click)="logout()">
                 <mat-icon>logout</mat-icon>
                 Kijelentkezés
@@ -643,6 +655,29 @@ export function untilLabel(kickoffIso: string, now: number): string {
 
       .acct { margin: 0 0 14px; display: grid; gap: 10px; }
       .acct__email { overflow-wrap: anywhere; }
+      .acct-links {
+        display: flex;
+        flex-direction: column;
+        margin: 0 0 14px;
+        border-top: 1px solid var(--border-light);
+      }
+      .acct-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: var(--min-target, 44px);
+        padding: 0 4px;
+        border-bottom: 1px solid var(--border-light);
+        color: var(--brand-deep);
+        font-weight: 600;
+        font-size: 15px;
+        text-decoration: none;
+      }
+      .acct-link:hover { background: var(--brand-tint); }
+      .acct-link:focus-visible { outline: 2px solid var(--brand-mid); outline-offset: -2px; }
+      .acct-link span { flex: 1; min-width: 0; }
+      .acct-link mat-icon { width: 20px; height: 20px; font-size: 20px; }
+      .acct-link__chev { color: var(--faint); }
 
       @media (max-width: 860px) {
         .layout { grid-template-columns: minmax(0, 1fr); }

@@ -9,6 +9,7 @@ import { EmailModule } from '../email/email.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { PasswordChangeService } from './password-change.service';
 import { PasswordResetController } from './password-reset.controller';
 import { PasswordResetService } from './password-reset.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -30,6 +31,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   providers: [
     AuthService,
     PasswordResetService,
+    PasswordChangeService,
     SlidingWindowLimiter,
     JwtStrategy,
     JwtAuthGuard,

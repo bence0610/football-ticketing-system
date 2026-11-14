@@ -86,6 +86,32 @@ export const APP_ROUTES: Routes = [
         title: 'Új jelszó beállítása',
       },
       {
+        // Public like reset-password: the link mailed to the new address may be opened
+        // in any browser, signed in (to any account) or not.
+        path: 'confirm-email/:token',
+        loadComponent: () =>
+          import('./features/auth/confirm-email.page').then((m) => m.ConfirmEmailPageComponent),
+        title: 'E-mail-cím megerősítése',
+      },
+      {
+        path: 'profile/details',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/profile/account/profile-details.page').then(
+            (m) => m.ProfileDetailsPageComponent,
+          ),
+        title: 'Adataim szerkesztése',
+      },
+      {
+        path: 'profile/password',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/profile/account/change-password.page').then(
+            (m) => m.ChangePasswordPageComponent,
+          ),
+        title: 'Jelszó módosítása',
+      },
+      {
         path: 'profile',
         canActivate: [authGuard],
         loadComponent: () =>

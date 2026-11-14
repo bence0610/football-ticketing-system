@@ -8,6 +8,8 @@ export interface JwtConfig {
   bcryptRounds: number;
   /** How long an emailed password-reset link stays valid. */
   passwordResetTtlMinutes: number;
+  /** How long the link confirming a new e-mail address stays valid. */
+  emailChangeTtlMinutes: number;
 }
 
 export default registerAs(
@@ -19,5 +21,6 @@ export default registerAs(
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10),
     passwordResetTtlMinutes: parseInt(process.env.PASSWORD_RESET_TTL_MINUTES ?? '60', 10),
+    emailChangeTtlMinutes: parseInt(process.env.EMAIL_CHANGE_TTL_MINUTES ?? '60', 10),
   }),
 );

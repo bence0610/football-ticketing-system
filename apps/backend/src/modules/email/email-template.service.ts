@@ -25,6 +25,9 @@ export class EmailTemplateService implements OnModuleInit {
     'seat-refund': 'seat-refund.hbs',
     'password-reset': 'password-reset.hbs',
     'password-changed': 'password-changed.hbs',
+    'email-change-confirm': 'email-change-confirm.hbs',
+    'email-change-requested': 'email-change-requested.hbs',
+    'email-changed': 'email-changed.hbs',
   };
 
   async onModuleInit(): Promise<void> {

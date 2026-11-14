@@ -8,8 +8,10 @@ import { AuthApiService } from '../../shared/services/auth.api.service';
 import {
   AuthResponse,
   AuthUser,
+  ChangePasswordPayload,
   LoginPayload,
   RegisterPayload,
+  UserProfile,
 } from '../../shared/models/auth.model';
 
 const REFRESH_FALLBACK_KEY = 'kte_refresh_token';
@@ -68,6 +70,31 @@ export class AuthService {
 
   login(payload: LoginPayload): Observable<AuthResponse> {
     return this.api.login(payload).pipe(tap((res) => this.applyAuthResponse(res)));
+  }
+
+  /**
+   * The server answers a password change like a login: this session gets a
+   * fresh token pair (the old refresh token is dead), so it is applied exactly
+   * as a login is and the user stays signed in.
+   */
+  changePassword(payload: ChangePasswordPayload): Observable<AuthResponse> {
+    return this.api.changePassword(payload).pipe(tap((res) => this.applyAuthResponse(res)));
+  }
+
+  /**
+   * Brings the signed-in user (header name, checkout e-mail, ...) up to date
+   * after the profile changed on the server. Ignored for another account's
+   * profile and when nobody is signed in.
+   */
+  syncProfile(profile: Pick<UserProfile, 'id' | 'email' | 'firstName' | 'lastName'>): void {
+    const user = this.currentUser();
+    if (!user || user.id !== profile.id) return;
+    this.currentUser.set({
+      ...user,
+      email: profile.email,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+    });
   }
 
   logout(): Observable<void> {

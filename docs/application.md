@@ -38,6 +38,7 @@ ha az átruházott jegy kiadásra kerül a közösségbe, a Várólistán szerep
 E-mailes regisztráció és bejelentkezés (JWT alapú, opcionális 2FA),
 Saját profil: aktív jegyek, bérletek, vásárlási előzmények,
 Loyalty pontegyenleg és szint megtekintése,
+Fiókműveletek: profiladatok (név, telefonszám, születési dátum) módosítása, jelszócsere bejelentkezve (a jelenlegi jelszóval), e-mail-cím módosítása az új címre küldött link megerősítésével (a cím csak a megerősítés után változik),
 Biztonságos kijelentkezés és session kezelés.
 
 

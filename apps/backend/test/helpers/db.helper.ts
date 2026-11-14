@@ -27,6 +27,7 @@ import {
  */
 const DATA_TABLES: readonly string[] = [
   'password_reset_tokens',
+  'email_change_tokens',
   'loyalty_transactions',
   'pass_loans',
   'tickets',

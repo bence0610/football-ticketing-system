@@ -36,7 +36,7 @@ export class User extends BaseEntity {
   lastName!: string;
 
   @Column({ type: 'varchar', length: 32, nullable: true, name: 'phone_number' })
-  phoneNumber?: string;
+  phoneNumber?: string | null;
 
   @Column({
     type: 'date',
@@ -44,7 +44,7 @@ export class User extends BaseEntity {
     name: 'date_of_birth',
     transformer: dateColumnTransformer,
   })
-  dateOfBirth?: Date;
+  dateOfBirth?: Date | null;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.FAN })
   role!: UserRole;

@@ -65,3 +65,15 @@ export function describeClient(client: ClientInfo | undefined): string | undefin
   );
   return parts.length > 0 ? parts.join(' · ') : undefined;
 }
+
+/** "2026. november 10. 20:41" in the given timezone - the "when" line of the security notices. */
+export function formatNoticeTime(when: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('hu-HU', {
+    timeZone,
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(when);
+}

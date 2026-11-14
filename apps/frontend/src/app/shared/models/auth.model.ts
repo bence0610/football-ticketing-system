@@ -37,13 +37,48 @@ export interface UserProfile {
   readonly firstName: string;
   readonly lastName: string;
   readonly phoneNumber?: string;
+  /** 'YYYY-MM-DD'. */
+  readonly dateOfBirth?: string;
   readonly role: UserRole;
   readonly loyaltyTier: LoyaltyTier;
   readonly loyaltyPoints: number;
   readonly emailVerified: boolean;
+  /** A new address waiting for its confirmation link to be opened; `email` stays the old one until then. */
+  readonly pendingEmail?: string;
   readonly twoFactorEnabled: boolean;
   readonly lastLoginAt?: string;
   readonly createdAt: string;
+}
+
+/** PATCH /users/me: exactly the editable fields. An empty phoneNumber clears it. */
+export interface ProfileUpdatePayload {
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly phoneNumber: string;
+  /** 'YYYY-MM-DD'; `null` clears a saved date; left out when there was none and none is entered. */
+  readonly dateOfBirth?: string | null;
+}
+
+export interface ChangePasswordPayload {
+  readonly currentPassword: string;
+  readonly newPassword: string;
+}
+
+export interface EmailChangePayload {
+  readonly newEmail: string;
+  readonly currentPassword: string;
+}
+
+/** 202 of POST /users/me/email-change. */
+export interface EmailChangeRequested {
+  readonly message: string;
+  readonly pendingEmail: string;
+}
+
+/** 200 of POST /auth/confirm-email-change. */
+export interface EmailChangeConfirmed {
+  readonly message: string;
+  readonly email: string;
 }
 
 export type TicketStatus =

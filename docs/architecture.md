@@ -86,8 +86,8 @@ Minden modul az `AppModule` importjai között szerepel; a `DatabaseModule` és 
 
 | Modul | Valós felelősség |
 | --- | --- |
-| `auth` | Regisztráció, bejelentkezés, refresh (rotációval), kijelentkezés, jelszó-visszaállítás (`PasswordResetController`/`Service`), `JwtStrategy`, `JwtAuthGuard`, `OptionalJwtAuthGuard`, `RolesGuard`, `@Roles`, `@CurrentUser`, `RefreshTokenStore` (Redis) |
-| `users` | `GET /users/count` (publikus regisztrációs számláló), `GET`/`PATCH /users/me`, `GET /users/me/tickets` |
+| `auth` | Regisztráció, bejelentkezés, refresh (rotációval), kijelentkezés, jelszó-visszaállítás (`PasswordResetController`/`Service`), jelszócsere bejelentkezve (`PasswordChangeService`, `POST auth/change-password`), az e-mail-cím megerősítése (`POST auth/confirm-email-change`), `JwtStrategy`, `JwtAuthGuard`, `OptionalJwtAuthGuard`, `RolesGuard`, `@Roles`, `@CurrentUser`, `RefreshTokenStore` (Redis) |
+| `users` | `GET /users/count` (publikus regisztrációs számláló), `GET`/`PATCH /users/me`, `GET /users/me/tickets`, `POST /users/me/email-change` (`EmailChangeService`), a fiókműveletek jelszó-ellenőrzése (`CurrentPasswordVerifier`) |
 | `matches` | Publikus mérkőzéslista, közelgő mérkőzések, részletek (`GET /matches`, `/matches/upcoming`, `/matches/:id`); eladási szabály: a megkezdett meccsre nem lehet venni (`match-sale.ts`) |
 | `seats` | Székkatalógus (`GET /seats`), meccsenkénti székállapot (`GET /matches/:matchId/seats`), székzárolás/meghosszabbítás/feloldás, "legjobb helyek" keresés és zárolás (`BestSeatsService`), szektorkatalógus, árazás (`seat-pricing.ts`) |
 | `tickets` | Saját jegyek, QR-kód (`GET /tickets/:id/qr`), beléptetés (`PATCH /tickets/:id/scan`), jegy-megjelenítés e-mailhez, lejáró job. A `cancelTicket` metódus létezik, de egyetlen kontroller vagy szolgáltatás sem hívja |
@@ -110,8 +110,8 @@ Nincs globális guard (`APP_GUARD` nincs): a védelem kontrolleren/metóduson de
 
 | Hozzáférés | Végpontok |
 | --- | --- |
-| Publikus | `POST auth/register`, `auth/login`, `auth/refresh`; `POST auth/password-reset/request`, `GET auth/password-reset/:token`, `POST auth/password-reset/confirm` (rate limit); `POST chatbot/message` (opcionális JWT + rate limit); `GET health`; `GET loyalty/tiers`; `GET matches`, `matches/upcoming`, `matches/:id`; `GET matches/:matchId/seats`; `POST matches/:matchId/seats/best`, `.../seats/:seatId/lock`, `.../lock/extend`, `DELETE .../lock` (vendég kosár, a `ownerToken` a bizonyíték); `GET seats`; `POST webhooks/stripe` (Stripe-aláírás); `GET season-passes/prices`, `season`, `tiers/:tier/sectors`, `seats`, `loans/preview/:token`; `GET users/count`; `GET weather/match/:matchId` |
-| Bejelentkezett (bármely szerepkör) | `auth/logout`, `users/me*`, `tickets/me`, `tickets/:id/qr`, `payments/*`, `waitlist/*`, `loyalty/me*`, `season-passes` hold/purchase/me/my/loans/QR végpontjai |
+| Publikus | `POST auth/register`, `auth/login`, `auth/refresh`; `POST auth/password-reset/request`, `GET auth/password-reset/:token`, `POST auth/password-reset/confirm` (rate limit); `POST auth/confirm-email-change` (a levélben kapott egyszer használható token a hitelesítő, rate limit); `POST chatbot/message` (opcionális JWT + rate limit); `GET health`; `GET loyalty/tiers`; `GET matches`, `matches/upcoming`, `matches/:id`; `GET matches/:matchId/seats`; `POST matches/:matchId/seats/best`, `.../seats/:seatId/lock`, `.../lock/extend`, `DELETE .../lock` (vendég kosár, a `ownerToken` a bizonyíték); `GET seats`; `POST webhooks/stripe` (Stripe-aláírás); `GET season-passes/prices`, `season`, `tiers/:tier/sectors`, `seats`, `loans/preview/:token`; `GET users/count`; `GET weather/match/:matchId` |
+| Bejelentkezett (bármely szerepkör) | `auth/logout`, `auth/change-password`, `users/me*` (köztük `users/me/email-change`), `tickets/me`, `tickets/:id/qr`, `payments/*`, `waitlist/*`, `loyalty/me*`, `season-passes` hold/purchase/me/my/loans/QR végpontjai |
 | `admin`, `super_admin` | teljes `admin/*`, `GET tickets/count`, `GET loyalty/transactions/count` |
 | `gate`, `admin`, `super_admin` | `PATCH tickets/:id/scan` |
 
@@ -125,13 +125,15 @@ Két, egymástól független Redis-alapú csúszóablak-megvalósítás van (sor
 | --- | --- | --- | --- |
 | `RateLimitGuard` + `@RateLimit` (jelszó-visszaállítás kontroller) | kliens IP (`req.ip`) | `pwreset:request` 10 / óra; `pwreset:confirm` 60 / óra (a token-ellenőrző és a megerősítő végpont közös keret) | zár (a kérést elutasítja) |
 | `PasswordResetService.requestReset` | az e-mail cím SHA-256 hash-e | 3 kérés / óra / cím, regisztrált és nem regisztrált címre egyformán számolva | zár |
+| `RateLimitGuard` + `@RateLimit` (fiókműveletek) | kliens IP (`req.ip`) | `pwchange:ip` 30 / óra (`auth/change-password`); `emailchange:ip` 20 / óra (`users/me/email-change`); `emailchange:confirm` 60 / óra (`auth/confirm-email-change`) | zár |
+| `CurrentPasswordVerifier` | felhasználó-azonosító | `pwchange:user` 10 / óra (jelszócsere); `emailchange:user` 5 / óra (címmódosítás); minden próbálkozás számít | zár |
 | `ChatbotRateLimitGuard` | bejelentkezett: felhasználó-azonosító; vendég: IP (`req.ip`) | 100 / óra, illetve 20 / óra (`CHATBOT_RATE_LIMIT_AUTH`, `CHATBOT_RATE_LIMIT_ANON`) | nyit (átengedi, figyelmeztetést naplóz) |
 
-Az IP-alapú limitek tehát: jelszó-visszaállítás (kontrollerszintű `RateLimitGuard`) és a vendég chatbot. A bejelentkezésre (`auth/login`) és regisztrációra nincs sebességkorlát.
+Az IP-alapú limitek tehát: jelszó-visszaállítás (kontrollerszintű `RateLimitGuard`), a fiókműveletek és a vendég chatbot. A bejelentkezésre (`auth/login`) és regisztrációra nincs sebességkorlát.
 
 ## 4. MySQL (TypeORM)
 
-Kapcsolat: `DatabaseModule` (`type: 'mysql'`, `utf8mb4_unicode_ci`, `timezone: 'Z'`, `synchronize` = `DB_SYNCHRONIZE`, alapértelmezés `false`). A séma migrációkkal épül (`src/database/migrations`, 13 fájl, `1714050000000-InitialSchema` -> `1715500000000-ThreePriceTiers`); a migrációkat külön kell futtatni (`npm run migration:run`), az alkalmazás indításkor nem futtatja (nincs `migrationsRun`). Az e2e `globalSetup` lefuttatja őket. Minden entitás a `BaseEntity`-ből öröklődik: UUID `id`, `created_at`, `updated_at`, `version` (`@VersionColumn`).
+Kapcsolat: `DatabaseModule` (`type: 'mysql'`, `utf8mb4_unicode_ci`, `timezone: 'Z'`, `synchronize` = `DB_SYNCHRONIZE`, alapértelmezés `false`). A séma migrációkkal épül (`src/database/migrations`, 14 fájl, `1714050000000-InitialSchema` -> `1715600000000-EmailChangeTokens`); a migrációkat külön kell futtatni (`npm run migration:run`), az alkalmazás indításkor nem futtatja (nincs `migrationsRun`). Az e2e `globalSetup` lefuttatja őket. Minden entitás a `BaseEntity`-ből öröklődik: UUID `id`, `created_at`, `updated_at`, `version` (`@VersionColumn`).
 
 Seed (`npm run seed`, `seeds/initial.seed.ts`, idempotens): admin (`admin@kte.hu`, `super_admin`), demo szurkoló (`fan@kte.hu`), beléptető (`kapu@kte.hu`, `gate`), a hiányzó szektorok, a székek (a `stadium-layout.ts` alapján 19 szektor, 5468 szék), a korábbi szezon meccseinek lezárása, közelgő felkészülési mérkőzések és a bérletárak. A szektorsorokat a `1715400000000-StadiumLayout` migráció írja be.
 
@@ -148,6 +150,7 @@ Seed (`npm run seed`, `seeds/initial.seed.ts`, idempotens): admin (`admin@kte.hu
 | `loyalty_transactions` (`LoyaltyTransaction`) | N-1 user (`CASCADE`) | **`uq_loyalty_source_reference (source, reference_id)`**: ugyanazért az eseményért a pont nem írható jóvá kétszer |
 | `waitlist` (`Waitlist`) | N-1 user, match (`CASCADE`) | `uq_waitlist_user_match (user_id, match_id)`; státuszok: active, notified, converted, expired, cancelled |
 | `password_reset_tokens` (`PasswordResetToken`) | N-1 user (`CASCADE`) | `token_hash` egyedi (csak a hash tárolt); `used_at`, `expires_at`, `password_fingerprint` |
+| `email_change_tokens` (`EmailChangeToken`) | N-1 user (`CASCADE`) | `token_hash` egyedi (csak a hash tárolt); `new_email`, `used_at`, `expires_at`, `password_fingerprint` |
 
 Státuszok: `TicketStatus` = pending_payment, paid, cancelled, refunded, used, expired; `TicketSource` = single, season_pass, loan. Egy szék egy meccsre "foglalt", ha van hozzá `pending_payment`, `paid` vagy `used` jegy (`tickets/ticket-occupancy.ts`).
 
@@ -233,7 +236,20 @@ Egyéb időzítők (nem cron): az e-mail egyszeri újrapróbálása `setTimeout`
 | Beléptető szerepkör | `gate`: csak a `PATCH tickets/:id/scan`; a QR-token JWT-jét a `QR_SIGNING_SECRET` írja alá (külön az auth titkoktól), a beolvasás a jegyet `used`-ra állítja `pessimistic_write` zárral és a `jti`-t tiltólistára teszi; második beolvasásra `already_used` |
 | Admin | `admin`/`super_admin`; seedelt fiók: `admin@kte.hu` |
 | Jelszó-visszaállítás | `POST auth/password-reset/request` mindig ugyanazt válaszolja (nem fedi fel, létezik-e a cím); a token `nanoid(48)`, csak a SHA-256 hash-e tárolt, érvényesség `PASSWORD_RESET_TTL_MINUTES` (60 perc), egyszer használható, az újabb kérés a korábbi linkeket érvényteleníti; megerősítéskor tranzakcióban fogy el a link és íródik át a jelszó, a jelszó közben megváltozott-e, az `password_fingerprint` ellenőrzi; utána minden refresh token törlődik és `password-changed` e-mail megy (IP-maszkolt kliensadatokkal) |
-| E-mail megerősítés, 2FA | **nincs megvalósítva**: az `email_verified`, `two_factor_enabled`, `two_factor_secret` oszlopok léteznek, a regisztráció `false`-ra állítja őket, de a bejelentkezés és a guardok nem nézik, és nincs hozzájuk végpont |
+| Fiókműveletek | lásd 8.1 |
+| E-mail megerősítés, 2FA | **nincs megvalósítva**: az `email_verified`, `two_factor_enabled`, `two_factor_secret` oszlopok léteznek, a regisztráció `false`-ra állítja őket, de a bejelentkezés és a guardok nem nézik, és nincs hozzájuk végpont. Kivétel: az e-mail-cím módosításának megerősítése `email_verified = true`-ra állítja (a megerősítő link bizonyítja, hogy a cím a fiók tulajdonosáé) |
+
+### 8.1 Fiókműveletek
+
+| Művelet | Végpont | Működés |
+| --- | --- | --- |
+| Profiladatok | `PATCH users/me` (JWT) | Csak `firstName`, `lastName`, `phoneNumber`, `dateOfBirth`; az e-mail-cím itt nem módosítható (a `forbidNonWhitelisted` validáció elutasítja). Telefonszám: számjegy, szóköz, `+`, `-`, zárójel, 6-32 karakter; az üres szöveg törli (`NULL`-ként tárolva). A profil-kitöltési hűségbónusz továbbra is egyszeri (`(source, referenceId)`). A `GET users/me` a `dateOfBirth`-öt `ÉÉÉÉ-HH-NN` formában, megerősítésre váró címmódosításnál a `pendingEmail`-t is visszaadja |
+| Jelszócsere | `POST auth/change-password` (JWT), törzs: `currentPassword`, `newPassword` | Az új jelszóra ugyanaz a szabály (`@IsAccountPassword`), mint a regisztrációnál és a visszaállításnál. Hibás jelenlegi jelszó: 400 `current_password_incorrect` (szándékosan nem 401: a frontend a 401-et lejárt munkamenetnek veszi); azonos új jelszó: 400 `password_unchanged`; párhuzamos módosítás: 409 `password_changed_concurrently`. Siker: bcrypt hash, compare-and-swap a régi hash-re, a fiók élő visszaállító linkjei érvénytelenek, `revokeAll` (minden refresh token törlődik, mint visszaállításkor), majd a hívó új access + refresh tokent kap a bejelentkezéssel azonos válaszban és sütiben: ez a munkamenet bejelentkezve marad, a többi eszközön már kiadott access token a lejáratáig (15 perc) még él. `password-changed` értesítő megy (profiloldali megfogalmazással) |
+| E-mail-cím módosítása | `POST users/me/email-change` (JWT), törzs: `newEmail`, `currentPassword`; `POST auth/confirm-email-change` (publikus), törzs: `token` | **Megerősítés előtt nincs hatása.** A cím a bejelentkezési azonosító és a jelszó-visszaállítás címe: azonnali cserénél egy elírás vagy egy támadó kizárhatná a tulajdonost. A kérés (jelszó kell; 400 `email_unchanged`, 409 `email_taken`) csak egy `email_change_tokens` sort hoz létre (`nanoid(48)`, csak a SHA-256 hash tárolt, `EMAIL_CHANGE_TTL_MINUTES`, alapértelmezés 60 perc, az újabb kérés a korábbit érvényteleníti), a linket (`/confirm-email/<token>`) az új címre küldi (`email-change-confirm`), a jelenlegi címet pedig értesíti maszkolt új címmel, link nélkül (`email-change-requested`); válasz 202 `{ message, pendingEmail }`. A megerősítés egy tranzakcióban: a token atomi elhasználása (egyszer használható), az új cím szabadságának újraellenőrzése (az egyedi index ütközése is 409 `email_taken`), `email` és `email_verified = true` beírása compare-and-swap-pal a jelszó-hash-re, a még élő (`pending`, `accepted`) bérletkölcsön-meghívók `borrower_email`-jének átírása, a fiók visszaállító linkjeinek érvénytelenítése (a régi postafiókba mentek). Hibakódok: 400 `email_change_token_invalid`, `email_change_token_used`, `email_change_token_expired`, `email_change_token_password_changed` (a kérés óta jelszócsere vagy visszaállítás történt). Utána a régi cím értesítést kap (`email-changed`); válasz 200 `{ message, email }`. A munkamenetek nem szűnnek meg (a kéréshez a jelszó kellett) |
+
+Mi kötődik az e-mail-címhez: a jegyek, bérletek, hűségpontok, várólista és a bérlet-birtokos kapcsolatok a felhasználó azonosítójához kötöttek, ezért a címcsere nem érinti őket. Egyedül a bérletkölcsön-meghívó (`pass_loans.borrower_email`) címalapú: az elfogadás és a bejövő meghívók listája a címmel egyeztet, ezért a még élő meghívók követik a címet; a lezárt (felhasznált, teljesült, visszavont, lejárt) kölcsönök a régi címmel maradnak a történetben.
+
+Az access token az `email` claimet is tartalmazza, de a `JwtStrategy` minden kérésnél az adatbázisból tölti be a felhasználót, és a `req.user.email` onnan jön: a címcsere előtt kiadott access token a lejáratáig érvényes marad, és a szerveren mindenhol már az új cím látszik. A tokenben maradt régi claimet a backend nem használja; a következő refresh már az új címmel ír alá.
 
 ## 9. Chatbot (Anthropic)
 
@@ -250,7 +266,7 @@ Egyéb időzítők (nem cron): az e-mail egyszeri újrapróbálása `setTimeout`
 
 ## 11. E-mail
 
-Nodemailer SMTP-transzport (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, feladó: `SMTP_FROM`), kapcsolatkészlettel (`pool`, 3 kapcsolat). Küldéskor egyetlen újrapróbálás van `EMAIL_RETRY_DELAY_MS` késleltetéssel (folyamaton belüli `setTimeout`); a második hiba kivételt dob, amit a hívók naplózzák. Külső levelezőszolgáltató-API (SendGrid, stb.) nincs. A sablonok Handlebars HTML-ek (`modules/email/templates/*.hbs`), induláskor lefordítva: `ticket-confirmation` (QR-képekkel), `loan-invitation`, `loan-confirmation`, `loan-cancelled`, `tier-upgraded`, `waitlist-notification`, `seat-refund`, `password-reset`, `password-changed`. A sablon-nevek típusos uniót alkotnak (`email.types.ts`).
+Nodemailer SMTP-transzport (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, feladó: `SMTP_FROM`), kapcsolatkészlettel (`pool`, 3 kapcsolat). Küldéskor egyetlen újrapróbálás van `EMAIL_RETRY_DELAY_MS` késleltetéssel (folyamaton belüli `setTimeout`); a második hiba kivételt dob, amit a hívók naplózzák. Külső levelezőszolgáltató-API (SendGrid, stb.) nincs. A sablonok Handlebars HTML-ek (`modules/email/templates/*.hbs`), induláskor lefordítva: `ticket-confirmation` (QR-képekkel), `loan-invitation`, `loan-confirmation`, `loan-cancelled`, `tier-upgraded`, `waitlist-notification`, `seat-refund`, `password-reset`, `password-changed`, `email-change-confirm`, `email-change-requested`, `email-changed`. A sablon-nevek típusos uniót alkotnak (`email.types.ts`).
 
 ## 12. Tesztelés és üzemeltetés
 

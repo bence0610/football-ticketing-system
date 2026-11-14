@@ -80,7 +80,7 @@ export class AuthService {
     });
 
     this.logger.log(`Registered user ${user.id} (${user.email})`);
-    return this.buildAuthResponse(user);
+    return this.issueSession(user);
   }
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
@@ -97,7 +97,7 @@ export class AuthService {
     user.lastLoginAt = new Date();
     await this.userRepository.save(user);
 
-    return this.buildAuthResponse(user);
+    return this.issueSession(user);
   }
 
   async refresh(refreshToken: string): Promise<AuthResponseDto> {
@@ -126,7 +126,7 @@ export class AuthService {
       throw new UnauthorizedException('A felhasználói fiók nem aktív.');
     }
 
-    return this.buildAuthResponse(user);
+    return this.issueSession(user);
   }
 
   async logout(refreshToken: string | undefined): Promise<void> {
@@ -155,7 +155,12 @@ export class AuthService {
     };
   }
 
-  private async buildAuthResponse(user: User): Promise<AuthResponseDto> {
+  /**
+   * A new access + refresh token pair for the user, the refresh token registered
+   * in Redis - what login returns. Also used after a password change, so the
+   * session that changed it stays signed in.
+   */
+  async issueSession(user: User): Promise<AuthResponseDto> {
     const accessToken = await this.signAccessToken(user);
     const { token: refreshToken, jti } = await this.signRefreshToken(user);
     await this.refreshStore.save(user.id, jti, this.refreshTtlSeconds);

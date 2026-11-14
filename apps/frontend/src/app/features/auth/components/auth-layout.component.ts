@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 
-export type AuthMode = 'login' | 'register' | 'reset';
+export type AuthMode = 'login' | 'register' | 'reset' | 'email';
 
 interface Feature {
   readonly icon: string;
@@ -35,6 +35,15 @@ const COPY: Record<AuthMode, BrandCopy> = {
       { icon: 'mail', text: 'Add meg az e-mail-címedet, és küldünk egy linket.' },
       { icon: 'timer', text: 'A link rövid ideig érvényes, és csak egyszer használható.' },
       { icon: 'lock', text: 'Az új jelszó beállítása után a többi eszközön megszűnik a bejelentkezés.' },
+    ],
+  },
+  email: {
+    title: 'Új e-mail-cím megerősítése',
+    lead: 'Csak a címed változik: a jegyeid, a bérleted, a pontjaid és a meghívóid a fiókodnál maradnak.',
+    features: [
+      { icon: 'mail', text: 'A megerősítő linket az új címre küldtük, a régi címre értesítést.' },
+      { icon: 'timer', text: 'A link rövid ideig érvényes, és csak egyszer használható.' },
+      { icon: 'login', text: 'A megerősítés után az új címmel jelentkezel be.' },
     ],
   },
   register: {

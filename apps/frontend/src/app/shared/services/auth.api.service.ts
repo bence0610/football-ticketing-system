@@ -3,7 +3,12 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AuthResponse,
+  ChangePasswordPayload,
+  EmailChangeConfirmed,
+  EmailChangePayload,
+  EmailChangeRequested,
   LoginPayload,
+  ProfileUpdatePayload,
   RegisterPayload,
   UserProfile,
   UserTicketsPage,
@@ -84,7 +89,36 @@ export class AuthApiService {
     });
   }
 
-  updateProfile(payload: Partial<{ firstName: string; lastName: string; phoneNumber: string }>): Observable<UserProfile> {
-    return this.http.patch<UserProfile>('/users/me', payload, WITH_CREDENTIALS);
+  updateProfile(payload: ProfileUpdatePayload): Observable<UserProfile> {
+    return this.http.patch<UserProfile>('/users/me', payload, {
+      ...WITH_CREDENTIALS,
+      context: FORM_CONTEXT,
+    });
+  }
+
+  /**
+   * Answers like a login: a fresh token pair for this session (every other
+   * session loses its refresh token). AuthService.changePassword applies it.
+   */
+  changePassword(payload: ChangePasswordPayload): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>('/auth/change-password', payload, {
+      ...WITH_CREDENTIALS,
+      context: FORM_CONTEXT,
+    });
+  }
+
+  /** 202: a link goes to the new address; `email` does not change until it is opened. */
+  requestEmailChange(payload: EmailChangePayload): Observable<EmailChangeRequested> {
+    return this.http.post<EmailChangeRequested>('/users/me/email-change', payload, {
+      ...WITH_CREDENTIALS,
+      context: FORM_CONTEXT,
+    });
+  }
+
+  /** Public: the emailed link works in any browser, signed in or not. */
+  confirmEmailChange(token: string): Observable<EmailChangeConfirmed> {
+    return this.http.post<EmailChangeConfirmed>('/auth/confirm-email-change', { token }, {
+      context: FORM_CONTEXT,
+    });
   }
 }

@@ -1,15 +1,15 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../../shared/services/auth.api.service';
+import { apiErrorCode as codeOf, apiErrorMessage as serverMessage } from '../../shared/utils/api-error';
 import {
-  PASSWORD_MAX,
+  passwordMaxBytesValidator,
   PASSWORD_MIN,
   PASSWORD_PATTERN,
-  passwordChecks,
+  passwordRuleError,
 } from '../../shared/utils/password-rules';
 import { AuthFieldComponent } from './components/auth-field.component';
 import { AuthLayoutComponent } from './components/auth-layout.component';
@@ -135,7 +135,7 @@ export class ResetPasswordPageComponent implements OnInit {
       [
         Validators.required,
         Validators.minLength(PASSWORD_MIN),
-        Validators.maxLength(PASSWORD_MAX),
+        passwordMaxBytesValidator,
         Validators.pattern(PASSWORD_PATTERN),
       ],
     ],
@@ -171,13 +171,7 @@ export class ResetPasswordPageComponent implements OnInit {
   }
 
   protected passwordError(): string {
-    const value = this.form.controls.password.value;
-    if (!value) return 'Adj meg egy jelszót.';
-    const c = passwordChecks(value);
-    if (!c.longEnough) return `Legalább ${PASSWORD_MIN} karakter kell.`;
-    if (!c.notTooLong) return `Legfeljebb ${PASSWORD_MAX} karakter lehet.`;
-    if (!c.hasLetter) return 'Kell bele legalább egy betű (a–z).';
-    return 'Kell bele legalább egy szám.';
+    return passwordRuleError(this.form.controls.password.value);
   }
 
   protected submit(): void {
@@ -216,21 +210,4 @@ export class ResetPasswordPageComponent implements OnInit {
       message: serverMessage(err) ?? 'Ez a visszaállító link nem használható. Kérj új linket.',
     });
   }
-}
-
-function codeOf(err: unknown): string | null {
-  if (err instanceof HttpErrorResponse && err.error && typeof err.error === 'object') {
-    const code = (err.error as Record<string, unknown>)['code'];
-    return typeof code === 'string' ? code : null;
-  }
-  return null;
-}
-
-function serverMessage(err: unknown): string | null {
-  if (err instanceof HttpErrorResponse && err.error && typeof err.error === 'object') {
-    const message = (err.error as Record<string, unknown>)['message'];
-    if (typeof message === 'string') return message;
-    if (Array.isArray(message) && typeof message[0] === 'string') return message[0];
-  }
-  return null;
 }

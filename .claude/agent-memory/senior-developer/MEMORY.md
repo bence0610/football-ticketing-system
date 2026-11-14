@@ -1,8 +1,1 @@
-- [User profile](user_profile.md) — kristof.laczkovich@gmail.com, KTE Jegyportál szakdolgozat
-- [Iteration 1 scope](project_iteration_1_foundation.md) — KTE-001 - KTE-007 foundation tasks completed
-- [Iteration 2 scope](project_iteration_2_landing_map.md) — Landing (E2) + Stadium Map (E3) public screens delivered
-- [Iteration 3 scope](project_iteration_3_cart_auth_checkout.md) — Auth, cart NgRx, Stripe checkout, weather banner, profile (KTE-020..037)
-- [Iteration 4 scope](project_iteration_4_tickets_loyalty_loans.md) — Tickets/Loyalty/Pass-Loan (KTE-038..054 except KTE-051)
-- [Payment flow](project_payment_flow.md) — single Stripe path in PaymentsModule; /api/payments/create-intent + /api/webhooks/stripe; CheckoutModule removed 2026-10-09
-- [Season pass purchase flow](project_season_pass_purchase_flow.md) — separate Stripe path in SeasonPassesModule, SeasonPassPrice catalogue, seat-map 'season_pass' status
-- [E2E test suite](project_e2e_test_suite.md) — apps/backend/test/, real MySQL+Redis, Stripe stub keeps real signature verifier
+- [Account operations](project_account_operations.md) — change password/e-mail: 400 not 401, confirm-before-effect, loan borrowerEmail migration, module placement

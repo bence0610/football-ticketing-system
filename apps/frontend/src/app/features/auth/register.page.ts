@@ -7,10 +7,10 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { strictEmailValidator } from '../../shared/validators/email.validator';
 import {
-  PASSWORD_MAX,
+  passwordMaxBytesValidator,
   PASSWORD_MIN,
   PASSWORD_PATTERN,
-  passwordChecks,
+  passwordRuleError,
 } from '../../shared/utils/password-rules';
 import { AuthFieldComponent } from './components/auth-field.component';
 import { AuthLayoutComponent } from './components/auth-layout.component';
@@ -168,7 +168,7 @@ export class RegisterPageComponent {
       [
         Validators.required,
         Validators.minLength(PASSWORD_MIN),
-        Validators.maxLength(PASSWORD_MAX),
+        passwordMaxBytesValidator,
         Validators.pattern(PASSWORD_PATTERN),
       ],
     ],
@@ -209,13 +209,7 @@ export class RegisterPageComponent {
   }
 
   protected passwordError(): string {
-    const value = this.form.controls.password.value;
-    if (!value) return 'Adj meg egy jelszót.';
-    const c = passwordChecks(value);
-    if (!c.longEnough) return `Legalább ${PASSWORD_MIN} karakter kell.`;
-    if (!c.notTooLong) return `Legfeljebb ${PASSWORD_MAX} karakter lehet.`;
-    if (!c.hasLetter) return 'Kell bele legalább egy betű (a–z).';
-    return 'Kell bele legalább egy szám.';
+    return passwordRuleError(this.form.controls.password.value);
   }
 
   protected submit(): void {

@@ -11,6 +11,7 @@ import {
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { loadSectorMap } from '../seats/sector-lookup';
 import { ProfileDto, ProfileTicketDto, ProfileTicketsDto, UpdateProfileDto } from './dto';
+import { EmailChangeService } from './email-change.service';
 
 /**
  * Statuses that mark a ticket as "still relevant" on the user's profile — i.e.
@@ -32,6 +33,7 @@ export class UsersService {
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>,
     private readonly loyaltyService: LoyaltyService,
+    private readonly emailChange: EmailChangeService,
   ) {}
 
   async count(): Promise<number> {
@@ -47,12 +49,15 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('Felhasználó nem található.');
     }
+    const pendingEmail = await this.emailChange.pendingEmailFor(user);
     return {
       id: user.id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      phoneNumber: user.phoneNumber,
+      phoneNumber: user.phoneNumber ?? undefined,
+      dateOfBirth: toDateOnly(user.dateOfBirth),
+      ...(pendingEmail !== undefined && { pendingEmail }),
       role: user.role,
       loyaltyTier: user.loyaltyTier,
       loyaltyPoints: user.loyaltyPoints,
@@ -121,9 +126,12 @@ export class UsersService {
       user.lastName = dto.lastName.trim();
     }
     if (dto.phoneNumber !== undefined) {
-      user.phoneNumber = dto.phoneNumber.trim() || undefined;
+      // "" (or null) clears the number. It has to become NULL, not undefined:
+      // save() skips undefined properties, so the old number would stay.
+      user.phoneNumber = dto.phoneNumber?.trim() || null;
     }
     if (dto.dateOfBirth !== undefined) {
+      // null clears it (a date entered by mistake); undefined leaves it alone.
       user.dateOfBirth = dto.dateOfBirth;
     }
 
@@ -184,4 +192,19 @@ export class UsersService {
     }
     return this.userRepository.find({ where: { id: In(ids) } });
   }
+}
+
+/**
+ * A DATE column value as 'YYYY-MM-DD'. The connection runs in UTC
+ * (`timezone: 'Z'`) and dateColumnTransformer builds the Date from the
+ * driver's 'YYYY-MM-DD' string, so the UTC calendar day is the stored day.
+ */
+function toDateOnly(value: Date | string | null | undefined): string | undefined {
+  if (value == null) {
+    return undefined;
+  }
+  if (typeof value === 'string') {
+    return value.slice(0, 10);
+  }
+  return Number.isNaN(value.getTime()) ? undefined : value.toISOString().slice(0, 10);
 }

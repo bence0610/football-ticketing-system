@@ -71,8 +71,9 @@ kte-auth-field { display: block; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  /* A 44px target, which still fits the 52px box with its 1.5px border. */
+  width: var(--min-target, 44px);
+  height: var(--min-target, 44px);
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -139,6 +140,8 @@ kte-auth-field { display: block; }
 .kte-auth-switch { margin: 8px 0 0; font-size: 15px; color: var(--muted); }
 .kte-auth-switch a { color: var(--brand-deep); font-weight: 600; }
 .kte-auth-form { display: flex; flex-direction: column; gap: 18px; margin-top: 28px; }
+/* Inside an account-page card the heading is right above: less air. */
+.kte-auth-form--card { margin-top: 18px; }
 .kte-auth-form__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .kte-auth-submit {
   text-decoration: none;

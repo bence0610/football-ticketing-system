@@ -53,6 +53,7 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().min(16).required(),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
   PASSWORD_RESET_TTL_MINUTES: Joi.number().integer().min(5).max(1440).default(60),
+  EMAIL_CHANGE_TTL_MINUTES: Joi.number().integer().min(5).max(1440).default(60),
   SUPPORT_EMAIL: Joi.string().email().default('jegy@kte.hu'),
 
   // Bcrypt
