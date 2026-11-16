@@ -14,13 +14,19 @@ export interface OverviewMatch {
   readonly status: string;
   /** False while the match is still ahead: sales, and so the figures, can still move. */
   readonly final: boolean;
-  readonly ticketCount: number;
-  readonly passEntryCount: number;
-  readonly occupiedSeats: number;
-  readonly capacity: number;
-  readonly occupancyPercent: number;
+  /**
+   * The club plays at home. Tickets are sold only for home matches: for an away match every
+   * figure below is null (the page shows a dash), and it is in no total or average.
+   */
+  readonly isHome: boolean;
+  readonly ticketCount: number | null;
+  readonly passEntryCount: number | null;
+  readonly occupiedSeats: number | null;
+  /** The sellable seats (the away section is not sold here). */
+  readonly capacity: number | null;
+  readonly occupancyPercent: number | null;
   /** HUF actually charged. */
-  readonly revenue: number;
+  readonly revenue: number | null;
 }
 
 export interface OverviewMetrics {

@@ -9,7 +9,7 @@ const match: MatchListItem = {
   id: 'm1',
   homeTeam: 'Kecskeméti TE',
   awayTeam: 'Ferencváros',
-  competition: 'NB1',
+  competition: 'NB2',
   venue: 'Széktói Stadion',
   kickoffAt: new Date(Date.now() + 3 * 86_400_000).toISOString(),
   status: 'on_sale',

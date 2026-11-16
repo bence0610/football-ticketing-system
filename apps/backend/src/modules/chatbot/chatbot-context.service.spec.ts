@@ -41,7 +41,7 @@ function makeMatch(
     id,
     homeTeam,
     awayTeam,
-    competition: 'NB I',
+    competition: 'NB II',
     venue: 'Széktói Stadion',
     kickoffAt,
     description,

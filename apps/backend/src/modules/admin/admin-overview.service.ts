@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -10,22 +11,17 @@ import {
   SeasonPassStatus,
   Sector,
   Ticket,
-  TicketSource,
-  TicketStatus,
 } from '../../database/entities';
+import { AppConfig } from '../../config';
+import { isHomeMatch } from '../matches/match-home';
 import { compareSeats } from '../seats/seat-order';
 import { compareSectors } from '../seats/sector-catalogue.service';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { passRevenueByTier, sumTiers } from './season-pass-revenue';
-import {
-  OverviewDto,
-  OverviewMatchDto,
-  OverviewPeriod,
-  OverviewSeasonDto,
-  SeatSalesDto,
-} from './dto/overview.dto';
+import { countSellableSeats } from './sellable-seats';
+import { OverviewDto, OverviewPeriod, OverviewSeasonDto, SeatSalesDto } from './dto/overview.dto';
+import { TicketAggregate, matchRows, overviewMetrics } from './overview-figures';
 
-const SOLD_STATUSES = [TicketStatus.PAID, TicketStatus.USED];
 const DAY_MS = 86_400_000;
 
 interface Season extends OverviewSeasonDto {
@@ -33,21 +29,8 @@ interface Season extends OverviewSeasonDto {
   to: Date;
 }
 
-interface TicketAggregate {
-  matchId: string;
-  status: TicketStatus;
-  source: TicketSource;
-  n: string;
-  amount: string;
-}
-
 function dateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-/** Percent 0..100, rounded; 0 for an empty denominator. */
-function percent(part: number, whole: number): number {
-  return whole <= 0 ? 0 : Math.round((part / whole) * 100);
 }
 
 function seasonDto(season: Season | null): OverviewSeasonDto | null {
@@ -71,7 +54,16 @@ export class AdminOverviewService {
     @InjectRepository(SeasonPassPrice)
     private readonly priceRepository: Repository<SeasonPassPrice>,
     @InjectRepository(Sector) private readonly sectorRepository: Repository<Sector>,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.homeTeamName = configService.getOrThrow<AppConfig>('app').homeTeamName;
+  }
+
+  private readonly homeTeamName: string;
+
+  private isHome(match: Match): boolean {
+    return isHomeMatch(match, this.homeTeamName);
+  }
 
   /** The active season, from the price list the pass purchase uses. */
   async currentSeason(): Promise<Season | null> {
@@ -104,12 +96,14 @@ export class AdminOverviewService {
     }
     const matches = await query.getMany();
 
-    const capacity = await this.seatRepository.count({ where: { isActive: true } });
-    const matchIds = matches.map((m) => m.id);
+    // Tickets are sold only for home matches, so away matches are neither queried for sales nor
+    // measured: they stay in the list with every sold-ticket figure null.
+    const sellableSeats = await countSellableSeats(this.seatRepository);
+    const homeIds = matches.filter((m) => this.isHome(m)).map((m) => m.id);
 
     // Per match: tickets by status and source, with the money actually charged.
     const ticketRows: TicketAggregate[] =
-      matchIds.length === 0
+      homeIds.length === 0
         ? []
         : await this.ticketRepository
             .createQueryBuilder('t')
@@ -118,61 +112,30 @@ export class AdminOverviewService {
             .addSelect('t.source', 'source')
             .addSelect('COUNT(t.id)', 'n')
             .addSelect('COALESCE(SUM(t.pricePaid), 0)', 'amount')
-            .where('t.matchId IN (:...matchIds)', { matchIds })
+            .where('t.matchId IN (:...homeIds)', { homeIds })
             .groupBy('t.matchId')
             .addGroupBy('t.status')
             .addGroupBy('t.source')
             .getRawMany<TicketAggregate>();
 
     const passSeats = await this.activePassSeatIds();
-    const seatsWithTicket = await this.passSeatsWithTicket(matchIds, passSeats);
+    const seatsWithTicket = await this.passSeatsWithTicket(homeIds, passSeats);
 
-    const rows: OverviewMatchDto[] = matches.map((match) => {
-      let ticketCount = 0;
-      let passEntryCount = 0;
-      let occupyingTickets = 0;
-      let revenue = 0;
-      for (const r of ticketRows) {
-        if (r.matchId !== match.id) continue;
-        const n = Number(r.n);
-        if (SOLD_STATUSES.includes(r.status)) {
-          revenue += Number(r.amount);
-          if (r.source === TicketSource.SINGLE) ticketCount += n;
-        }
-        if (OCCUPYING_TICKET_STATUSES.includes(r.status)) {
-          occupyingTickets += n;
-          if (r.source !== TicketSource.SINGLE) passEntryCount += n;
-        }
-      }
-      const withTicket = seatsWithTicket.get(match.id) ?? new Set<string>();
-      const heldOnly = [...passSeats].filter((id) => !withTicket.has(id)).length;
-      const occupiedSeats = Math.min(capacity, occupyingTickets + heldOnly);
-      return {
-        matchId: match.id,
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam,
-        kickoffAt: match.kickoffAt.toISOString(),
-        status: match.status,
-        final: match.status === MatchStatus.FINISHED || match.kickoffAt <= now,
-        ticketCount,
-        passEntryCount,
-        occupiedSeats,
-        capacity,
-        occupancyPercent: percent(occupiedSeats, capacity),
-        revenue: Math.round(revenue),
-      };
+    const rows = matchRows({
+      matches: matches.map((m) => ({
+        id: m.id,
+        homeTeam: m.homeTeam,
+        awayTeam: m.awayTeam,
+        kickoffAt: m.kickoffAt,
+        status: m.status,
+        isHome: this.isHome(m),
+      })),
+      ticketRows,
+      passSeats,
+      passSeatsWithTicket: seatsWithTicket,
+      sellableSeats,
+      now,
     });
-
-    const finals = rows.filter((r) => r.final);
-    const played = new Set(finals.map((r) => r.matchId));
-    let playedTickets = 0;
-    let scannedTickets = 0;
-    for (const r of ticketRows) {
-      if (!played.has(r.matchId) || r.source !== TicketSource.SINGLE) continue;
-      if (!SOLD_STATUSES.includes(r.status)) continue;
-      playedTickets += Number(r.n);
-      if (r.status === TicketStatus.USED) scannedTickets += Number(r.n);
-    }
 
     // Season-pass money, apart from match revenue: one payment per season, never split over matches.
     const passTiers =
@@ -195,19 +158,7 @@ export class AdminOverviewService {
         passCount: passTotals.passCount,
         byTier: passTiers,
       },
-      metrics: {
-        revenue: rows.reduce((a, r) => a + r.revenue, 0),
-        ticketsSold: rows.reduce((a, r) => a + r.ticketCount, 0),
-        passEntries: rows.reduce((a, r) => a + r.passEntryCount, 0),
-        averageOccupancyPercent:
-          finals.length === 0
-            ? null
-            : Math.round(finals.reduce((a, r) => a + r.occupancyPercent, 0) / finals.length),
-        finalMatchCount: finals.length,
-        redemptionPercent: playedTickets === 0 ? null : percent(scannedTickets, playedTickets),
-        scannedTickets,
-        playedTickets,
-      },
+      metrics: overviewMetrics(rows, ticketRows),
       matches: rows,
     };
   }
@@ -215,9 +166,12 @@ export class AdminOverviewService {
   /** How often each seat was taken across the matches played this season. */
   async getSeatSales(now = new Date()): Promise<SeatSalesDto> {
     const season = await this.currentSeason();
+    // Only home matches: an away match has no sales, and the seats held by passes must not be
+    // counted as "taken" for it.
     const query = this.matchRepository
       .createQueryBuilder('m')
       .where('m.status NOT IN (:...skip)', { skip: [MatchStatus.CANCELLED, MatchStatus.POSTPONED] })
+      .andWhere('m.homeTeam = :home', { home: this.homeTeamName })
       .andWhere('m.kickoffAt <= :now', { now });
     if (season) {
       query.andWhere('m.kickoffAt BETWEEN :from AND :to', { from: season.from, to: season.to });

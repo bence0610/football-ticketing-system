@@ -13,6 +13,19 @@ export const LOW_OCCUPANCY_PERCENT = 50;
 
 export type OccupancyTone = 'full' | 'low' | 'normal';
 
+/** A match that is sold here (a home match): every figure is present. */
+export type SoldMatch = OverviewMatch & {
+  readonly isHome: true;
+  readonly ticketCount: number;
+  readonly passEntryCount: number;
+  readonly occupiedSeats: number;
+  readonly capacity: number;
+  readonly occupancyPercent: number;
+  readonly revenue: number;
+};
+
+export const isSoldMatch = (match: OverviewMatch): match is SoldMatch => match.isHome;
+
 export function occupancyTone(percent: number): OccupancyTone {
   if (percent >= 100) return 'full';
   if (percent < LOW_OCCUPANCY_PERCENT) return 'low';
@@ -79,10 +92,11 @@ export function matchesCsv(matches: readonly OverviewMatch[]): string {
     fixtureLabel(m),
     m.kickoffAt,
     m.final ? 'igen' : 'nem',
-    m.ticketCount,
-    m.passEntryCount,
-    m.occupancyPercent,
-    m.revenue,
+    // An away match has no figures: an empty cell, not a zero.
+    m.ticketCount ?? '',
+    m.passEntryCount ?? '',
+    m.occupancyPercent ?? '',
+    m.revenue ?? '',
   ]);
   return [header, ...rows].map((r) => r.map(csvField).join(';')).join('\r\n') + '\r\n';
 }
@@ -100,13 +114,13 @@ export function niceMax(value: number): number {
 }
 
 export interface Bar {
-  readonly match: OverviewMatch;
+  readonly match: SoldMatch;
   /** Height in the same unit as `plotHeight`. */
   readonly height: number;
 }
 
 export function barHeights(
-  matches: readonly OverviewMatch[],
+  matches: readonly SoldMatch[],
   plotHeight: number,
   axisMax: number,
 ): readonly Bar[] {

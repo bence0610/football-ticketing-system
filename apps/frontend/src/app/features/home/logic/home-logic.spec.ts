@@ -9,7 +9,7 @@ function match(over: Partial<MatchListItem>): MatchListItem {
     id: 'm',
     homeTeam: 'Kecskeméti TE',
     awayTeam: 'X',
-    competition: 'NB1',
+    competition: 'NB2',
     venue: 'V',
     kickoffAt: '2026-11-09T19:00:00.000Z',
     status: 'on_sale',

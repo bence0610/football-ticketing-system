@@ -13,6 +13,7 @@ import { RevenueBarChartComponent } from '../components/revenue-bar-chart.compon
 import {
   fixtureLabel,
   headerSubtitle,
+  isSoldMatch,
   matchesCsv,
   occupancyTone,
   periodOptions,
@@ -103,7 +104,7 @@ const percentText = (value: number | null): string => (value === null ? '—' : 
 
             <section class="card" aria-labelledby="chart-title">
               <h2 id="chart-title" class="card__title">Bevétel meccsenként</h2>
-              <kte-revenue-bar-chart [data]="d.matches" />
+              <kte-revenue-bar-chart [data]="soldMatches()" />
               <p class="card__fine">
                 A bérletes belépők nem hoznak meccsenkénti bevételt: a bérlet ára egy összeg a szezonra, ezért nincs
                 meccshez rendelhető forintértékük. A számuk a táblázatban látható.
@@ -132,23 +133,39 @@ const percentText = (value: number | null): string => (value === null ? '—' : 
                             <span>{{ fixture(m) }}</span>
                             <span class="fixture__when">
                               {{ m.kickoffAt | date: 'yyyy. MM. dd. HH:mm' : '' : 'hu-HU' }}
-                              @if (!m.final) {
+                              @if (!m.isHome) {
+                                <span class="chip" data-testid="away">idegenben</span>
+                              } @else if (!m.final) {
                                 <span class="chip" data-testid="not-final">nem végleges</span>
                               }
                             </span>
                           </th>
                           <td class="num">
-                            {{ m.ticketCount }}
-                            @if (m.passEntryCount > 0) {
-                              <span class="sub">+ {{ m.passEntryCount }} bérletes</span>
+                            @if (m.ticketCount === null) {
+                              <span class="dash" data-testid="no-tickets" title="Idegenbeli mérkőzés: itt nem értékesítünk jegyet">–</span>
+                            } @else {
+                              {{ m.ticketCount }}
+                              @if (m.passEntryCount !== null && m.passEntryCount > 0) {
+                                <span class="sub">+ {{ m.passEntryCount }} bérletes</span>
+                              }
                             }
                           </td>
                           <td class="num">
-                            <span class="occ" [attr.data-tone]="tone(m.occupancyPercent)" data-testid="occupancy">
-                              {{ m.occupancyPercent }}%
-                            </span>
+                            @if (m.occupancyPercent === null) {
+                              <span class="dash" data-testid="no-occupancy" title="Idegenbeli mérkőzés: itt nem értékesítünk jegyet">–</span>
+                            } @else {
+                              <span class="occ" [attr.data-tone]="tone(m.occupancyPercent)" data-testid="occupancy">
+                                {{ m.occupancyPercent }}%
+                              </span>
+                            }
                           </td>
-                          <td class="num">{{ m.revenue | hufCurrency }}</td>
+                          <td class="num">
+                            @if (m.revenue === null) {
+                              <span class="dash" data-testid="no-revenue" title="Idegenbeli mérkőzés: itt nem értékesítünk jegyet">–</span>
+                            } @else {
+                              {{ m.revenue | hufCurrency }}
+                            }
+                          </td>
                         </tr>
                       }
                     </tbody>
@@ -441,6 +458,10 @@ const percentText = (value: number | null): string => (value === null ? '—' : 
         font-weight: 600;
       }
 
+      .dash {
+        color: var(--muted);
+      }
+
       .occ {
         display: inline-block;
         padding: 2px 8px;
@@ -490,6 +511,9 @@ export class RevenueStatsPageComponent {
     const s = this.state();
     return s.status === 'ready' ? s.data : null;
   });
+
+  /** The matches that are sold here (home matches): the chart and the tiles are about these only. */
+  protected readonly soldMatches = computed(() => (this.data()?.matches ?? []).filter(isSoldMatch));
   protected readonly ready = computed(() => this.data() !== null);
   protected readonly errorMessage = computed(() => {
     const s = this.state();
@@ -511,7 +535,7 @@ export class RevenueStatsPageComponent {
         testId: 'metric-revenue',
         label: 'Bevétel',
         value: huf.transform(m.revenue),
-        context: `${d.matches.length} meccs, a ténylegesen terhelt összeg`,
+        context: `${this.soldMatches().length} hazai meccs, a ténylegesen terhelt összeg`,
       },
       {
         testId: 'metric-tickets',

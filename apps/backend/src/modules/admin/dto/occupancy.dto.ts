@@ -16,7 +16,8 @@ export class MatchOccupancyDto {
   @ApiProperty({ format: 'date-time' }) kickoffAt!: string;
   @ApiProperty() venue!: string;
 
-  @ApiProperty({ description: 'Összes szék a stadionban' }) totalCapacity!: number;
+  @ApiProperty({ description: 'Értékesíthető székek (a vendégszektor nélkül)' })
+  totalCapacity!: number;
   @ApiProperty() totalSold!: number;
   @ApiProperty() totalLocked!: number;
   @ApiProperty() totalAvailable!: number;

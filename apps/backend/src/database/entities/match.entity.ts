@@ -29,7 +29,8 @@ export class Match extends BaseEntity {
   @Column({ type: 'varchar', length: 100, name: 'away_team' })
   awayTeam!: string;
 
-  @Column({ type: 'enum', enum: Competition, default: Competition.NB1 })
+  // The club plays in the NB II. Keep in step with migration CompetitionDefaultNb2.
+  @Column({ type: 'enum', enum: Competition, default: Competition.NB2 })
   competition!: Competition;
 
   @Column({ type: 'varchar', length: 200 })

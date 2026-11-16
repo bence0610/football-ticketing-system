@@ -19,15 +19,35 @@ export class OverviewMatchDto {
     description: 'False while the match is still ahead: sales, and so the figures, can still move.',
   })
   final!: boolean;
-  @ApiProperty({ description: 'Single tickets sold (paid or used).' }) ticketCount!: number;
-  @ApiProperty({ description: 'Season-pass and loan entries issued for the match.' })
-  passEntryCount!: number;
-  @ApiProperty({ description: 'Seats taken: tickets plus seats held by an active pass.' })
-  occupiedSeats!: number;
-  @ApiProperty() capacity!: number;
-  @ApiProperty({ description: '0..100' }) occupancyPercent!: number;
-  @ApiProperty({ description: 'HUF actually charged (sum of ticket.pricePaid).' })
-  revenue!: number;
+  @ApiProperty({
+    description:
+      'The club plays at home. Tickets are sold only for home matches: every figure below is null for an away match (a dash, not a zero).',
+  })
+  isHome!: boolean;
+  @ApiPropertyOptional({ nullable: true, description: 'Single tickets sold (paid or used).' })
+  ticketCount!: number | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Season-pass and loan entries issued for the match.',
+  })
+  passEntryCount!: number | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Seats taken: tickets plus seats held by an active pass.',
+  })
+  occupiedSeats!: number | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'The sellable seats: every active seat outside the away section.',
+  })
+  capacity!: number | null;
+  @ApiPropertyOptional({ nullable: true, description: '0..100 of the sellable seats.' })
+  occupancyPercent!: number | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'HUF actually charged (sum of ticket.pricePaid).',
+  })
+  revenue!: number | null;
 }
 
 export class OverviewMetricsDto {
@@ -117,7 +137,9 @@ export class SeatSalesDto {
   @ApiPropertyOptional({ type: OverviewSeasonDto, nullable: true })
   season!: OverviewSeasonDto | null;
   @ApiProperty({ format: 'date-time' }) generatedAt!: string;
-  @ApiProperty({ description: 'Matches played in the season; the denominator of every seat.' })
+  @ApiProperty({
+    description: 'HOME matches played in the season; the denominator of every seat.',
+  })
   matchCount!: number;
   @ApiProperty({ type: [SeatSaleSectorDto], description: 'Stadium order, upper arc first.' })
   sectors!: SeatSaleSectorDto[];

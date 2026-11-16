@@ -23,7 +23,7 @@ const baseMatch: MatchResource = {
   id: MATCH_ID,
   homeTeam: 'KTE',
   awayTeam: 'Fehérvár',
-  competition: 'NB1',
+  competition: 'NB2',
   venue: 'Széktói Stadion',
   kickoffAt: new Date(FUTURE_MS).toISOString(),
   status: 'on_sale',

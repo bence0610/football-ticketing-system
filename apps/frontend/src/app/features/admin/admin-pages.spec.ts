@@ -20,6 +20,7 @@ const match = (over: Partial<OverviewMatch>): OverviewMatch => ({
   kickoffAt: '2026-07-12T16:00:00.000Z',
   status: 'finished',
   final: true,
+  isHome: true,
   ticketCount: 10,
   passEntryCount: 0,
   occupiedSeats: 10,
@@ -177,6 +178,46 @@ describe('RevenueStatsPageComponent', async () => {
     expect(text(rows[0])).toContain('35 000');
     expect(text(rows[2])).toContain('+ 3 bérletes');
     expect(el.querySelectorAll('[data-testid="not-final"]').length).toBe(1);
+  });
+
+  describe('an away match in the list', () => {
+    const away = match({
+      matchId: 'away-1',
+      homeTeam: 'Szeged',
+      awayTeam: 'Kecskeméti TE',
+      isHome: false,
+      ticketCount: null,
+      passEntryCount: null,
+      occupiedSeats: null,
+      capacity: null,
+      occupancyPercent: null,
+      revenue: null,
+    });
+    const withAway = (): Overview => {
+      const base = overview();
+      return { ...base, matches: [...base.matches, away] };
+    };
+
+    it('stays in the table, with a dash for tickets, occupancy and revenue, and is labelled', async () => {
+      const el = await render(withAway());
+      const rows = Array.from(el.querySelectorAll('[data-testid="match-row"]'));
+      expect(rows.length).toBe(4);
+      const row = rows[3];
+      expect(text(row)).toContain('Szeged – Kecskeméti TE');
+      expect(text(row.querySelector('[data-testid="away"]'))).toBe('idegenben');
+      for (const id of ['no-tickets', 'no-occupancy', 'no-revenue']) {
+        expect(text(row.querySelector(`[data-testid="${id}"]`))).toBe('–');
+      }
+      expect(row.querySelector('[data-testid="occupancy"]')).toBeNull();
+      expect(text(row)).not.toContain('0%');
+      expect(text(row)).not.toContain('Ft');
+    });
+
+    it('draws no bar for it, and the revenue tile counts home matches only', async () => {
+      const el = await render(withAway());
+      expect(el.querySelectorAll('[data-testid="revenue-bar"]').length).toBe(3);
+      expect(text(el.querySelector('[data-testid="metric-revenue"]'))).toContain('3 hazai meccs');
+    });
   });
 
   it('names the season and refresh time in the header and offers a CSV export', async () => {

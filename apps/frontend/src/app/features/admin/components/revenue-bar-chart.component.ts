@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, Input, computed, signal } from '@angular/core';
-import { OverviewMatch } from '../../../shared/models/admin.model';
 import { HufCurrencyPipe } from '../../../shared/pipes/huf-currency.pipe';
-import { barHeights, fixtureLabel, niceMax } from '../logic/admin-logic';
+import { SoldMatch, barHeights, fixtureLabel, niceMax } from '../logic/admin-logic';
 
 const PLOT_HEIGHT = 220;
 const TOP = 12;
@@ -147,9 +146,10 @@ const LABEL_BAND = 48;
   ],
 })
 export class RevenueBarChartComponent {
-  protected readonly matches = signal<readonly OverviewMatch[]>([]);
+  protected readonly matches = signal<readonly SoldMatch[]>([]);
 
-  @Input({ required: true }) set data(value: readonly OverviewMatch[]) {
+  /** Matches that are sold here: away matches have no revenue and are not drawn. */
+  @Input({ required: true }) set data(value: readonly SoldMatch[]) {
     this.matches.set(value);
   }
 

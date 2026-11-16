@@ -14,6 +14,7 @@ import {
   SeasonPassPrice,
   SeasonPassStatus,
   SeatCategory,
+  Sector,
   Ticket,
   TicketSource,
   TicketStatus,
@@ -201,6 +202,190 @@ describe('Admin overview (E2E)', () => {
     expect(res.body.matchCount).toBe(1);
     const taken = (res.body.seats as Array<{ number: number; taken: number }>).map((s) => s.taken);
     expect(taken).toEqual([1, 1, 0, 0]);
+  });
+
+  describe('away matches', () => {
+    /** An away match, listed in the season but never sold here. */
+    async function addAwayMatch(): Promise<Match> {
+      const matchRepo = ctx.dataSource.getRepository(Match);
+      return matchRepo.save(
+        matchRepo.create({
+          homeTeam: 'Szeged',
+          awayTeam: 'Kecskeméti TE',
+          competition: Competition.NB2,
+          venue: 'Szeged - vendégpálya',
+          kickoffAt: new Date(Date.now() - 5 * 86_400_000),
+          status: MatchStatus.FINISHED,
+          capacity: 0,
+          basePrice: '0.00',
+          isSeasonPassEligible: false,
+        }),
+      );
+    }
+
+    it('lists an away match with no figures and keeps it out of every total, even with a ticket and a pass on its books', async () => {
+      const admin = await createUser(UserRole.ADMIN);
+      const fan = await createUser(UserRole.FAN);
+      await seed(fan.id);
+      const auth = { Authorization: `Bearer ${admin.token}` };
+      const overview = async () =>
+        (await request(server).get('/api/admin/overview?period=season').set(auth)).body;
+      const seatSales = async () =>
+        (await request(server).get('/api/admin/seat-sales').set(auth)).body;
+      const revenue = async () => (await request(server).get('/api/admin/revenue').set(auth)).body;
+
+      // An active season pass: its seat counted as "occupied" for EVERY match, away ones too.
+      const seats = await ctx.dataSource.getRepository(Seat).find({ order: { number: 'ASC' } });
+      await ctx.dataSource.getRepository(SeasonPass).save(
+        ctx.dataSource.getRepository(SeasonPass).create({
+          userId: fan.id,
+          holderName: 'Bérletes Teszt',
+          seatId: seats[3].id,
+          seasonLabel: '2026/2027',
+          validFrom: new Date('2026-07-01'),
+          validUntil: new Date('2027-06-30'),
+          status: SeasonPassStatus.ACTIVE,
+          pricePaid: '22000.00',
+          currency: 'HUF',
+          qrCode: `KTE-SP-${randomUUID()}`,
+        }),
+      );
+      await ctx.dataSource.getRepository(SeasonPassPrice).save(
+        ctx.dataSource.getRepository(SeasonPassPrice).create({
+          section: 'upper',
+          sectionLabel: 'Felső ív',
+          seasonLabel: '2026/2027',
+          price: 22000,
+          currency: 'HUF',
+          validFrom: new Date('2026-07-01'),
+          validUntil: new Date('2027-06-30'),
+          isActive: true,
+        }),
+      );
+
+      const before = {
+        overview: await overview(),
+        seatSales: await seatSales(),
+        revenue: await revenue(),
+      };
+      const away = await addAwayMatch();
+      // Forged: a ticket on an away match is a state the application never creates, so it
+      // proves that even a stray one is not counted anywhere.
+      await ctx.dataSource.getRepository(Ticket).save(
+        ctx.dataSource.getRepository(Ticket).create({
+          matchId: away.id,
+          seatId: seats[2].id,
+          userId: fan.id,
+          status: TicketStatus.PAID,
+          source: TicketSource.SINGLE,
+          pricePaid: '9999.00',
+          currency: 'HUF',
+          qrCode: `KTE-${randomUUID()}`,
+          qrJti: randomUUID(),
+        }),
+      );
+      const after = {
+        overview: await overview(),
+        seatSales: await seatSales(),
+        revenue: await revenue(),
+      };
+
+      const row = (after.overview.matches as Array<Record<string, unknown>>).find(
+        (m) => m.matchId === away.id,
+      )!;
+      expect(row).toMatchObject({
+        isHome: false,
+        final: true,
+        ticketCount: null,
+        passEntryCount: null,
+        occupiedSeats: null,
+        capacity: null,
+        occupancyPercent: null,
+        revenue: null,
+      });
+      expect(after.overview.metrics).toEqual(before.overview.metrics);
+      expect(after.overview.matches.filter((m: { isHome: boolean }) => m.isHome)).toEqual(
+        before.overview.matches,
+      );
+      expect(after.seatSales.matchCount).toBe(before.seatSales.matchCount);
+      expect(after.seatSales.seats).toEqual(before.seatSales.seats);
+      expect(after.revenue.summary).toEqual(before.revenue.summary);
+      expect(after.revenue.daily).toEqual(before.revenue.daily);
+      expect(after.revenue.byMatch).toEqual(before.revenue.byMatch);
+    });
+
+    it('has no occupancy report for an away match', async () => {
+      const admin = await createUser(UserRole.ADMIN);
+      const away = await addAwayMatch();
+      const res = await request(server)
+        .get(`/api/admin/matches/${away.id}/occupancy`)
+        .set('Authorization', `Bearer ${admin.token}`);
+      expect(res.status).toBe(400);
+    });
+  });
+
+  it('reads a fully sold home match as exactly 100% of the sellable seats, the away section not counted', async () => {
+    const admin = await createUser(UserRole.ADMIN);
+    const fan = await createUser(UserRole.FAN);
+    const { m2 } = await seed(fan.id);
+    const sectorRepo = ctx.dataSource.getRepository(Sector);
+    const sector = (code: string, arc: 'upper' | 'lower', isAway: boolean): Sector =>
+      sectorRepo.create({
+        code,
+        name: code,
+        arc,
+        position: 90,
+        gate: 1,
+        priceCategory: isAway ? null : 'upper',
+        isAway,
+        isCovered: false,
+      });
+    await sectorRepo.save([sector('A', 'upper', false), sector('AWAY-T', 'lower', true)]);
+    const seatRepo = ctx.dataSource.getRepository(Seat);
+    await seatRepo.save(
+      seatRepo.create({
+        section: 'AWAY-T',
+        row: '1',
+        number: 1,
+        category: SeatCategory.STANDARD,
+        priceModifier: '1.00',
+        isAccessible: false,
+        isActive: true,
+      }),
+    );
+    // Sell the other three sellable seats of the upcoming match: all four are now taken.
+    const sellable = await seatRepo.find({ where: { section: 'A' }, order: { number: 'ASC' } });
+    const ticketRepo = ctx.dataSource.getRepository(Ticket);
+    for (const seat of sellable.slice(1)) {
+      await ticketRepo.save(
+        ticketRepo.create({
+          matchId: m2.id,
+          seatId: seat.id,
+          userId: fan.id,
+          status: TicketStatus.PAID,
+          source: TicketSource.SINGLE,
+          pricePaid: '3333.00',
+          currency: 'HUF',
+          qrCode: `KTE-${randomUUID()}`,
+          qrJti: randomUUID(),
+        }),
+      );
+    }
+    const auth = { Authorization: `Bearer ${admin.token}` };
+
+    const overview = await request(server).get('/api/admin/overview?period=season').set(auth);
+    const row = (overview.body.matches as Array<Record<string, unknown>>).find(
+      (m) => m.matchId === m2.id,
+    )!;
+    // 5 active seats in the stadium, 4 sellable: 100%, not 80%.
+    expect(row).toMatchObject({ occupiedSeats: 4, capacity: 4, occupancyPercent: 100 });
+
+    const occupancy = await request(server).get(`/api/admin/matches/${m2.id}/occupancy`).set(auth);
+    expect(occupancy.status).toBe(200);
+    expect(occupancy.body).toMatchObject({ totalCapacity: 4, totalSold: 4, occupancyPercent: 100 });
+    expect((occupancy.body.sectors as Array<{ section: string }>).map((s) => s.section)).toEqual([
+      'A',
+    ]);
   });
 
   it('is read-only: the admin area exposes no write route', async () => {

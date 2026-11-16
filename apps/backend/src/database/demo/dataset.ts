@@ -1,0 +1,806 @@
+import { LoyaltyTier, UserRole } from '../entities/user.entity';
+import { WaitlistStatus } from '../entities/waitlist.entity';
+import { seatUnitPrice } from '../../modules/seats/seat-pricing';
+import { formatFullName } from '../../common/format-name';
+import { TIER_LABEL } from '../stadium-layout';
+import { blurbFor } from './blurbs';
+import {
+  BASE_OCCUPANCY,
+  SeatPool,
+  SeatRef,
+  SectorRef,
+  Stadium,
+  placeOrders,
+  sampleLeadDays,
+  sectorWeights,
+  soldShareAt,
+} from './demand';
+import { LedgerRow, LoyaltyEvent, LoyaltyRules, simulateLoyalty } from './ledger';
+import { planLoans } from './loans';
+import type {
+  DemoLoan,
+  DemoPass,
+  DemoUser,
+  ForcedOrder,
+  LoanRow,
+  MatchRow,
+  NamedAccount,
+  PassRow,
+  PassTier,
+  PriceRow,
+  TicketRow,
+  UserRow,
+  WaitlistRow,
+} from './model';
+import { PASS_TIERS, buildPasses } from './passes';
+import { Rng } from './rng';
+import { MatchPlan, awayTeamOf, buildSchedule, homeTeamOf, venueFor } from './schedule';
+import {
+  DAY_MS,
+  HOUR_MS,
+  MINUTE_MS,
+  dayNumberOf,
+  dayNumberOfDateColumn,
+  monthOf,
+  wallClockToUtc,
+} from './time';
+import { CLASS_WEIGHT, buildUsers } from './users';
+
+export const DEFAULT_CROWD_SIZE = 3000;
+export const DEFAULT_SEED = 20261116;
+/** Nobody owns a hundred tickets: no crowd account is given more than this in one season... */
+export const SEASON_TICKET_CAP = 50;
+/** ...or in the two seasons together. */
+export const LIFETIME_TICKET_CAP = 85;
+/**
+ * The portal was newer last season, so fewer of the crowd's tickets went through it: the
+ * previous season sells this share of what a current-season match of the same pull would.
+ */
+export const PREVIOUS_SEASON_SHARE = 0.8;
+/** The invitation lifetime the application uses (LOAN_INVITATION_TTL_HOURS). */
+const LOAN_TTL_HOURS = 72;
+
+/** Last season's pass prices: a little lower, so the two seasons differ. */
+const PREVIOUS_PRICES: Record<PassTier, number> = { vip: 40000, lower: 27000, upper: 20000 };
+
+export interface DemoInput {
+  now: Date;
+  seats: SeatRef[];
+  sectors: SectorRef[];
+  season: {
+    label: string;
+    validFrom: Date;
+    validUntil: Date;
+    prices: Record<PassTier, number>;
+  };
+  /** One bcrypt hash, shared by every demo account. */
+  passwordHash: string;
+  /** Seats held by passes that are not demo data: no single ticket may be put on them. */
+  foreignPassSeatIds?: ReadonlySet<string>;
+  rules: LoyaltyRules;
+  crowdSize?: number;
+  seed?: number;
+}
+
+export interface DemoDataset {
+  users: UserRow[];
+  matches: MatchRow[];
+  prices: PriceRow[];
+  passes: PassRow[];
+  loans: LoanRow[];
+  tickets: TicketRow[];
+  ledger: LedgerRow[];
+  waitlist: WaitlistRow[];
+  accounts: NamedAccount[];
+  soldOutMatchId: string;
+  /** Matches by key, for the report. */
+  matchKeys: Map<string, string>;
+  notes: string[];
+}
+
+interface Order {
+  id: string;
+  plan: MatchPlan;
+  user: DemoUser;
+  seats: SeatRef[];
+  at: Date;
+  scanned: boolean[];
+  stripeId: string;
+  ticketIds: string[];
+}
+
+const floorSecond = (ms: number): Date => new Date(Math.floor(ms / 1000) * 1000);
+const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
+
+export function previousSeasonLabel(label: string): string {
+  const m = /^(\d{4})\/(\d{4})$/.exec(label);
+  if (!m) throw new Error(`Unexpected season label "${label}" (expected 2026/2027).`);
+  return `${Number(m[1]) - 1}/${Number(m[2]) - 1}`;
+}
+
+function shiftYear(date: Date, years: number): Date {
+  return new Date(Date.UTC(date.getUTCFullYear() + years, date.getUTCMonth(), date.getUTCDate()));
+}
+
+/** The first 04:00 (stadium time) at or after `after`: when the nightly expiry sweep would run. */
+function nextSweepAfter(after: Date): Date {
+  const day = dayNumberOf(after);
+  const sameDay = wallClockToUtc(day, 4, 0);
+  return sameDay.getTime() >= after.getTime() ? sameDay : wallClockToUtc(day + 1, 4, 0);
+}
+
+function scanFlags(
+  plan: MatchPlan,
+  size: number,
+  override: boolean | undefined,
+  rng: Rng,
+): boolean[] {
+  if (plan.phase === 'upcoming') return new Array<boolean>(size).fill(false);
+  if (override !== undefined) return new Array<boolean>(size).fill(override);
+  // Groups mostly arrive together; a few no-shows, a few split parties. About 90% overall.
+  const arrives = plan.phase === 'live' ? 0.8 : 0.885;
+  const r = rng.next();
+  if (r < arrives) return new Array<boolean>(size).fill(true);
+  if (r < arrives + 0.075) return new Array<boolean>(size).fill(false);
+  return Array.from({ length: size }, () => rng.chance(0.5));
+}
+
+function purchaseTime(plan: MatchPlan, user: DemoUser, now: Date, rng: Rng): Date {
+  const kickoff = plan.kickoffAt.getTime();
+  const latest = Math.min(kickoff, now.getTime()) - 20 * MINUTE_MS;
+  let t: number;
+  if (plan.phase === 'upcoming') {
+    t = plan.soldOut
+      ? now.getTime() - 8 * HOUR_MS - Math.pow(rng.next(), 1.4) * 11 * DAY_MS
+      : now.getTime() - rng.exponential(3.5) * DAY_MS;
+  } else {
+    t = kickoff - sampleLeadDays(rng) * DAY_MS;
+  }
+  const earliest = user.createdAt.getTime() + HOUR_MS;
+  return floorSecond(clamp(t, Math.min(earliest, latest), latest));
+}
+
+interface OrderContext {
+  now: Date;
+  stadium: Stadium;
+  users: readonly DemoUser[];
+  plans: readonly MatchPlan[];
+  blockedByPlan: (plan: MatchPlan) => ReadonlySet<string>;
+  rng: Rng;
+}
+
+function generateOrders(ctx: OrderContext): Order[] {
+  const { now, stadium, users, rng } = ctx;
+  const crowd = users.filter((u) => CLASS_WEIGHT[u.fanClass] > 0);
+  const homePlans = ctx.plans
+    .filter((p) => p.home)
+    .sort((a, b) => a.kickoffAt.getTime() - b.kickoffAt.getTime());
+  const planKeys = new Set(homePlans.map((p) => p.key));
+
+  const forcedByMatch = new Map<string, Array<{ user: DemoUser; order: ForcedOrder }>>();
+  for (const user of users) {
+    for (const order of user.forced) {
+      if (!planKeys.has(order.matchKey)) {
+        throw new Error(`${user.email}: forced order for unknown home match ${order.matchKey}`);
+      }
+      const list = forcedByMatch.get(order.matchKey) ?? [];
+      list.push({ user, order });
+      forcedByMatch.set(order.matchKey, list);
+    }
+  }
+
+  const seasonTickets = new Map<string, number>();
+  const lifetimeTickets = new Map<string, number>();
+  const orders: Order[] = [];
+
+  const make = (plan: MatchPlan, user: DemoUser, seats: SeatRef[], scanned?: boolean): Order => {
+    const at = purchaseTime(plan, user, now, rng);
+    const key = `${user.id}|${plan.season}`;
+    seasonTickets.set(key, (seasonTickets.get(key) ?? 0) + seats.length);
+    lifetimeTickets.set(user.id, (lifetimeTickets.get(user.id) ?? 0) + seats.length);
+    return {
+      id: rng.uuid(),
+      plan,
+      user,
+      seats,
+      at,
+      scanned: scanFlags(plan, seats.length, scanned, rng),
+      stripeId: `pi_demo_${rng.token(24)}`,
+      ticketIds: seats.map(() => rng.uuid()),
+    };
+  };
+
+  for (const plan of homePlans) {
+    const pool = new SeatPool(stadium, ctx.blockedByPlan(plan));
+    const free = pool.totalFree();
+    const month = monthOf(dayNumberOf(plan.kickoffAt));
+    const weights = sectorWeights(stadium, {
+      draw: plan.opponent.draw,
+      cold: month >= 11 || month <= 3,
+    });
+    const share = clamp(
+      BASE_OCCUPANCY *
+        plan.opponent.draw *
+        plan.timeFactor *
+        (plan.season === 'previous' ? PREVIOUS_SEASON_SHARE : 1) *
+        rng.between(0.92, 1.08),
+      0.06,
+      0.85,
+    );
+    let total = Math.round(free * share);
+    if (plan.phase === 'upcoming') {
+      total = Math.round(total * soldShareAt((plan.kickoffAt.getTime() - now.getTime()) / DAY_MS));
+    }
+
+    const forced = forcedByMatch.get(plan.key) ?? [];
+    const placed = placeOrders(
+      pool,
+      weights,
+      total,
+      rng,
+      forced.map((f) => f.order.size),
+      plan.soldOut,
+    );
+    forced.forEach((f, i) =>
+      orders.push(make(plan, f.user, placed.forced[i], f.order.scanned ?? true)),
+    );
+
+    const bySize: SeatRef[][][] = [[], [], [], [], [], [], []];
+    for (const g of placed.groups) bySize[g.length].push(g);
+
+    const used = new Set(forced.map((f) => f.user.id));
+    const cutoff = Math.min(plan.kickoffAt.getTime(), now.getTime()) - 6 * HOUR_MS;
+    const eligible = crowd.filter((u) => u.createdAt.getTime() <= cutoff);
+
+    for (let k = 6; k >= 1; k -= 1) {
+      const groups = bySize[k];
+      if (groups.length === 0) continue;
+      const keyed: Array<{ user: DemoUser; key: number }> = [];
+      for (const u of eligible) {
+        if (used.has(u.id)) continue;
+        if ((seasonTickets.get(`${u.id}|${plan.season}`) ?? 0) + k > SEASON_TICKET_CAP) continue;
+        if ((lifetimeTickets.get(u.id) ?? 0) + k > LIFETIME_TICKET_CAP) continue;
+        const gap = Math.abs(u.groupPref - k);
+        const fit = gap === 0 ? 1 : gap === 1 ? 0.45 : 0.2;
+        const presale =
+          plan.phase === 'upcoming' && (u.fanClass === 'devoted' || u.fanClass === 'regular')
+            ? 1.8
+            : 1;
+        const weight = CLASS_WEIGHT[u.fanClass] * fit * (u.passHolder ? 0.4 : 1) * presale;
+        keyed.push({ user: u, key: rng.exponential(1) / weight });
+      }
+      keyed.sort((a, b) => a.key - b.key);
+      let next = 0;
+      for (const c of keyed) {
+        if (next >= groups.length) break;
+        if (used.has(c.user.id)) continue;
+        used.add(c.user.id);
+        orders.push(make(plan, c.user, groups[next], undefined));
+        next += 1;
+      }
+      if (next < groups.length) {
+        throw new Error(
+          `Not enough accounts to buy the ${groups.length} orders of ${k} seats for ${plan.key}; raise the crowd size.`,
+        );
+      }
+    }
+  }
+  return orders;
+}
+
+/** What the invitation for a loan looked like, and the entry it produced. */
+function loanRowsAndTickets(
+  loans: readonly DemoLoan[],
+  planByKey: ReadonlyMap<string, MatchPlan>,
+  matchIdByKey: ReadonlyMap<string, string>,
+  stewardId: string,
+  now: Date,
+  rng: Rng,
+): { rows: LoanRow[]; tickets: TicketRow[]; events: LoyaltyEvent[] } {
+  const rows: LoanRow[] = [];
+  const tickets: TicketRow[] = [];
+  const events: LoyaltyEvent[] = [];
+  const nowMs = now.getTime();
+  const hours = (h: number): number => h * HOUR_MS;
+
+  for (const loan of loans) {
+    const match = planByKey.get(loan.matchKey) as MatchPlan;
+    const kickoff = match.kickoffAt.getTime();
+    const passFloor = loan.pass.createdAt.getTime() + 2 * DAY_MS;
+    let createdMs: number;
+    switch (loan.outcome) {
+      case 'used':
+      case 'completed':
+        createdMs = kickoff - rng.between(2, 6) * DAY_MS;
+        break;
+      case 'expired':
+        createdMs = kickoff - rng.between(6, 9) * DAY_MS;
+        break;
+      case 'cancelled_pending':
+        createdMs = nowMs - rng.between(3, 6) * DAY_MS;
+        break;
+      case 'cancelled_accepted':
+        createdMs = nowMs - rng.between(6, 9) * DAY_MS;
+        break;
+      case 'accepted':
+        createdMs = nowMs - rng.between(2, 4) * DAY_MS;
+        break;
+      default:
+        createdMs = nowMs - rng.between(20, 40) * HOUR_MS;
+    }
+    createdMs = Math.max(createdMs, passFloor);
+    if (createdMs > kickoff - DAY_MS || createdMs > nowMs - HOUR_MS) {
+      throw new Error(`Loan ${loan.matchKey}/${loan.outcome} would be sent after it could matter.`);
+    }
+    const createdAt = floorSecond(createdMs);
+    const expiresAt = floorSecond(createdMs + hours(LOAN_TTL_HOURS));
+    const accepted = ['used', 'completed', 'accepted', 'cancelled_accepted'].includes(loan.outcome);
+    const acceptedAt = accepted ? floorSecond(createdMs + hours(rng.between(1, 20))) : null;
+    const qrJti = accepted ? rng.token(21) : null;
+
+    let status = loan.outcome as string;
+    let completedAt: Date | null = null;
+    let cancelledAt: Date | null = null;
+    let qrRevokedAt: Date | null = null;
+    let reason: string | null = null;
+    if (loan.outcome === 'cancelled_pending' || loan.outcome === 'cancelled_accepted') {
+      status = 'cancelled';
+      const base = acceptedAt ? acceptedAt.getTime() : createdMs;
+      cancelledAt = floorSecond(
+        loan.outcome === 'cancelled_accepted'
+          ? base + rng.between(1, 2) * DAY_MS
+          : base + hours(rng.between(1, 30)),
+      );
+      reason =
+        loan.outcome === 'cancelled_accepted'
+          ? 'Közbejött egy családi program, így visszavonom a kölcsönzést.'
+          : 'Mégsem tudom átadni, a belépőt magam használom.';
+      if (loan.outcome === 'cancelled_accepted') qrRevokedAt = cancelledAt;
+    }
+    if (loan.outcome === 'used' || loan.outcome === 'completed') {
+      completedAt = floorSecond(kickoff + hours(rng.between(2, 3)));
+      if (loan.outcome === 'completed') qrRevokedAt = completedAt;
+      events.push({ kind: 'loan', userId: loan.lenderId, at: completedAt, loanId: loan.id });
+    }
+    rows.push({
+      id: loan.id,
+      seasonPassId: loan.pass.id,
+      lenderUserId: loan.lenderId,
+      borrowerUserId: loan.borrowerId,
+      matchId: matchIdByKey.get(loan.matchKey) as string,
+      borrowerEmail: loan.borrowerEmail,
+      status,
+      invitationToken: rng.token(48),
+      expiresAt,
+      acceptedAt,
+      qrJti,
+      qrRevokedAt,
+      cancelledAt,
+      cancellationReason: reason,
+      completedAt,
+      createdAt,
+      updatedAt: completedAt ?? cancelledAt ?? acceptedAt ?? createdAt,
+      version: 1,
+    });
+
+    // The borrowed entry exists only while the loan stands (a withdrawn one is deleted).
+    if (loan.outcome === 'used' || loan.outcome === 'completed' || loan.outcome === 'accepted') {
+      const used = loan.outcome === 'used';
+      const scannedAt = used ? floorSecond(kickoff - rng.between(10, 50) * MINUTE_MS) : null;
+      const expiredAt =
+        loan.outcome === 'completed' ? nextSweepAfter(new Date(kickoff + DAY_MS)) : null;
+      tickets.push({
+        id: rng.uuid(),
+        matchId: matchIdByKey.get(loan.matchKey) as string,
+        seatId: loan.pass.seat.id,
+        userId: loan.borrowerId as string,
+        seasonPassId: loan.pass.id,
+        status: used ? 'used' : loan.outcome === 'completed' ? 'expired' : 'paid',
+        source: 'loan',
+        pricePaid: '0.00',
+        currency: 'HUF',
+        qrCode: `KTE-LOAN-${rng.uuid()}`,
+        qrJti: rng.token(21),
+        stripePaymentIntentId: null,
+        usedAt: scannedAt,
+        scannedAt,
+        scannedByUserId: used ? stewardId : null,
+        expiredAt,
+        confirmationEmailSentAt: null,
+        createdAt: acceptedAt as Date,
+        updatedAt: scannedAt ?? expiredAt ?? (acceptedAt as Date),
+        version: 1,
+      });
+    }
+  }
+  return { rows, tickets, events };
+}
+
+/** The entries season-pass holders opened: one per attended match, plus every holder for the sold-out one. */
+function passTickets(
+  passes: readonly DemoPass[],
+  plans: readonly MatchPlan[],
+  matchIdByKey: ReadonlyMap<string, string>,
+  lent: ReadonlySet<string>,
+  stewardId: string,
+  now: Date,
+  rng: Rng,
+): TicketRow[] {
+  const out: TicketRow[] = [];
+  const leaguePlans = plans.filter((p) => p.home && p.passEligible);
+  for (const pass of passes) {
+    for (const plan of leaguePlans) {
+      if (plan.season !== pass.season) continue;
+      const kickoff = plan.kickoffAt.getTime();
+      if (kickoff < pass.createdAt.getTime() + HOUR_MS) continue;
+      if (lent.has(`${pass.id}|${plan.key}`)) continue;
+      const base = {
+        id: rng.uuid(),
+        matchId: matchIdByKey.get(plan.key) as string,
+        seatId: pass.seat.id,
+        userId: pass.buyerId,
+        seasonPassId: pass.id,
+        source: 'season_pass',
+        pricePaid: '0.00',
+        currency: 'HUF',
+        qrCode: `KTE-SP-${rng.uuid()}`,
+        qrJti: rng.token(21),
+        stripePaymentIntentId: null,
+        expiredAt: null,
+        confirmationEmailSentAt: null,
+        version: 1,
+      };
+      if (plan.phase === 'upcoming') {
+        // Opened the QR page ahead of time: only the sold-out match needs every seat accounted for.
+        if (!plan.soldOut) continue;
+        const createdAt = floorSecond(now.getTime() - 8 * HOUR_MS - rng.between(0, 9 * DAY_MS));
+        out.push({
+          ...base,
+          status: 'paid',
+          usedAt: null,
+          scannedAt: null,
+          scannedByUserId: null,
+          createdAt,
+          updatedAt: createdAt,
+        });
+        continue;
+      }
+      const comes = pass.alwaysAttends || rng.chance(plan.season === 'current' ? 0.85 : 0.8);
+      if (!comes) continue;
+      const scannedAt = floorSecond(kickoff - rng.between(8, 70) * MINUTE_MS);
+      const createdAt = floorSecond(scannedAt.getTime() - rng.between(15, 300) * MINUTE_MS);
+      out.push({
+        ...base,
+        status: 'used',
+        usedAt: scannedAt,
+        scannedAt,
+        scannedByUserId: stewardId,
+        createdAt: new Date(Math.max(createdAt.getTime(), pass.createdAt.getTime() + HOUR_MS)),
+        updatedAt: scannedAt,
+      });
+    }
+  }
+  return out;
+}
+
+export function buildDemoDataset(input: DemoInput): DemoDataset {
+  const root = new Rng(input.seed ?? DEFAULT_SEED);
+  const rUsers = root.fork('users');
+  const rMatches = root.fork('matches');
+  const rPasses = root.fork('passes');
+  const rLoans = root.fork('loans');
+  const rOrders = root.fork('orders');
+  const rExtra = root.fork('extra');
+  const rLedger = root.fork('ledger');
+  const rWait = root.fork('waitlist');
+  const now = input.now;
+  const notes: string[] = [];
+
+  const previousLabel = previousSeasonLabel(input.season.label);
+  const previousWindow = {
+    label: previousLabel,
+    validFrom: shiftYear(input.season.validFrom, -1),
+    validUntil: shiftYear(input.season.validUntil, -1),
+    prices: PREVIOUS_PRICES,
+  };
+  const schedule = buildSchedule(now, input.season, previousLabel);
+  const plans = [...schedule.current, ...schedule.previous];
+  const planByKey = new Map(plans.map((p) => [p.key, p]));
+  const stadium = new Stadium(input.seats, input.sectors);
+  const sellable = stadium.sellableSeats().length;
+
+  const users = buildUsers(
+    { now, seasonStart: input.season.validFrom, crowdSize: input.crowdSize ?? DEFAULT_CROWD_SIZE },
+    rUsers,
+  );
+  const byKey = new Map(users.filter((u) => u.key).map((u) => [u.key as string, u]));
+  const steward = byKey.get('kapus') as DemoUser;
+
+  // Matches.
+  const matchIdByKey = new Map<string, string>();
+  const matches: MatchRow[] = [];
+  for (const plan of [...plans].sort((a, b) => a.key.localeCompare(b.key))) {
+    const id = rMatches.uuid();
+    matchIdByKey.set(plan.key, id);
+    matches.push({
+      id,
+      homeTeam: homeTeamOf(plan),
+      awayTeam: awayTeamOf(plan),
+      competition: plan.competition,
+      venue: venueFor(plan),
+      kickoffAt: plan.kickoffAt,
+      status: plan.status,
+      // Away matches have no stock here. A home match's capacity is the sellable seats: the
+      // away section is never sold, so a capacity that counted it could never be reached
+      // (and the waitlist rule, active tickets reaching capacity, could never hold).
+      capacity: plan.home ? sellable : 0,
+      basePrice: plan.basePrice.toFixed(2),
+      description: blurbFor(plan),
+      isSeasonPassEligible: plan.passEligible,
+      createdAt: floorSecond(
+        Math.min(plan.kickoffAt.getTime() - 60 * DAY_MS, now.getTime() - DAY_MS),
+      ),
+      updatedAt: floorSecond(
+        Math.min(plan.kickoffAt.getTime() - 60 * DAY_MS, now.getTime() - DAY_MS),
+      ),
+      version: 1,
+    });
+  }
+
+  // Season passes and loans.
+  const foreign = input.foreignPassSeatIds ?? new Set<string>();
+  const passes = buildPasses(
+    {
+      stadium,
+      users,
+      now,
+      season: input.season,
+      previous: previousWindow,
+      foreignPassSeatIds: foreign,
+    },
+    rPasses,
+  );
+  const currentPasses = passes.filter((p) => p.season === 'current');
+  const passSeats = {
+    current: new Set(currentPasses.map((p) => p.seat.id)),
+    previous: new Set(passes.filter((p) => p.season === 'previous').map((p) => p.seat.id)),
+  };
+  const loans = planLoans(
+    users,
+    currentPasses,
+    new Map(schedule.current.map((m) => [m.key, m])),
+    rLoans,
+  );
+  const lent = new Set(
+    loans
+      .filter((l) => ['used', 'completed', 'accepted'].includes(l.outcome))
+      .map((l) => `${l.pass.id}|${l.matchKey}`),
+  );
+
+  // Single tickets. A seat held by an active pass (or by a pass that was not made here) is
+  // never offered for sale, whatever the match: that is how the seat map treats it.
+  const orders = generateOrders({
+    now,
+    stadium,
+    users,
+    plans,
+    blockedByPlan: (plan) => {
+      const blocked = new Set(foreign);
+      for (const id of plan.season === 'current' ? passSeats.current : passSeats.previous)
+        blocked.add(id);
+      return blocked;
+    },
+    rng: rOrders,
+  });
+
+  const loanOut = loanRowsAndTickets(loans, planByKey, matchIdByKey, steward.id, now, rExtra);
+  const entryTickets = passTickets(passes, plans, matchIdByKey, lent, steward.id, now, rExtra);
+
+  // Waitlist for the sold-out match: fans without a place on it, first in line a named account.
+  const soldOutPlan = plans.find((p) => p.soldOut) as MatchPlan;
+  const soldOutId = matchIdByKey.get(soldOutPlan.key) as string;
+  const holdersOfSoldOut = new Set<string>(
+    orders.filter((o) => o.plan.soldOut).map((o) => o.user.id),
+  );
+  for (const t of entryTickets) if (t.matchId === soldOutId) holdersOfSoldOut.add(t.userId);
+  const lastSale = Math.max(
+    ...orders.filter((o) => o.plan.soldOut).map((o) => o.at.getTime()),
+    ...entryTickets.filter((t) => t.matchId === soldOutId).map((t) => t.createdAt.getTime()),
+  );
+  const waiters = rWait.shuffle(
+    users.filter(
+      (u) =>
+        !u.key &&
+        u.role === UserRole.FAN &&
+        !holdersOfSoldOut.has(u.id) &&
+        u.createdAt.getTime() < lastSale &&
+        !u.passHolder,
+    ),
+  );
+  const waitCount = 78;
+  const first = byKey.get('varolistas') as DemoUser;
+  const waitUsers = [first, ...waiters.slice(0, waitCount - 1)];
+  const waitStart = lastSale + 90 * MINUTE_MS;
+  const waitEnd = now.getTime() - 15 * MINUTE_MS;
+  const waitTimes = waitUsers
+    .map((_, i) =>
+      i === 0 ? waitStart : waitStart + Math.pow(rWait.next(), 1.5) * (waitEnd - waitStart),
+    )
+    .sort((a, b) => a - b);
+  const waitlist: WaitlistRow[] = waitUsers.map((u, i) => {
+    const cancelled = i > 0 && rWait.chance(0.06);
+    const createdAt = floorSecond(Math.max(waitTimes[i], u.createdAt.getTime() + HOUR_MS));
+    const preferred = rWait.chance(0.4)
+      ? rWait.pick(stadium.sectors.filter((s) => stadium.isSellable(s.code)).map((s) => s.code))
+      : null;
+    return {
+      id: rWait.uuid(),
+      userId: u.id,
+      matchId: soldOutId,
+      status: cancelled ? WaitlistStatus.CANCELLED : WaitlistStatus.ACTIVE,
+      requestedQuantity: [1, 2, 3, 4][rWait.weightedIndex([30, 40, 15, 15])],
+      preferredSection: preferred,
+      notifiedAt: null,
+      createdAt,
+      updatedAt: createdAt,
+      version: 1,
+    };
+  });
+
+  // Loyalty: replay every event in time order for the points, tiers and prices paid.
+  const events: LoyaltyEvent[] = [];
+  for (const u of users) {
+    if (u.role !== UserRole.FAN) continue;
+    events.push({ kind: 'registration', userId: u.id, at: u.createdAt });
+    if (u.profileCompletedAt)
+      events.push({ kind: 'profile', userId: u.id, at: u.profileCompletedAt });
+  }
+  for (const o of orders) {
+    events.push({
+      kind: 'order',
+      userId: o.user.id,
+      at: o.at,
+      orderId: o.id,
+      ticketIds: o.ticketIds,
+      unitPrices: o.seats.map((s) => seatUnitPrice(o.plan.basePrice, s.priceModifier)),
+    });
+  }
+  for (const p of passes)
+    events.push({ kind: 'pass', userId: p.buyerId, at: p.createdAt, passId: p.id });
+  events.push(...loanOut.events);
+  const carryoverAt = wallClockToUtc(dayNumberOfDateColumn(input.season.validFrom) - 1, 3, 0);
+  const outcome = simulateLoyalty(events, input.rules, carryoverAt, rLedger, now);
+
+  for (const u of users) {
+    if (!u.expectedTier) continue;
+    const got = outcome.balances.get(u.id);
+    if (!got || got.tier !== u.expectedTier) {
+      throw new Error(
+        `${u.email} should be ${u.expectedTier} but the ledger gives ${got?.tier} (${got?.points} points).`,
+      );
+    }
+  }
+
+  // Rows.
+  const singleTickets: TicketRow[] = [];
+  for (const o of orders) {
+    const prices = outcome.orderPrices.get(o.id) as number[];
+    const kickoff = o.plan.kickoffAt;
+    o.seats.forEach((seat, i) => {
+      const scannedAt = o.scanned[i]
+        ? floorSecond(
+            kickoff.getTime() -
+              (8 + ((o.at.getTime() / 1000) % 60) + (i % 3)) * MINUTE_MS -
+              i * 11_000,
+          )
+        : null;
+      const expired = !scannedAt && o.plan.season === 'previous';
+      const expiredAt = expired ? nextSweepAfter(new Date(kickoff.getTime() + DAY_MS)) : null;
+      singleTickets.push({
+        id: o.ticketIds[i],
+        matchId: matchIdByKey.get(o.plan.key) as string,
+        seatId: seat.id,
+        userId: o.user.id,
+        seasonPassId: null,
+        status: scannedAt ? 'used' : expired ? 'expired' : 'paid',
+        source: 'single',
+        pricePaid: prices[i].toFixed(2),
+        currency: 'HUF',
+        qrCode: `KTE-${rOrders.uuid()}`,
+        qrJti: rOrders.token(21),
+        stripePaymentIntentId: o.stripeId,
+        usedAt: scannedAt,
+        scannedAt,
+        scannedByUserId: scannedAt ? steward.id : null,
+        expiredAt,
+        confirmationEmailSentAt: floorSecond(o.at.getTime() + 3000),
+        createdAt: o.at,
+        updatedAt: scannedAt ?? expiredAt ?? o.at,
+        version: 1,
+      });
+    });
+  }
+
+  const userRows: UserRow[] = users.map((u) => {
+    const balance = outcome.balances.get(u.id);
+    return {
+      id: u.id,
+      email: u.email,
+      passwordHash: input.passwordHash,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      phoneNumber: u.phoneNumber,
+      dateOfBirth: u.dateOfBirth,
+      role: u.role,
+      loyaltyTier: balance?.tier ?? LoyaltyTier.BRONZE,
+      loyaltyPoints: balance?.points ?? 0,
+      emailVerified: true,
+      twoFactorEnabled: false,
+      lastLoginAt: u.lastLoginAt,
+      profileCompletedAt: u.profileCompletedAt,
+      isActive: true,
+      createdAt: u.createdAt,
+      updatedAt: u.lastLoginAt ?? u.createdAt,
+      version: 1,
+    };
+  });
+
+  const passRows: PassRow[] = passes.map((p) => ({
+    id: p.id,
+    userId: p.buyerId,
+    holderName: p.holderName,
+    holderUserId: p.holderId,
+    seatId: p.seat.id,
+    seasonLabel: p.seasonLabel,
+    validFrom: p.validFrom,
+    validUntil: p.validUntil,
+    status: p.status,
+    pricePaid: p.price.toFixed(2),
+    currency: 'HUF',
+    qrCode: p.qrCode,
+    autoRenew: false,
+    stripePaymentIntentId: `pi_demo_pass_${rExtra.token(20)}`,
+    createdAt: p.createdAt,
+    updatedAt: p.createdAt,
+    version: 1,
+  }));
+
+  const priceRows: PriceRow[] = PASS_TIERS.map((tier) => ({
+    id: rExtra.uuid(),
+    section: tier,
+    sectionLabel: TIER_LABEL[tier],
+    seasonLabel: previousLabel,
+    price: PREVIOUS_PRICES[tier],
+    currency: 'HUF',
+    validFrom: previousWindow.validFrom,
+    validUntil: previousWindow.validUntil,
+    isActive: false,
+    createdAt: floorSecond(previousWindow.validFrom.getTime() - 20 * DAY_MS),
+    updatedAt: floorSecond(previousWindow.validFrom.getTime() - 20 * DAY_MS),
+    version: 1,
+  }));
+
+  const accounts: NamedAccount[] = users
+    .filter((u) => u.key)
+    .map((u) => ({
+      email: u.email,
+      name: formatFullName(u),
+      role: u.role,
+      purpose: u.purpose as string,
+    }));
+
+  return {
+    users: userRows,
+    matches,
+    prices: priceRows,
+    passes: passRows,
+    loans: loanOut.rows,
+    tickets: [...singleTickets, ...entryTickets, ...loanOut.tickets],
+    ledger: outcome.ledger,
+    waitlist,
+    accounts,
+    soldOutMatchId: soldOutId,
+    matchKeys: matchIdByKey,
+    notes,
+  };
+}

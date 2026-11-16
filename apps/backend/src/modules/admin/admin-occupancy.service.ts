@@ -1,11 +1,15 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { In, Repository } from 'typeorm';
+import { AppConfig } from '../../config';
 import { Match, Seat, Ticket } from '../../database/entities';
+import { isHomeMatch } from '../matches/match-home';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { MatchOccupancyDto, SectorOccupancyDto } from './dto/occupancy.dto';
+import { findSellableSeats } from './sellable-seats';
 
 @Injectable()
 export class AdminOccupancyService {
@@ -16,10 +20,19 @@ export class AdminOccupancyService {
     @InjectRepository(Seat) private readonly seatRepository: Repository<Seat>,
     @InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.homeTeamName = configService.getOrThrow<AppConfig>('app').homeTeamName;
+  }
+
+  private readonly homeTeamName: string;
 
   /**
-   * Returns per-sector occupancy for the heatmap, plus stadium-wide totals.
+   * Returns per-sector occupancy for the heatmap, plus totals.
+   *
+   * Only the sellable seats take part: the away section is never sold here, so it is in
+   * neither the sectors nor the totals, and a sold-out home match reads exactly 100%. An
+   * away match has no sales to measure and is refused.
    * Reads:
    *   - seats catalogue (DB),
    *   - active tickets for the match (DB),
@@ -31,10 +44,13 @@ export class AdminOccupancyService {
       throw new NotFoundException('Meccs nem található.');
     }
 
-    const seats = await this.seatRepository.find({
-      where: { isActive: true },
-      order: { section: 'ASC' },
-    });
+    if (!isHomeMatch(match, this.homeTeamName)) {
+      throw new BadRequestException(
+        'Idegenbeli mérkőzésre nem értékesítünk jegyet, ezért nincs kihasználtság.',
+      );
+    }
+
+    const seats = await findSellableSeats(this.seatRepository);
 
     const tickets = await this.ticketRepository.find({
       where: { matchId, status: In([...OCCUPYING_TICKET_STATUSES]) },

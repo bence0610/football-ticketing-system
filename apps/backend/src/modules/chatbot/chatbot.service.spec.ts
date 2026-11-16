@@ -56,7 +56,7 @@ const SNAPSHOT: ChatbotContextSnapshot = {
       isHome: true,
       homeTeam: 'Kecskeméti TE',
       awayTeam: 'Ferencváros',
-      competition: 'NB I',
+      competition: 'NB II',
       venue: 'Széktói Stadion',
       kickoffAt: '2030-01-05T17:00:00.000Z',
       status: 'on_sale',
@@ -110,7 +110,7 @@ const SNAPSHOT: ChatbotContextSnapshot = {
       isHome: false,
       homeTeam: 'Újpest',
       awayTeam: 'Kecskeméti TE',
-      competition: 'NB I',
+      competition: 'NB II',
       venue: 'Szusza Ferenc Stadion',
       kickoffAt: '2030-01-12T17:00:00.000Z',
       status: 'scheduled',
@@ -258,6 +258,19 @@ describe('ChatbotService', () => {
       expect(system[1].text).toContain('hazai mérkőzés');
       expect(system[1].text).toContain('idegenbeli mérkőzés');
       expect(system[1].text).toContain('szektoronkénti adat nem elérhető');
+    });
+
+    it('gives no capacity, sold or free figure for an away match, and says no tickets are sold for it', async () => {
+      create.mockResolvedValue(okResponse());
+      await service.sendMessage({ message: 'mikor van a következő meccs?', owner: ALICE });
+      const { system } = create.mock.calls[0][0] as { system: { text: string }[] };
+      const text = system[1].text;
+      const away = text.slice(text.indexOf('Újpest vs Kecskeméti TE'));
+      expect(away).toContain('nem értékesítünk jegyet');
+      expect(away).not.toMatch(/Elkelt: 0 \(0%\)/);
+      expect(away).not.toContain('kapacitás: 100');
+      // The home match keeps its figures.
+      expect(text).toContain('Elkelt: 40 (40%), szabad: 60');
     });
 
     it('answers "which sector is covered?" from the snapshot: covered, not covered, or unknown', async () => {

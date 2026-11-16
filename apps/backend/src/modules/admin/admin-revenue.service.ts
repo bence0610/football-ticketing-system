@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AppConfig } from '../../config';
 import { Match, SeasonPass, Ticket, TicketSource, TicketStatus } from '../../database/entities';
 import { PASS_REVENUE_STATUSES, passRevenueByTier, sumTiers } from './season-pass-revenue';
 import {
@@ -19,7 +21,16 @@ export class AdminRevenueService {
   constructor(
     @InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>,
     @InjectRepository(SeasonPass) private readonly passRepository: Repository<SeasonPass>,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.homeTeamName = configService.getOrThrow<AppConfig>('app').homeTeamName;
+  }
+
+  /**
+   * Tickets are sold only for the club's home matches. Every ticket figure below joins the
+   * match and keeps the home ones, so an away match can never add to revenue or ticket counts.
+   */
+  private readonly homeTeamName: string;
 
   /**
    * Aggregates revenue stats for the admin dashboard. `summary`, `daily` and
@@ -108,10 +119,12 @@ export class AdminRevenueService {
   ): Promise<{ amount: number; ticketCount: number }> {
     const row = await this.ticketRepository
       .createQueryBuilder('t')
+      .innerJoin(Match, 'm', 'm.id = t.matchId')
       .select('COALESCE(SUM(t.pricePaid), 0)', 'amount')
       .addSelect('COUNT(t.id)', 'ticketCount')
       .where('t.status IN (:...statuses)', { statuses: REVENUE_STATUSES })
       .andWhere('t.source = :single', { single: TicketSource.SINGLE })
+      .andWhere('m.homeTeam = :home', { home: this.homeTeamName })
       .andWhere('t.createdAt BETWEEN :from AND :to', { from, to })
       .getRawOne<{ amount: string | number; ticketCount: string | number }>();
     return {
@@ -123,11 +136,13 @@ export class AdminRevenueService {
   private async dailySeries(from: Date, to: Date): Promise<RevenueDailyPointDto[]> {
     const rows = await this.ticketRepository
       .createQueryBuilder('t')
+      .innerJoin(Match, 'm', 'm.id = t.matchId')
       .select("DATE_FORMAT(t.createdAt, '%Y-%m-%d')", 'date')
       .addSelect('COALESCE(SUM(t.pricePaid), 0)', 'amount')
       .addSelect('COUNT(t.id)', 'ticketCount')
       .where('t.status IN (:...statuses)', { statuses: REVENUE_STATUSES })
       .andWhere('t.source = :single', { single: TicketSource.SINGLE })
+      .andWhere('m.homeTeam = :home', { home: this.homeTeamName })
       .andWhere('t.createdAt BETWEEN :from AND :to', { from, to })
       .groupBy('date')
       .orderBy('date', 'ASC')
@@ -164,6 +179,7 @@ export class AdminRevenueService {
       .addSelect('COALESCE(SUM(t.pricePaid), 0)', 'revenue')
       .where('t.status IN (:...statuses)', { statuses: REVENUE_STATUSES })
       .andWhere('t.source = :single', { single: TicketSource.SINGLE })
+      .andWhere('m.homeTeam = :home', { home: this.homeTeamName })
       .groupBy('t.matchId')
       .addGroupBy('m.homeTeam')
       .addGroupBy('m.awayTeam')

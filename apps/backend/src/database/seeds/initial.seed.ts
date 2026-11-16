@@ -148,11 +148,10 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
   }
 
   // 6. Mark past-season matches as FINISHED (idempotent housekeeping).
-  // The previous season's NB1 fixtures (e.g. KTE vs Ferencvárosi TC on 2026-07-05)
-  // are kept for historical reference but moved to FINISHED so they no longer
-  // appear in the on-sale listings.
+  // The previous season's fixtures (e.g. KTE vs Diósgyőri VTK) are kept for historical
+  // reference but moved to FINISHED so they no longer appear in the on-sale listings.
   const pastSeasonMatches = await matchRepo.find({
-    where: [{ homeTeam: 'Kecskeméti TE', awayTeam: 'Ferencvárosi TC' }],
+    where: [{ homeTeam: 'Kecskeméti TE', awayTeam: 'Diósgyőri VTK' }],
   });
   for (const past of pastSeasonMatches) {
     if (past.status !== MatchStatus.FINISHED) {
@@ -163,13 +162,23 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
   }
 
   // 7. Upcoming friendly matches (pre-season July 2026)
-  const totalCapacity = await seatRepo.count({ where: { isActive: true } });
-  // Matches created before a layout change carry the old seat count.
+  // A match's capacity is what it can SELL: the active seats outside the away section, which
+  // is never sold here. With the whole stadium as capacity a sold-out match would still show
+  // 280 free seats (and the waitlist rule could never trigger).
+  const totalCapacity = await seatRepo
+    .createQueryBuilder('seat')
+    .innerJoin(Sector, 'sector', 'sector.code = seat.section')
+    .where('seat.isActive = 1')
+    .andWhere('sector.isAway = 0')
+    .getCount();
+  // Matches created before a layout change carry the old seat count. Away matches have no
+  // stock (capacity 0) and are left alone.
   await dataSource
     .createQueryBuilder()
     .update(Match)
     .set({ capacity: totalCapacity })
     .where('capacity != :totalCapacity', { totalCapacity })
+    .andWhere('capacity > 0')
     .execute();
 
   interface FriendlyBlueprint {
@@ -186,24 +195,25 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
   const upcomingMatches: FriendlyBlueprint[] = [
     {
       homeTeam: 'Kecskeméti TE',
-      awayTeam: 'Újpest FC',
+      awayTeam: 'Szeged',
       competition: Competition.FRIENDLY,
       venue: 'Széktói Stadion, Kecskemét',
       // 2026-07-12 (Saturday) 18:00 local => 16:00 UTC
       kickoffAt: new Date('2026-07-12T16:00:00.000Z'),
       basePrice: '3500.00',
       description:
-        'Felkészülési mérkőzés. KTE vs Újpest FC — nyári előszezoni teszt a Széktói Stadionban.',
+        'Felkészülési mérkőzés. KTE vs Szeged — nyári előszezoni teszt a Széktói Stadionban.',
     },
     {
       homeTeam: 'Kecskeméti TE',
-      awayTeam: 'Paksi FC',
+      awayTeam: 'Szentlőrinc',
       competition: Competition.FRIENDLY,
       venue: 'Széktói Stadion, Kecskemét',
       // 2026-07-26 (Sunday) 17:00 local => 15:00 UTC
       kickoffAt: new Date('2026-07-26T15:00:00.000Z'),
       basePrice: '3000.00',
-      description: 'Felkészülési mérkőzés. KTE vs Paksi FC — utolsó főpróba a bajnoki rajt előtt.',
+      description:
+        'Felkészülési mérkőzés. KTE vs Szentlőrinc — utolsó főpróba a bajnoki rajt előtt.',
     },
   ];
 

@@ -29,7 +29,7 @@ const match = (id: string, offsetMs: number): MatchListItem => ({
   id,
   homeTeam: 'Kecskeméti TE',
   awayTeam: `Ellenfél ${id}`,
-  competition: 'NB1',
+  competition: 'NB2',
   venue: 'Széktói Stadion',
   kickoffAt: new Date(Date.now() + offsetMs).toISOString(),
   status: 'on_sale',

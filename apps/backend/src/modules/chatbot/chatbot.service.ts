@@ -257,8 +257,7 @@ export class ChatbotService {
         `- ${match.homeTeam} vs ${match.awayTeam} (${match.competition})
   Hazai/idegenbeli: ${match.isHome ? 'hazai mérkőzés (a KTE otthon játszik)' : 'idegenbeli mérkőzés'}
   Időpont: ${dateLabel}, helyszín: ${match.venue}
-  Alapár: ${match.basePrice.toLocaleString('hu-HU')} Ft, kapacitás: ${match.capacity}
-  Elkelt: ${match.soldSeats} (${match.occupancyPercent}%), szabad: ${match.availableSeats}
+  ${this.formatSales(match)}
   Szektorok: ${this.formatSectors(match)}
   Időjárás-előrejelzés a kezdésre: ${this.formatWeather(match)}${match.description ? `\n  Leírás: ${match.description}` : ''}
   Státusz: ${match.status}`,
@@ -266,6 +265,19 @@ export class ChatbotService {
     }
     lines.push(generalSections);
     return lines.join('\n\n');
+  }
+
+  /**
+   * Price and sales of a match. Tickets are sold only for home matches: for an away match there
+   * is nothing to count, so no capacity, sold or free figure is given (a "0 sold, 0%" line would
+   * read as an empty home match).
+   */
+  private formatSales(match: ChatbotMatchSnapshot): string {
+    if (!match.isHome) {
+      return 'Jegyértékesítés: erre az idegenbeli mérkőzésre a portálon nem értékesítünk jegyet; kapacitás, eladott és szabad helyek nincsenek. Ne ajánlj jegyvásárlást.';
+    }
+    return `Alapár: ${match.basePrice.toLocaleString('hu-HU')} Ft, kapacitás: ${match.capacity}
+  Elkelt: ${match.soldSeats} (${match.occupancyPercent}%), szabad: ${match.availableSeats}`;
   }
 
   private formatWeather(match: ChatbotMatchSnapshot): string {

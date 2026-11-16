@@ -2,8 +2,10 @@ import { OverviewMatch, SeatSale } from '../../../shared/models/admin.model';
 import {
   barHeights,
   csvField,
+  SoldMatch,
   headerSubtitle,
   heatmapInterpretation,
+  isSoldMatch,
   matchesCsv,
   niceMax,
   occupancyTone,
@@ -13,19 +15,38 @@ import {
   takenPercent,
 } from './admin-logic';
 
-const match = (over: Partial<OverviewMatch> = {}): OverviewMatch => ({
+const match = (over: Partial<SoldMatch> = {}): SoldMatch => ({
   matchId: 'm1',
   homeTeam: 'Kecskeméti TE',
   awayTeam: 'Újpest FC',
   kickoffAt: '2026-07-12T16:00:00.000Z',
   status: 'finished',
   final: true,
+  isHome: true,
   ticketCount: 10,
   passEntryCount: 2,
   occupiedSeats: 12,
   capacity: 20,
   occupancyPercent: 60,
   revenue: 35000,
+  ...over,
+});
+
+/** An away match: listed, but with no sold-ticket figure at all. */
+const awayMatch = (over: Partial<OverviewMatch> = {}): OverviewMatch => ({
+  matchId: 'a1',
+  homeTeam: 'Szeged',
+  awayTeam: 'Kecskeméti TE',
+  kickoffAt: '2026-11-08T15:00:00.000Z',
+  status: 'finished',
+  final: true,
+  isHome: false,
+  ticketCount: null,
+  passEntryCount: null,
+  occupiedSeats: null,
+  capacity: null,
+  occupancyPercent: null,
+  revenue: null,
   ...over,
 });
 
@@ -76,6 +97,18 @@ describe('CSV', () => {
     );
     expect(lines[1]).toBe('Kecskeméti TE – Újpest FC;2026-07-12T16:00:00.000Z;igen;10;2;60;35000');
     expect(lines[2]).toContain(';nem;');
+  });
+
+  it('leaves the figure cells of an away match empty: a dash, not a zero', () => {
+    const lines = matchesCsv([awayMatch()]).trimEnd().split('\r\n');
+    expect(lines[1]).toBe('Szeged – Kecskeméti TE;2026-11-08T15:00:00.000Z;igen;;;;');
+  });
+});
+
+describe('matches that are sold here', () => {
+  it('are the home matches only, so an away match is in no chart and no count', () => {
+    const all = [match({ matchId: 'h1' }), awayMatch(), match({ matchId: 'h2' })];
+    expect(all.filter(isSoldMatch).map((m) => m.matchId)).toEqual(['h1', 'h2']);
   });
 });
 
