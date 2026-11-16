@@ -51,17 +51,28 @@ export class SeasonPassDailyPointDto {
  */
 export class SeasonPassRevenueDto {
   @ApiProperty({ description: 'Ma megvásárolt bérletek bevétele HUF-ban' }) todayRevenue!: number;
-  @ApiProperty({ description: 'Az aktuális hónapban megvásárolt bérletek bevétele HUF-ban' }) monthRevenue!: number;
+  @ApiProperty({ description: 'Az aktuális hónapban megvásárolt bérletek bevétele HUF-ban' })
+  monthRevenue!: number;
   @ApiProperty() todayPassCount!: number;
   @ApiProperty() monthPassCount!: number;
-  @ApiProperty({ type: [SeasonPassDailyPointDto], description: 'Napi bérletbevétel (vásárlás napja szerint), ugyanazon az időablakon, mint a `daily`' })
+  @ApiProperty({
+    type: [SeasonPassDailyPointDto],
+    description:
+      'Napi bérletbevétel (vásárlás napja szerint), ugyanazon az időablakon, mint a `daily`',
+  })
   daily!: SeasonPassDailyPointDto[];
-  @ApiProperty({ type: [SeasonPassTierRevenueDto], description: 'Összes (aktív vagy lejárt) bérlet árkategóriánként, minden szezonra' })
+  @ApiProperty({
+    type: [SeasonPassTierRevenueDto],
+    description: 'Összes (aktív vagy lejárt) bérlet árkategóriánként, minden szezonra',
+  })
   byTier!: SeasonPassTierRevenueDto[];
 }
 
 export class RevenueStatsDto {
-  @ApiProperty({ type: RevenueSummaryDto, description: 'Csak meccsjegyek (PAID + USED, egyedi jegyek); bérlet nélkül' })
+  @ApiProperty({
+    type: RevenueSummaryDto,
+    description: 'Csak meccsjegyek (PAID + USED, egyedi jegyek); bérlet nélkül',
+  })
   summary!: RevenueSummaryDto;
 
   @ApiProperty({
@@ -76,6 +87,9 @@ export class RevenueStatsDto {
   })
   byMatch!: RevenueByMatchDto[];
 
-  @ApiProperty({ type: SeasonPassRevenueDto, description: 'Bérletbevétel, külön a meccsjegyektől; nincs meccsekre szétosztva' })
+  @ApiProperty({
+    type: SeasonPassRevenueDto,
+    description: 'Bérletbevétel, külön a meccsjegyektől; nincs meccsekre szétosztva',
+  })
   seasonPasses!: SeasonPassRevenueDto;
 }

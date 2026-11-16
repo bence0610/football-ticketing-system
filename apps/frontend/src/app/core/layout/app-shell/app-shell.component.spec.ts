@@ -38,6 +38,14 @@ describe('AppShellComponent', () => {
     expect(routes).toContain('/stadium');
   });
 
+  it('names the /stadium entry "Jegyvásárlás" in the menu and the route title', () => {
+    const fixture = TestBed.createComponent(AppShellComponent);
+    const items = (fixture.componentInstance as unknown as {
+      navItems: () => readonly { route: string; label: string }[];
+    }).navItems();
+    expect(items.find((item) => item.route === '/stadium')?.label).toBe('Jegyvásárlás');
+  });
+
   describe('the Admin link', () => {
     function navLabels(user: { role: string } | null): string[] {
       TestBed.resetTestingModule();
@@ -81,26 +89,129 @@ describe('AppShellComponent', () => {
     }
   });
 
+  function render(url: string, user: { role: string; firstName?: string } | null = null) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [AppShellComponent, HttpClientTestingModule],
+      providers: [
+        provideRouter([{ path: '**', children: [] }]),
+        provideAnimationsAsync(),
+        provideStore({ [CART_FEATURE_KEY]: cartReducer }),
+        {
+          provide: AuthService,
+          useValue: {
+            user: signal(user),
+            isAuthenticated: signal(user !== null),
+            logout: () => of(undefined),
+          },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AppShellComponent);
+    (fixture.componentInstance as unknown as { currentUrl: { set(v: string): void } }).currentUrl.set(url);
+    fixture.detectChanges();
+    return fixture;
+  }
+  const renderEl = (url: string, user: { role: string; firstName?: string } | null = null) =>
+    render(url, user).nativeElement as HTMLElement;
+
   describe('the chat launcher', () => {
-    it('sits in the header toolbar, so it can never cover page content', () => {
-      const fixture = TestBed.createComponent(AppShellComponent);
-      fixture.detectChanges();
-      const el = fixture.nativeElement as HTMLElement;
+    it('is mounted once at shell level, not in the toolbar, the page body or the footer', () => {
+      const el = renderEl('/');
       const widget = el.querySelector('kte-chatbot-widget');
       expect(widget).not.toBeNull();
-      expect(widget!.closest('.kte-shell__toolbar')).not.toBeNull();
-      // ...and is not pulled out of the flow onto the page
-      const button = widget!.querySelector('button') as HTMLElement;
-      expect(getComputedStyle(button).position).not.toBe('fixed');
-      expect(getComputedStyle(widget as HTMLElement).position).not.toBe('fixed');
+      expect(widget!.closest('.kte-shell__toolbar')).toBeNull();
+      expect(widget!.closest('main')).toBeNull();
+      expect(widget!.closest('footer')).toBeNull();
     });
 
-    it('stays out of the page body and footer', () => {
-      const fixture = TestBed.createComponent(AppShellComponent);
-      fixture.detectChanges();
+    it('floats at the bottom-right corner', () => {
+      const el = renderEl('/');
+      const widget = el.querySelector('kte-chatbot-widget') as HTMLElement;
+      const style = getComputedStyle(widget);
+      expect(style.position).toBe('fixed');
+      expect(style.right).not.toBe('auto');
+      expect(style.bottom).not.toBe('auto');
+    });
+
+    it('is not shown on the payment step', () => {
+      expect(renderEl('/checkout').querySelector('kte-chatbot-widget')).toBeNull();
+    });
+
+    it('the footer reserves the bubble\'s room as its bottom padding', () => {
+      const el = renderEl('/');
+      const footer = el.querySelector('footer') as HTMLElement;
+      expect(footer).not.toBeNull();
+      // calc(var(--chat-clearance)) is declared by the token sheet; the rule must reference it
+      const rules = Array.from(document.styleSheets).flatMap((sheet) =>
+        Array.from(sheet.cssRules).map((rule) => rule.cssText),
+      );
+      const footerRule = rules.find((text) => text.includes('kte-shell__footer') && text.includes('padding'));
+      expect(footerRule).toContain('--chat-clearance');
+    });
+  });
+
+  describe('the header', () => {
+    it('is named "Jegyvásárlás", not "Stadion"', () => {
+      const el = renderEl('/');
+      const links = Array.from(el.querySelectorAll('nav a')).map((a) => a.textContent?.trim());
+      expect(links).toContain('Jegyvásárlás');
+      expect(links).not.toContain('Stadion');
+      expect(el.querySelector('nav a[href="/stadium"]')?.textContent?.trim()).toBe('Jegyvásárlás');
+    });
+
+    it('shows the club crest, with alt text, instead of the text tile', () => {
+      const el = renderEl('/');
+      const img = el.querySelector('.kte-shell__brand img') as HTMLImageElement;
+      expect(img).not.toBeNull();
+      expect(img.getAttribute('src')).toBe('assets/kte-cimer.png');
+      expect(img.alt).toBe('Kecskeméti TE címer');
+      expect(el.querySelector('.kte-shell__brand-mark')).toBeNull();
+    });
+
+    it('falls back to the "KTE" tile when the crest cannot load', () => {
+      const fixture = render('/');
       const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('main kte-chatbot-widget')).toBeNull();
-      expect(el.querySelector('footer kte-chatbot-widget')).toBeNull();
+      const img = el.querySelector('.kte-shell__brand img') as HTMLImageElement;
+      img.dispatchEvent(new Event('error'));
+      fixture.detectChanges();
+      expect(el.querySelector('.kte-shell__brand img')).toBeNull();
+      expect(el.querySelector('.kte-shell__brand-mark')?.textContent).toBe('KTE');
+      expect(el.querySelector('.kte-shell__brand-text')?.textContent).toContain('Jegyportál');
+    });
+
+    it('puts the avatar and name last, after the cart', () => {
+      const el = renderEl('/', { role: 'fan', firstName: 'Anna' });
+      const bar = el.querySelector('.kte-shell__bar') as HTMLElement;
+      // (the menu panel's host element is not visible; only real controls count)
+      const order = Array.from(bar.children)
+        .filter((c) => c.tagName !== 'MAT-MENU')
+        .map((c) => c.className.toString());
+      const cart = order.findIndex((c) => c.includes('kte-shell__cart'));
+      const user = order.findIndex((c) => c.includes('kte-shell__user'));
+      expect(cart).toBeGreaterThan(-1);
+      expect(user).toBe(order.length - 1);
+      expect(user).toBeGreaterThan(cart);
+    });
+  });
+
+  describe('the full-screen pages', () => {
+    for (const url of ['/login', '/register', '/forgot-password', '/reset-password/abc', '/confirm-email/abc']) {
+      it(`${url} has no header or footer`, () => {
+        const el = renderEl(url);
+        expect(el.querySelector('mat-toolbar')).toBeNull();
+        expect(el.querySelector('.kte-shell__nav')).toBeNull();
+        expect(el.querySelector('footer')).toBeNull();
+        expect(el.querySelector('router-outlet')).not.toBeNull();
+      });
+    }
+
+    it('every other page keeps the header and footer', () => {
+      for (const url of ['/', '/stadium', '/season-pass', '/cart', '/profile']) {
+        const el = renderEl(url);
+        expect(el.querySelector('mat-toolbar')).not.toBeNull();
+        expect(el.querySelector('footer')).not.toBeNull();
+      }
     });
   });
 });

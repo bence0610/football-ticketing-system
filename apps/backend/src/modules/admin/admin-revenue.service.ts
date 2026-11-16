@@ -60,8 +60,12 @@ export class AdminRevenueService {
     now: Date,
   ): Promise<SeasonPassRevenueDto> {
     const [today, month, byTier, dailyRows] = await Promise.all([
-      passRevenueByTier(this.passRepository, { createdBetween: { from: todayStart, to: endOfDay(now) } }),
-      passRevenueByTier(this.passRepository, { createdBetween: { from: monthStart, to: endOfDay(now) } }),
+      passRevenueByTier(this.passRepository, {
+        createdBetween: { from: todayStart, to: endOfDay(now) },
+      }),
+      passRevenueByTier(this.passRepository, {
+        createdBetween: { from: monthStart, to: endOfDay(now) },
+      }),
       passRevenueByTier(this.passRepository, {}),
       this.passRepository
         .createQueryBuilder('sp')

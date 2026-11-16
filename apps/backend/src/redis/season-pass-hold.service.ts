@@ -118,7 +118,12 @@ return 0
 `;
 
 export type SeasonPassHoldResult =
-  | { readonly kind: 'held'; readonly holdToken: string; readonly ttlSeconds: number; readonly renewed: boolean }
+  | {
+      readonly kind: 'held';
+      readonly holdToken: string;
+      readonly ttlSeconds: number;
+      readonly renewed: boolean;
+    }
   | { readonly kind: 'held_by_other' };
 
 const MAX_HOLD_ATTEMPTS = 5;

@@ -1,4 +1,17 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  EventEmitter,
+  Input,
+  Output,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { CartItem, MAX_CART_ITEMS } from '../../../../shared/models/cart.model';
 import { HufCurrencyPipe } from '../../../../shared/pipes/huf-currency.pipe';
 import { sectorName } from '../../../../shared/utils/sector-name';
@@ -257,6 +270,59 @@ import { sectorName } from '../../../../shared/utils/sector-name';
   ],
 })
 export class SeatSummaryComponent {
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly document = inject(DOCUMENT);
+
+  constructor() {
+    // On a phone this bar is glued to the bottom edge, exactly where the chat bubble floats.
+    // While it is stuck there it publishes how much of the viewport it takes (`--dock-inset`)
+    // and the bubble rides above it. Once the page has scrolled to where the bar rests in the
+    // flow (above the footer) it takes nothing and the bubble drops back into the footer's room.
+    afterNextRender(() => {
+      const view = this.document.defaultView;
+      if (!view || typeof ResizeObserver === 'undefined') {
+        return;
+      }
+      const root = this.document.documentElement;
+      const el = this.host.nativeElement;
+      const phone = view.matchMedia('(max-width: 899px)');
+      let frame = 0;
+      const publish = (): void => {
+        frame = 0;
+        const rect = el.getBoundingClientRect();
+        const viewportBottom = view.visualViewport?.height ?? view.innerHeight;
+        const stuck = phone.matches && rect.height > 0 && rect.bottom >= viewportBottom - 2;
+        root.style.setProperty(
+          '--dock-inset',
+          stuck ? `${Math.max(0, Math.round(viewportBottom - rect.top))}px` : '0px',
+        );
+      };
+      const schedule = (): void => {
+        if (!frame) {
+          frame = view.requestAnimationFrame(publish);
+        }
+      };
+      const resize = new ResizeObserver(schedule);
+      resize.observe(el);
+      view.addEventListener('resize', schedule);
+      // The scroller is the shell's content pane, not the window: listen in the capture phase.
+      this.document.addEventListener('scroll', schedule, { capture: true, passive: true });
+      phone.addEventListener('change', schedule);
+      schedule();
+      this.destroyRef.onDestroy(() => {
+        resize.disconnect();
+        view.removeEventListener('resize', schedule);
+        this.document.removeEventListener('scroll', schedule, { capture: true });
+        phone.removeEventListener('change', schedule);
+        if (frame) {
+          view.cancelAnimationFrame(frame);
+        }
+        root.style.removeProperty('--dock-inset');
+      });
+    });
+  }
+
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly max = MAX_CART_ITEMS;
   protected readonly open = signal(false);
   private readonly list = signal<readonly CartItem[]>([]);

@@ -20,18 +20,24 @@ describe('72-byte limit on a password that is compared', () => {
   it('login accepts 72 bytes and refuses 74, pointing to the password reset', () => {
     const ok = validateSync(plainToInstance(LoginDto, { email: 'fan@kte.hu', password: atLimit }));
     expect(messagesOf(ok, 'password')).toEqual([]);
-    const bad = validateSync(plainToInstance(LoginDto, { email: 'fan@kte.hu', password: overLimit }));
+    const bad = validateSync(
+      plainToInstance(LoginDto, { email: 'fan@kte.hu', password: overLimit }),
+    );
     expect(messagesOf(bad, 'password').join(' ')).toContain('Elfelejtett jelszó');
   });
 
   it('the current password of a change and of an e-mail change obey it too', () => {
     const change = (currentPassword: string) =>
-      validateSync(plainToInstance(ChangePasswordDto, { currentPassword, newPassword: 'Jelszo123' }));
+      validateSync(
+        plainToInstance(ChangePasswordDto, { currentPassword, newPassword: 'Jelszo123' }),
+      );
     expect(messagesOf(change(atLimit), 'currentPassword')).toEqual([]);
     expect(messagesOf(change(overLimit), 'currentPassword').join(' ')).toContain('72 bájt');
 
     const email = (currentPassword: string) =>
-      validateSync(plainToInstance(RequestEmailChangeDto, { newEmail: 'uj@kte.hu', currentPassword }));
+      validateSync(
+        plainToInstance(RequestEmailChangeDto, { newEmail: 'uj@kte.hu', currentPassword }),
+      );
     expect(messagesOf(email(atLimit), 'currentPassword')).toEqual([]);
     expect(messagesOf(email(overLimit), 'currentPassword').join(' ')).toContain('72 bájt');
   });

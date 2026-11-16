@@ -1,4 +1,10 @@
-import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import { bestSplit, findRuns, groupRows, GridSeat, rankWindows, Window } from './best-seats';
 import { BestSeatsResponseDto, SeatAvailability, SeatRunDto } from './dto';
@@ -82,7 +88,9 @@ export class BestSeatsService {
         { userId },
       );
       if (!locked) {
-        this.logger.debug(`Best seats: placement taken before the lock (attempt ${attempt}/${MAX_ATTEMPTS}).`);
+        this.logger.debug(
+          `Best seats: placement taken before the lock (attempt ${attempt}/${MAX_ATTEMPTS}).`,
+        );
         continue;
       }
 

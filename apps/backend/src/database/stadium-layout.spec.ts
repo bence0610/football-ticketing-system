@@ -210,7 +210,7 @@ describe('stadium layout', () => {
         'utf8',
       ).replace(/\\`/g, '`');
       // The rule it writes: away -> NULL, VIP -> vip, upper arc -> upper, else lower.
-      expect(source).toContain("WHEN `is_away` = 1 THEN NULL");
+      expect(source).toContain('WHEN `is_away` = 1 THEN NULL');
       expect(source).toContain("WHEN `code` = 'VIP' THEN 'vip'");
       expect(source).toContain("WHEN `arc` = 'upper' THEN 'upper'");
       const derive = (s: { code: string; arc: string; isAway: boolean }): string | null =>

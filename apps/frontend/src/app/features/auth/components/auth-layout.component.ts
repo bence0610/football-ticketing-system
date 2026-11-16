@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
+import { RouterLink } from '@angular/router';
+import { CrestComponent } from '../../../shared/components/crest/crest.component';
 
 export type AuthMode = 'login' | 'register' | 'reset' | 'email';
 
@@ -70,7 +72,7 @@ const COPY: Record<AuthMode, BrandCopy> = {
   selector: 'kte-auth-layout',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconModule],
+  imports: [MatIconModule, RouterLink, CrestComponent],
   template: `
     <div class="auth">
       <aside class="auth__brand" aria-label="KTE Jegyportál">
@@ -88,19 +90,22 @@ const COPY: Record<AuthMode, BrandCopy> = {
         </svg>
 
         <div class="auth__inner">
-          <div class="auth__logo">
-            <svg class="auth__crest" width="88" height="100" viewBox="0 0 88 100" aria-hidden="true">
-              <path
-                d="M44 3 6 15v34c0 24 15 40 38 48 23-8 38-24 38-48V15z"
-                fill="rgba(255,255,255,.1)"
-                stroke="#fff"
-                stroke-width="3"
-                stroke-linejoin="round"
-              />
-              <text x="44" y="58" text-anchor="middle" font-family="Archivo, sans-serif" font-weight="800" font-size="24" fill="#fff">KTE</text>
-            </svg>
+          <!-- There is no site header on this page, so the brand is the way back to the home page. -->
+          <a class="auth__logo" routerLink="/" aria-label="KTE Jegyportál - vissza a kezdőlapra">
+            <kte-crest class="auth__crest" [plated]="true">
+              <svg width="88" height="100" viewBox="0 0 88 100" aria-hidden="true">
+                <path
+                  d="M44 3 6 15v34c0 24 15 40 38 48 23-8 38-24 38-48V15z"
+                  fill="rgba(255,255,255,.1)"
+                  stroke="#fff"
+                  stroke-width="3"
+                  stroke-linejoin="round"
+                />
+                <text x="44" y="58" text-anchor="middle" font-family="Archivo, sans-serif" font-weight="800" font-size="24" fill="#fff">KTE</text>
+              </svg>
+            </kte-crest>
             <span class="auth__wordmark">Jegyportál</span>
-          </div>
+          </a>
 
           <h2 class="auth__title" data-testid="auth-brand-title">{{ copy.title }}</h2>
           <p class="auth__lead">{{ copy.lead }}</p>
@@ -134,7 +139,8 @@ const COPY: Record<AuthMode, BrandCopy> = {
       .auth {
         display: grid;
         grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-        min-height: calc(100dvh - var(--header-h, 72px));
+        /* Full screen: the shell shows no header or footer on this page. */
+        min-height: 100dvh;
       }
 
       /* ── Brand panel ─────────────────────────────────────────────── */
@@ -172,7 +178,17 @@ const COPY: Record<AuthMode, BrandCopy> = {
         max-width: 560px;
         margin-left: auto;
       }
-      .auth__logo { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+      .auth__logo {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        align-self: flex-start;
+        color: inherit;
+        text-decoration: none;
+      }
+      .auth__logo:focus-visible { outline: 2px solid #fff; outline-offset: 6px; border-radius: 6px; }
+      .auth__crest { --crest-h: 84px; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.3)); }
       .auth__wordmark {
         font-family: var(--font-display);
         font-weight: 700;
@@ -222,7 +238,8 @@ const COPY: Record<AuthMode, BrandCopy> = {
         background: var(--surface);
         display: flex;
         justify-content: center;
-        padding: 64px 32px 48px;
+        /* The bottom is the room the chat bubble sits in when the form is scrolled to its end. */
+        padding: 64px 32px var(--chat-clearance, 88px);
       }
       .auth__form-inner { width: 100%; max-width: 420px; }
 
@@ -231,12 +248,12 @@ const COPY: Record<AuthMode, BrandCopy> = {
         .auth { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
         .auth__inner { padding: 16px; max-width: none; height: auto; }
         .auth__logo { flex-direction: row; align-items: center; gap: 12px; }
-        .auth__crest { width: 35px; height: 40px; }
+        .auth__crest { --crest-h: 36px; }
         .auth__wordmark { font-size: 18px; }
         .auth__title { margin: 10px 0 0; font-size: 17px; min-height: 2.5em; }
         .auth__lead, .auth__features, .auth__extra { display: none; }
         .auth__stadium { display: none; }
-        .auth__form { padding: 24px 16px 32px; }
+        .auth__form { padding: 24px 16px var(--chat-clearance, 88px); }
       }
     `,
   ],

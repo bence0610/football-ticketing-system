@@ -1,10 +1,48 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { createTransport, Transporter } from 'nodemailer';
 import type { Attachment } from 'nodemailer/lib/mailer';
 import { MailConfig } from '../../config';
 import { EmailTemplateService } from './email-template.service';
 import { EmailContextMap, EmailTemplateName, SendEmailRequest } from './email.types';
+
+/** Content-ID the shared header's <img> points at (partials/layout.hbs). */
+export const CREST_CID = 'crest@kte-jegyportal';
+
+let crestBytes: Buffer | null | undefined;
+
+/**
+ * The club crest as an inline attachment, so the header shows without the recipient allowing
+ * remote images. Read once.
+ *
+ * `templates/assets/kte-cimer.png` is a COPY of the frontend's crest,
+ * `apps/frontend/src/assets/kte-cimer.png` (see crest.component.ts there). If the crest changes,
+ * replace BOTH files, or the site and the e-mails will show different crests. Returns null when the file is missing; the header then falls back
+ * to the "KTE" tile instead of pointing at an image that is not there.
+ */
+export function crestAttachment(logger?: Logger): Attachment | null {
+  if (crestBytes === undefined) {
+    try {
+      crestBytes = readFileSync(resolve(__dirname, 'templates', 'assets', 'kte-cimer.png'));
+    } catch (error) {
+      logger?.error(
+        `Crest image missing, e-mails fall back to the text tile: ${(error as Error).message}`,
+      );
+      crestBytes = null;
+    }
+  }
+  return crestBytes
+    ? {
+        filename: 'kte-cimer.png',
+        content: crestBytes,
+        contentType: 'image/png',
+        cid: CREST_CID,
+        contentDisposition: 'inline',
+      }
+    : null;
+}
 
 /**
  * Production-grade transactional email sender. Uses Nodemailer over SMTP
@@ -49,12 +87,18 @@ export class EmailService implements OnModuleDestroy {
   async send<T extends EmailTemplateName>(request: SendEmailRequest<T>): Promise<void> {
     // Gmail and Outlook block data: images, so inline images travel as CID attachments.
     const { context, attachments } = extractInlineImages(request.context);
+    const crest = crestAttachment(this.logger);
     const { html, text } = this.templateService.renderBoth(
       request.template,
       context as EmailContextMap[T],
       request.subject,
+      crest !== null,
     );
-    await this.deliverWithRetry(request, { html, text, attachments });
+    await this.deliverWithRetry(request, {
+      html,
+      text,
+      attachments: crest ? [crest, ...attachments] : attachments,
+    });
   }
 
   private async deliverWithRetry(

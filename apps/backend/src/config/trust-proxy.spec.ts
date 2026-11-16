@@ -37,8 +37,12 @@ describe('parseTrustProxy', () => {
       CORS_ORIGINS: 'http://x.test',
     };
     const check = (value?: string) =>
-      envValidationSchema.validate({ ...base, ...(value === undefined ? {} : { TRUST_PROXY: value }) }, { allowUnknown: true, abortEarly: false });
-    const errorsOf = (value?: string) => (check(value).error?.details ?? []).filter((d) => d.path[0] === 'TRUST_PROXY');
+      envValidationSchema.validate(
+        { ...base, ...(value === undefined ? {} : { TRUST_PROXY: value }) },
+        { allowUnknown: true, abortEarly: false },
+      );
+    const errorsOf = (value?: string) =>
+      (check(value).error?.details ?? []).filter((d) => d.path[0] === 'TRUST_PROXY');
     expect(errorsOf()).toEqual([]);
     expect(errorsOf('1')).toEqual([]);
     expect(errorsOf('loopback')).toEqual([]);
@@ -61,7 +65,9 @@ describe('trust proxy and req.ip', () => {
   const spoofed = '203.0.113.7';
 
   it('without a proxy configured, X-Forwarded-For is ignored: a caller cannot pick their own address', async () => {
-    const res = await request(app(parseTrustProxy('false'))).get('/ip').set('X-Forwarded-For', spoofed);
+    const res = await request(app(parseTrustProxy('false')))
+      .get('/ip')
+      .set('X-Forwarded-For', spoofed);
     expect(res.body.ip).not.toBe(spoofed);
     expect(['127.0.0.1', '::1', '::ffff:127.0.0.1']).toContain(res.body.ip);
   });

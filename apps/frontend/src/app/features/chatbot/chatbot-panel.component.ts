@@ -115,10 +115,10 @@ import { ChatbotStore } from './state/chatbot.signals';
       .kte-chatbot-panel {
         display: flex;
         flex-direction: column;
-        /* Sits under the header (72px + 8px gap) with a 16px gutter on every side. */
+        /* Opens above the bubble, with a 16px gutter at the right and the top. */
         width: min(360px, calc(100vw - 32px));
-        height: 520px; /* shrinks to the space under the header on short screens */
-        max-height: calc(100dvh - var(--header-h, 72px) - 24px);
+        height: 520px; /* shrinks to the space above the bubble on short screens */
+        max-height: calc(100dvh - var(--chat-clearance, 88px) - var(--dock-inset, 0px) - 16px);
         background: var(--kte-ink);
         color: var(--kte-surface);
         border-radius: var(--kte-radius-lg);

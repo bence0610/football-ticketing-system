@@ -14,7 +14,10 @@ export function hasKickedOff(match: Pick<Match, 'kickoffAt'>, now: Date = new Da
 }
 
 /** Throws 409 `match_started` when the match has kicked off. */
-export function assertMatchNotStarted(match: Pick<Match, 'kickoffAt'>, now: Date = new Date()): void {
+export function assertMatchNotStarted(
+  match: Pick<Match, 'kickoffAt'>,
+  now: Date = new Date(),
+): void {
   if (hasKickedOff(match, now)) {
     throw new ConflictException({
       statusCode: 409,

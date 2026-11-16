@@ -36,7 +36,7 @@ export const APP_ROUTES: Routes = [
         path: 'stadium',
         loadComponent: () =>
           import('./features/stadium/stadium.page').then((m) => m.StadiumPageComponent),
-        title: 'Stadion - Helyválasztás',
+        title: 'Jegyvásárlás - Helyválasztás',
       },
       {
         path: 'cart',

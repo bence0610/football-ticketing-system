@@ -71,7 +71,11 @@ describe('BestSeatsService: concurrent requests (real Redis)', () => {
   });
 
   beforeAll(async () => {
-    redis = new Redis(REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1, retryStrategy: () => null });
+    redis = new Redis(REDIS_URL, {
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      retryStrategy: () => null,
+    });
     try {
       await redis.connect();
       await redis.ping();
@@ -111,7 +115,13 @@ describe('BestSeatsService: concurrent requests (real Redis)', () => {
   };
 
   const request = (count: number, extra: { allowSplit?: boolean; userId?: string } = {}) =>
-    service.findAndLock({ matchId: MATCH, section: 'X', count, allowSplit: extra.allowSplit ?? false, userId: extra.userId });
+    service.findAndLock({
+      matchId: MATCH,
+      section: 'X',
+      count,
+      allowSplit: extra.allowSplit ?? false,
+      userId: extra.userId,
+    });
 
   run('two simultaneous requests for the same best run never get the same seat', async () => {
     // Both snapshots are taken before either lock: both rank the same run first.
@@ -136,7 +146,10 @@ describe('BestSeatsService: concurrent requests (real Redis)', () => {
     setTimeout(release, 100);
     const results = await Promise.allSettled(requests);
 
-    const won = results.filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof request>>> => r.status === 'fulfilled');
+    const won = results.filter(
+      (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof request>>> =>
+        r.status === 'fulfilled',
+    );
     // 48 seats / 2 per party = 24 parties fit; the other requests may only fail, never double-book
     expect(won.length).toBeLessThanOrEqual(24);
     expect(won.length).toBeGreaterThan(0);
@@ -174,46 +187,54 @@ describe('BestSeatsService: concurrent requests (real Redis)', () => {
     });
   });
 
-  run('a split is locked atomically too: two simultaneous split requests do not share a seat', async () => {
-    // fragment the sector: in every row take every third seat, so runs are 2 long
-    for (const s of sector) {
-      if (s.number % 3 === 0) await redis.set(RedisKeys.seatLock(MATCH, s.id), 'other', 'EX', 60);
-    }
-    let release!: () => void;
-    snapshotGate = new Promise((r) => (release = r));
-    const a = request(4, { allowSplit: true });
-    const b = request(4, { allowSplit: true });
-    setTimeout(release, 50);
-    const [ra, rb] = await Promise.all([a, b]);
-    expect(ra.kind).toBe('split');
-    expect(rb.kind).toBe('split');
-    const idsA = ra.runs.flatMap((r) => r.seats.map((s) => s.id));
-    const idsB = rb.runs.flatMap((r) => r.seats.map((s) => s.id));
-    expect(idsA).toHaveLength(4);
-    expect(idsB).toHaveLength(4);
-    expect(idsA.filter((id) => idsB.includes(id))).toEqual([]);
-  });
+  run(
+    'a split is locked atomically too: two simultaneous split requests do not share a seat',
+    async () => {
+      // fragment the sector: in every row take every third seat, so runs are 2 long
+      for (const s of sector) {
+        if (s.number % 3 === 0) await redis.set(RedisKeys.seatLock(MATCH, s.id), 'other', 'EX', 60);
+      }
+      let release!: () => void;
+      snapshotGate = new Promise((r) => (release = r));
+      const a = request(4, { allowSplit: true });
+      const b = request(4, { allowSplit: true });
+      setTimeout(release, 50);
+      const [ra, rb] = await Promise.all([a, b]);
+      expect(ra.kind).toBe('split');
+      expect(rb.kind).toBe('split');
+      const idsA = ra.runs.flatMap((r) => r.seats.map((s) => s.id));
+      const idsB = rb.runs.flatMap((r) => r.seats.map((s) => s.id));
+      expect(idsA).toHaveLength(4);
+      expect(idsB).toHaveLength(4);
+      expect(idsA.filter((id) => idsB.includes(id))).toEqual([]);
+    },
+  );
 
-  run('no run long enough: 409 says so, gives the longest run and the split it would lock', async () => {
-    for (const s of sector) {
-      if (s.number % 3 === 0) await redis.set(RedisKeys.seatLock(MATCH, s.id), 'other', 'EX', 60);
-    }
-    const err = await request(4).catch((e) => e);
-    expect(err.getStatus()).toBe(409);
-    const body = err.getResponse();
-    expect(body.code).toBe('no_adjacent_run');
-    expect(body.longestRun).toBe(2);
-    expect(body.alternative.runs).toHaveLength(2);
-    // and nothing was locked by the refusal
-    const before = (await redis.keys(`seat-lock:${MATCH}:*`)).length;
-    expect(before).toBe(sector.filter((s) => s.number % 3 === 0).length);
-  });
+  run(
+    'no run long enough: 409 says so, gives the longest run and the split it would lock',
+    async () => {
+      for (const s of sector) {
+        if (s.number % 3 === 0) await redis.set(RedisKeys.seatLock(MATCH, s.id), 'other', 'EX', 60);
+      }
+      const err = await request(4).catch((e) => e);
+      expect(err.getStatus()).toBe(409);
+      const body = err.getResponse();
+      expect(body.code).toBe('no_adjacent_run');
+      expect(body.longestRun).toBe(2);
+      expect(body.alternative.runs).toHaveLength(2);
+      // and nothing was locked by the refusal
+      const before = (await redis.keys(`seat-lock:${MATCH}:*`)).length;
+      expect(before).toBe(sector.filter((s) => s.number % 3 === 0).length);
+    },
+  );
 
   run('records the seats under the user for the cart flow', async () => {
     const userId = randomUUID();
     const r = await request(3, { userId });
     const owner = await redis.hgetall(RedisKeys.seatLockOwner(MATCH, userId));
-    expect(Object.keys(owner).sort()).toEqual(r.runs.flatMap((x) => x.seats.map((s) => s.id)).sort());
+    expect(Object.keys(owner).sort()).toEqual(
+      r.runs.flatMap((x) => x.seats.map((s) => s.id)).sort(),
+    );
     expect(Object.values(owner).every((t) => t === r.ownerToken)).toBe(true);
     await redis.del(RedisKeys.seatLockOwner(MATCH, userId));
   });
@@ -229,9 +250,16 @@ describe('BestSeatsService: the away section', () => {
     const acquire = jest.fn();
     const stub = {
       assertMatchOpenForSale: async () => undefined,
-      loadSectorForFinder: async () => ({ sector: { isAway: true }, seats: [], width: 0, ideal: 0 }),
+      loadSectorForFinder: async () => ({
+        sector: { isAway: true },
+        seats: [],
+        width: 0,
+        ideal: 0,
+      }),
     } as unknown as SeatsService;
-    const service = new BestSeatsService(stub, { acquireFirstFreeGroup: acquire } as unknown as SeatLockService);
+    const service = new BestSeatsService(stub, {
+      acquireFirstFreeGroup: acquire,
+    } as unknown as SeatLockService);
     await expect(
       service.findAndLock({ matchId: MATCH, section: 'VENDÉG', count: 2, allowSplit: true }),
     ).rejects.toMatchObject({ status: 403 });

@@ -10,13 +10,21 @@ describe('chatbot caller identity', () => {
   });
 
   it('falls back to the socket address, then to "unknown"', () => {
-    expect(extractClientIp(req({ socket: { remoteAddress: '192.0.2.1' } as Request['socket'] }))).toBe('192.0.2.1');
+    expect(
+      extractClientIp(req({ socket: { remoteAddress: '192.0.2.1' } as Request['socket'] })),
+    ).toBe('192.0.2.1');
     expect(extractClientIp(req({}))).toBe('unknown');
   });
 
   it('gives two anonymous callers who differ only in a forged header the SAME owner (no fresh identity per header)', () => {
-    const a = resolveChatbotOwner(req({ ip: '198.51.100.20', headers: { 'x-forwarded-for': '1.1.1.1' } }), undefined);
-    const b = resolveChatbotOwner(req({ ip: '198.51.100.20', headers: { 'x-forwarded-for': '2.2.2.2' } }), undefined);
+    const a = resolveChatbotOwner(
+      req({ ip: '198.51.100.20', headers: { 'x-forwarded-for': '1.1.1.1' } }),
+      undefined,
+    );
+    const b = resolveChatbotOwner(
+      req({ ip: '198.51.100.20', headers: { 'x-forwarded-for': '2.2.2.2' } }),
+      undefined,
+    );
     expect(a).toBe(b);
   });
 });

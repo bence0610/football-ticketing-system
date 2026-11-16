@@ -33,7 +33,10 @@ describe('POST /matches/:matchId/seats/best (validation and wiring)', () => {
   afterAll(async () => app.close());
   beforeEach(() => findAndLock.mockReset().mockResolvedValue({ kind: 'together' }));
 
-  const post = (body: unknown) => request(app.getHttpServer()).post(`/matches/${MATCH_ID}/seats/best`).send(body as object);
+  const post = (body: unknown) =>
+    request(app.getHttpServer())
+      .post(`/matches/${MATCH_ID}/seats/best`)
+      .send(body as object);
 
   it('passes the party size, sector and the split choice through', async () => {
     await post({ section: 'C/2', count: 4, allowSplit: true }).expect(201);
@@ -65,6 +68,9 @@ describe('POST /matches/:matchId/seats/best (validation and wiring)', () => {
   });
 
   it('rejects a non-UUID match id', async () => {
-    await request(app.getHttpServer()).post('/matches/nope/seats/best').send({ section: 'C/2', count: 2 }).expect(400);
+    await request(app.getHttpServer())
+      .post('/matches/nope/seats/best')
+      .send({ section: 'C/2', count: 2 })
+      .expect(400);
   });
 });

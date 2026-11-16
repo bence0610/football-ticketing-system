@@ -123,15 +123,18 @@ describe('SeasonPassHoldService (real Redis)', () => {
     expect(await redis.ttl(RedisKeys.seasonPassHold(season, seat))).toBeGreaterThan(890);
   });
 
-  itRedis('a seat held by someone else is refused, and does not move the requester\'s own hold', async () => {
-    const seat = randomUUID();
-    const mine = randomUUID();
-    const me = randomUUID();
-    await holds.hold(season, seat, randomUUID());
-    await holds.hold(season, mine, me);
-    expect((await holds.hold(season, seat, me)).kind).toBe('held_by_other');
-    expect(await redis.exists(RedisKeys.seasonPassHold(season, mine))).toBe(1);
-  });
+  itRedis(
+    "a seat held by someone else is refused, and does not move the requester's own hold",
+    async () => {
+      const seat = randomUUID();
+      const mine = randomUUID();
+      const me = randomUUID();
+      await holds.hold(season, seat, randomUUID());
+      await holds.hold(season, mine, me);
+      expect((await holds.hold(season, seat, me)).kind).toBe('held_by_other');
+      expect(await redis.exists(RedisKeys.seasonPassHold(season, mine))).toBe(1);
+    },
+  );
 
   itRedis('verifyAndExtend is bound to token AND user', async () => {
     const user = randomUUID();

@@ -21,7 +21,8 @@ export interface PassTierRevenue {
   revenue: number;
 }
 
-const tierLabel = (tier: PassTier): string => (tier === 'unknown' ? 'Ismeretlen' : TIER_LABEL[tier]);
+const tierLabel = (tier: PassTier): string =>
+  tier === 'unknown' ? 'Ismeretlen' : TIER_LABEL[tier];
 const TIER_ORDER: PassTier[] = ['vip', 'lower', 'upper', 'unknown'];
 
 export interface PassRevenueFilter {
@@ -68,7 +69,9 @@ export async function passRevenueByTier(
     .sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
 }
 
-export const sumTiers = (tiers: readonly PassTierRevenue[]): { revenue: number; passCount: number } => ({
+export const sumTiers = (
+  tiers: readonly PassTierRevenue[],
+): { revenue: number; passCount: number } => ({
   revenue: tiers.reduce((a, t) => a + t.revenue, 0),
   passCount: tiers.reduce((a, t) => a + t.passCount, 0),
 });

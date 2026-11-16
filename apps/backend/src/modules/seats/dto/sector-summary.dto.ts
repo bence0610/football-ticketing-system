@@ -34,7 +34,8 @@ export class SectorSummaryDto {
   @ApiProperty({
     nullable: true,
     enum: ['vip', 'upper', 'lower'],
-    description: 'Árkategória: a felső ív, az alsó ív vagy a VIP. null: a vendégszektor (nincs ára).',
+    description:
+      'Árkategória: a felső ív, az alsó ív vagy a VIP. null: a vendégszektor (nincs ára).',
   })
   priceCategory!: 'vip' | 'upper' | 'lower' | null;
 

@@ -70,7 +70,9 @@ export class MatchSeatsController {
       'Egyetlen szerveroldali művelet: a rangsorolt elhelyezések közül a Redis (Lua szkript) az első teljesen szabadot zárolja, egy lépésben, ezért két egyidejű kérés nem kaphatja ugyanazt a sort. Soha nem ad vendégszektorbeli széket. Ha nincs elég hosszú sor, 409 `no_adjacent_run` (vagy `not_enough_seats`) a válasz a leghosszabb sorral és a felajánlható két rövidebb sorral; `allowSplit: true` esetén ezt zárolja is.',
   })
   @ApiOkResponse({ type: BestSeatsResponseDto })
-  @ApiConflictResponse({ description: '`no_adjacent_run`, `not_enough_seats`, `contended` vagy `match_started`.' })
+  @ApiConflictResponse({
+    description: '`no_adjacent_run`, `not_enough_seats`, `contended` vagy `match_started`.',
+  })
   findBestSeats(
     @Param('matchId', new ParseUUIDPipe()) matchId: string,
     @Body() body: BestSeatsRequestDto,
@@ -95,7 +97,9 @@ export class MatchSeatsController {
       'Atomi `SET NX EX` művelettel zárolja a széket Redis-ben (alapértelmezett TTL 300 mp). Sikeres zárolás esetén egy ownerToken-t kap a hívó. Bejelentkezett és vendég felhasználó is használhatja: ha JWT érkezik, a `userId` a lock metaadatába kerül.',
   })
   @ApiOkResponse({ type: LockSeatResponseDto })
-  @ApiConflictResponse({ description: 'A szék már zárolva van, vagy a mérkőzés már elkezdődött (`match_started`).' })
+  @ApiConflictResponse({
+    description: 'A szék már zárolva van, vagy a mérkőzés már elkezdődött (`match_started`).',
+  })
   async lockSeat(
     @Param('matchId', new ParseUUIDPipe()) matchId: string,
     @Param('seatId', new ParseUUIDPipe()) seatId: string,

@@ -86,7 +86,8 @@ export class SeasonPassesController {
 
   @Get('prices')
   @ApiOperation({
-    summary: 'Aktív szezon (2026/2027) bérletárainak listája árkategóriánként (felső ív, alsó ív, VIP)',
+    summary:
+      'Aktív szezon (2026/2027) bérletárainak listája árkategóriánként (felső ív, alsó ív, VIP)',
   })
   @ApiOkResponse({ type: [SeasonPassPriceDto] })
   async listPrices(): Promise<SeasonPassPriceDto[]> {

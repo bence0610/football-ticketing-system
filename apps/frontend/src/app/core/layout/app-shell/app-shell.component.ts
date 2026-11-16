@@ -14,6 +14,7 @@ import { AuthService } from '../../auth/auth.service';
 import { isAdminRole } from '../../auth/roles';
 import { CartFacade } from '../../cart/cart.facade';
 import { ChatbotWidgetComponent } from '../../../features/chatbot/chatbot-widget.component';
+import { CrestComponent } from '../../../shared/components/crest/crest.component';
 import { initialsOf } from '../../../shared/utils/format-name';
 
 interface NavItem {
@@ -45,6 +46,7 @@ const HIDDEN_CHATBOT_ROUTES: readonly string[] = ['/checkout'];
     MatSidenavModule,
     MatListModule,
     ChatbotWidgetComponent,
+    CrestComponent,
   ],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.scss',
@@ -60,7 +62,7 @@ export class AppShellComponent {
 
   protected readonly navItems = signal<readonly NavItem[]>([
     { label: 'Kezdőlap', route: '/', icon: 'home', exact: true },
-    { label: 'Stadion', route: '/stadium', icon: 'stadium' },
+    { label: 'Jegyvásárlás', route: '/stadium', icon: 'confirmation_number' },
     { label: 'Bérlet vásárlás', route: '/season-pass', icon: 'card_membership' },
     { label: 'Kosár', route: '/cart', icon: 'shopping_cart' },
     { label: 'Hűség', route: '/loyalty', icon: 'star', authOnly: true },
@@ -80,7 +82,7 @@ export class AppShellComponent {
   protected readonly sidenavOpen = signal(false);
   protected readonly year = new Date().getFullYear();
 
-  // The chatbot widget is hidden on the checkout flow so it can't cover
+  // The chatbot bubble is hidden on the checkout flow so it can't cover
   // the Stripe payment element on small screens. This signal flips on
   // every navigation event.
   protected readonly currentUrl = signal<string>(this.router.url);
@@ -106,6 +108,18 @@ export class AppShellComponent {
   protected readonly paymentFocus = computed(
     () => this.currentUrl().split(/[?#]/)[0] === '/checkout',
   );
+  // The auth pages (sign in, register, password reset, e-mail confirmation) are full-screen: a
+  // brand panel beside the form, and no site header or footer.
+  protected readonly fullScreen = computed(() => {
+    const path = this.currentUrl().split(/[?#]/)[0];
+    return (
+      path === '/login' ||
+      path === '/register' ||
+      path === '/forgot-password' ||
+      path.startsWith('/reset-password/') ||
+      path.startsWith('/confirm-email/')
+    );
+  });
   protected readonly showChatbot = computed(() => {
     const url = this.currentUrl();
     return !HIDDEN_CHATBOT_ROUTES.some((prefix) => url.startsWith(prefix));

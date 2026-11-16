@@ -52,7 +52,10 @@ export class OverviewMetricsDto {
 }
 
 export class SeasonPassTierRevenueDto {
-  @ApiProperty({ enum: ['vip', 'lower', 'upper', 'unknown'], description: "Price tier of the pass's seat; 'unknown' for a pass without a seat." })
+  @ApiProperty({
+    enum: ['vip', 'lower', 'upper', 'unknown'],
+    description: "Price tier of the pass's seat; 'unknown' for a pass without a seat.",
+  })
   tier!: 'vip' | 'lower' | 'upper' | 'unknown';
   @ApiProperty({ example: 'Felső ív' }) label!: string;
   @ApiProperty() passCount!: number;
@@ -72,7 +75,10 @@ export class OverviewSeasonPassesDto {
       "'season': every pass of the active season (period=season). 'purchased_in_period': passes bought in the last 30/90 days. Note the basis differs from match revenue, which is by kickoff date.",
   })
   basis!: 'season' | 'purchased_in_period';
-  @ApiProperty({ description: 'HUF actually charged for the passes counted (active or expired; pending and cancelled excluded).' })
+  @ApiProperty({
+    description:
+      'HUF actually charged for the passes counted (active or expired; pending and cancelled excluded).',
+  })
   revenue!: number;
   @ApiProperty() passCount!: number;
   @ApiProperty({ type: [SeasonPassTierRevenueDto] }) byTier!: SeasonPassTierRevenueDto[];
@@ -84,7 +90,10 @@ export class OverviewDto {
   @ApiProperty({ enum: OVERVIEW_PERIODS }) period!: OverviewPeriod;
   @ApiProperty({ format: 'date-time' }) generatedAt!: string;
   @ApiProperty({ type: OverviewMetricsDto }) metrics!: OverviewMetricsDto;
-  @ApiProperty({ type: OverviewSeasonPassesDto, description: 'Season-pass revenue, separate from `metrics.revenue` (match tickets).' })
+  @ApiProperty({
+    type: OverviewSeasonPassesDto,
+    description: 'Season-pass revenue, separate from `metrics.revenue` (match tickets).',
+  })
   seasonPasses!: OverviewSeasonPassesDto;
   @ApiProperty({ type: [OverviewMatchDto] }) matches!: OverviewMatchDto[];
 }

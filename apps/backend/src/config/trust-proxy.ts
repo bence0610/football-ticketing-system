@@ -40,7 +40,9 @@ export function parseTrustProxy(raw: string | undefined | null): TrustProxySetti
   }
   const entries = value.split(',').map((e) => e.trim());
   if (entries.some((e) => e === '' || /\s/.test(e))) {
-    throw new Error(`TRUST_PROXY "${value}" is not a hop count or a comma-separated list of addresses.`);
+    throw new Error(
+      `TRUST_PROXY "${value}" is not a hop count or a comma-separated list of addresses.`,
+    );
   }
   return entries.join(',');
 }

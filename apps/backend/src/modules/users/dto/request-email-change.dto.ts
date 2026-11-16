@@ -1,7 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { IsWithinBcryptLimit, PASSWORD_BYTES_AT_LOGIN_MESSAGE } from '../../auth/dto/password.decorator';
+import {
+  IsWithinBcryptLimit,
+  PASSWORD_BYTES_AT_LOGIN_MESSAGE,
+} from '../../auth/dto/password.decorator';
 
 export class RequestEmailChangeDto {
   @ApiProperty({

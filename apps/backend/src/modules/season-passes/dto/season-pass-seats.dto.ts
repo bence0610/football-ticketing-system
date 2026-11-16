@@ -43,7 +43,10 @@ export class SeasonPassTierSectorsDto {
   @ApiProperty({ example: 30000, description: 'A bérlet ára ebben az árkategóriában.' })
   price!: number;
 
-  @ApiProperty({ type: [SeasonPassSectorDto], description: 'Stadionsorrendben, vendégszektor nélkül.' })
+  @ApiProperty({
+    type: [SeasonPassSectorDto],
+    description: 'Stadionsorrendben, vendégszektor nélkül.',
+  })
   sectors!: SeasonPassSectorDto[];
 }
 
@@ -102,10 +105,17 @@ export class SeasonPassSeatMapDto {
   @ApiProperty({ example: '2026/2027' })
   seasonLabel!: string;
 
-  @ApiProperty({ type: [Number], example: [9], description: 'Ezek után a székszámok után van lépcső (folyosó).' })
+  @ApiProperty({
+    type: [Number],
+    example: [9],
+    description: 'Ezek után a székszámok után van lépcső (folyosó).',
+  })
   aisles!: number[];
 
-  @ApiProperty({ example: 12, description: 'A leghosszabb egymás melletti választható sor hossza.' })
+  @ApiProperty({
+    example: 12,
+    description: 'A leghosszabb egymás melletti választható sor hossza.',
+  })
   longestRun!: number;
 
   @ApiProperty({ type: [SeasonPassSeatDto] })
@@ -116,7 +126,9 @@ export class SeasonPassHoldResponseDto {
   @ApiProperty({ format: 'uuid' })
   seatId!: string;
 
-  @ApiProperty({ description: 'A foglalás azonosítója: a vásárlásnál és a feloldásnál kell megadni.' })
+  @ApiProperty({
+    description: 'A foglalás azonosítója: a vásárlásnál és a feloldásnál kell megadni.',
+  })
   holdToken!: string;
 
   @ApiProperty({ example: 900 })

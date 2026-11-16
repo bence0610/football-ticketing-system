@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { SeatStatusDto } from './seat-status.dto';
 
 /** The most seats one request may ask for: the cart holds six tickets. */
@@ -32,7 +41,10 @@ export class SeatRunDto {
   @ApiProperty({ example: '3' })
   row!: string;
 
-  @ApiProperty({ type: [SeatStatusDto], description: 'Egymás melletti székek, szám szerint növekvő sorrendben.' })
+  @ApiProperty({
+    type: [SeatStatusDto],
+    description: 'Egymás melletti székek, szám szerint növekvő sorrendben.',
+  })
   seats!: SeatStatusDto[];
 }
 
@@ -45,14 +57,18 @@ export class BestSeatsResponseDto {
 
   @ApiProperty({
     enum: ['together', 'split'],
-    description: '`together`: egy összefüggő sor. `split`: két külön sor (csak `allowSplit` esetén).',
+    description:
+      '`together`: egy összefüggő sor. `split`: két külön sor (csak `allowSplit` esetén).',
   })
   kind!: 'together' | 'split';
 
   @ApiProperty({ type: [SeatRunDto] })
   runs!: SeatRunDto[];
 
-  @ApiProperty({ description: 'Mind a zárolt székhez ugyanez a token tartozik; a feloldás székenként ezzel történik.' })
+  @ApiProperty({
+    description:
+      'Mind a zárolt székhez ugyanez a token tartozik; a feloldás székenként ezzel történik.',
+  })
   ownerToken!: string;
 
   @ApiProperty()

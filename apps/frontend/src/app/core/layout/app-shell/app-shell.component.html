@@ -44,12 +44,20 @@
   </mat-sidenav>
 
   <mat-sidenav-content class="kte-shell__content">
+    <!-- The club crest; if the image cannot load, the old "KTE" tile stands in for it. -->
+    <ng-template #brandMark>
+      <kte-crest class="kte-shell__crest" [plated]="true">
+        <span class="kte-shell__brand-mark" aria-hidden="true">KTE</span>
+      </kte-crest>
+    </ng-template>
+
+    @if (!fullScreen()) {
     <mat-toolbar class="kte-shell__toolbar">
       <div class="kte-shell__bar">
         @if (paymentFocus()) {
           <!-- Payment: no navigation, nothing that leads away mid-payment -->
           <span class="kte-shell__brand kte-shell__brand--static">
-            <span class="kte-shell__brand-mark" aria-hidden="true">KTE</span>
+            <ng-container *ngTemplateOutlet="brandMark" />
             <span class="kte-shell__brand-text">Jegyportál</span>
           </span>
           <span class="kte-shell__spacer"></span>
@@ -69,7 +77,7 @@
           </button>
 
           <a routerLink="/" class="kte-shell__brand" aria-label="KTE Jegyportál">
-            <span class="kte-shell__brand-mark">KTE</span>
+            <ng-container *ngTemplateOutlet="brandMark" />
             <span class="kte-shell__brand-text">Jegyportál</span>
           </a>
 
@@ -87,10 +95,6 @@
           </nav>
 
           <span class="kte-shell__spacer"></span>
-
-          @if (showChatbot()) {
-            <kte-chatbot-widget />
-          }
 
           <a
             mat-icon-button
@@ -132,15 +136,24 @@
         }
       </div>
     </mat-toolbar>
+    }
 
     <main class="kte-shell__main" [class.kte-shell__main--bleed]="bleed()">
       <router-outlet />
     </main>
 
+    @if (!fullScreen()) {
+    <!-- Its bottom padding is the space the chat bubble sits in at the end of every page. -->
     <footer class="kte-shell__footer">
       <span>&copy; {{ year }} Kecskeméti TE</span>
       <span>Hivatalos jegyértékesítés</span>
     </footer>
+    }
   </mat-sidenav-content>
 </mat-sidenav-container>
+
+<!-- The chat launcher floats bottom-right. Every page leaves room for it (see --chat-clearance). -->
+@if (showChatbot()) {
+  <kte-chatbot-widget />
+}
 

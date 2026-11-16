@@ -55,13 +55,35 @@ describe('findRuns', () => {
   });
 
   it('is 0 when nothing is free', () => {
-    expect(longestRun(grid(2, 6, ['1:1', '1:2', '1:3', '1:4', '1:5', '1:6', '2:1', '2:2', '2:3', '2:4', '2:5', '2:6']))).toBe(0);
+    expect(
+      longestRun(
+        grid(2, 6, [
+          '1:1',
+          '1:2',
+          '1:3',
+          '1:4',
+          '1:5',
+          '1:6',
+          '2:1',
+          '2:2',
+          '2:3',
+          '2:4',
+          '2:5',
+          '2:6',
+        ]),
+      ),
+    ).toBe(0);
   });
 });
 
 describe('groupRows', () => {
   it('orders rows numerically, not alphabetically', () => {
-    const seats: GridSeat[] = ['10', '2', '1', '16', '9'].map((row) => ({ id: row, row, number: 1, free: true }));
+    const seats: GridSeat[] = ['10', '2', '1', '16', '9'].map((row) => ({
+      id: row,
+      row,
+      number: 1,
+      free: true,
+    }));
     expect(groupRows(seats).map((r) => r.row)).toEqual(['1', '2', '9', '10', '16']);
   });
 });
@@ -107,9 +129,13 @@ describe('rankWindows', () => {
 
   it('breaks ties towards the lower seat number, deterministically', () => {
     // halfway at the boundary of seat 6/7 of a 12-wide row: windows [5,6] and [7,8] tie
-    const a = rankWindows(findRuns(grid(1, 12)), 2, rowIndex, 6).slice(0, 3).map(numbers);
+    const a = rankWindows(findRuns(grid(1, 12)), 2, rowIndex, 6)
+      .slice(0, 3)
+      .map(numbers);
     expect(a[0]).toEqual([6, 7]);
-    const b = rankWindows(findRuns(grid(1, 12)), 2, rowIndex, 6).slice(0, 3).map(numbers);
+    const b = rankWindows(findRuns(grid(1, 12)), 2, rowIndex, 6)
+      .slice(0, 3)
+      .map(numbers);
     expect(b).toEqual(a);
     const tie = rankWindows(findRuns(grid(1, 12)), 2, rowIndex, 6);
     expect(tie[1].cost).toBe(tie[2].cost);

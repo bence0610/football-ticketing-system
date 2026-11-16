@@ -61,10 +61,19 @@ export class SeasonPassPriceDto {
   })
   arc!: 'upper' | 'lower' | null;
 
-  @ApiProperty({ nullable: true, example: 1, description: 'Mindig null: a bérlet árkategóriára szól, nem szektorra.' })
+  @ApiProperty({
+    nullable: true,
+    example: 1,
+    description: 'Mindig null: a bérlet árkategóriára szól, nem szektorra.',
+  })
   position!: number | null;
 
-  @ApiProperty({ nullable: true, example: 2, description: 'A bejárat (1-4), ha a kategória minden szektorát ugyanaz a kapu szolgálja ki; különben null.' })
+  @ApiProperty({
+    nullable: true,
+    example: 2,
+    description:
+      'A bejárat (1-4), ha a kategória minden szektorát ugyanaz a kapu szolgálja ki; különben null.',
+  })
   gate!: number | null;
 
   @ApiProperty({

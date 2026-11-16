@@ -397,8 +397,26 @@ describe('SeasonPassesService – price list and season overview', () => {
       const [lower] = await service.listPrices();
 
       expect(lower.sectors).toEqual([
-        { section: 'K', name: 'K szektor', arc: 'lower', position: 5, gate: 2, covered: false, total: 280, freeSeats: 100 },
-        { section: 'F', name: 'F szektor', arc: 'lower', position: 10, gate: 1, covered: false, total: 234, freeSeats: 34 },
+        {
+          section: 'K',
+          name: 'K szektor',
+          arc: 'lower',
+          position: 5,
+          gate: 2,
+          covered: false,
+          total: 280,
+          freeSeats: 100,
+        },
+        {
+          section: 'F',
+          name: 'F szektor',
+          arc: 'lower',
+          position: 10,
+          gate: 1,
+          covered: false,
+          total: 234,
+          freeSeats: 34,
+        },
       ]);
     });
 

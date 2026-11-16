@@ -181,6 +181,7 @@ const MAX_PORT_HEIGHT_PX = 620;
           <div
             #board
             class="kte-seat-grid__board"
+            role="presentation"
             [style.width.px]="boardSize().w"
             [style.height.px]="boardSize().h"
             (click)="onBoardClick($event)"

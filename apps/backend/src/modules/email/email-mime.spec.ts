@@ -64,6 +64,15 @@ describe('e-mail MIME on the wire', () => {
     });
   });
 
+  it('the crest travels as one inline PNG part, referenced by the header, in every message', () => {
+    raw.forEach((message) => {
+      expect(message.match(/Content-ID: <crest@kte-jegyportal>/g) ?? []).toHaveLength(1);
+      expect(message).toContain('src=3D"cid:crest@kte-jegyportal"');
+      expect(message).toMatch(/Content-Type: image\/png; name=kte-cimer\.png/);
+      expect(message).toMatch(/Content-Disposition: inline; filename=kte-cimer\.png/);
+    });
+  });
+
   it('QR images are inline CID parts referenced by the HTML, not data: URLs', () => {
     fixtures.forEach((fixture, i) => {
       const message = raw[i];

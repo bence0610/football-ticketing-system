@@ -249,7 +249,7 @@ export class WaitlistCardComponent implements OnInit {
       await firstValueFrom(this.api.claim(this.entry.matchId));
       this.snackBar.open(
         'Megerősítve. Most kiválaszthatod a helyedet a stadiontérképen.',
-        'Stadiontérkép',
+        'Jegyvásárlás',
         { duration: 6000 },
       );
       void this.router.navigate(['/stadium'], {

@@ -8,6 +8,10 @@
       {
         "include": "modules/email/templates/**/*.hbs",
         "outDir": "dist"
+      },
+      {
+        "include": "modules/email/templates/assets/*.png",
+        "outDir": "dist"
       }
     ],
     "watchAssets": true

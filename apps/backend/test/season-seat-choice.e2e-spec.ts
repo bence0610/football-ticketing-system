@@ -91,7 +91,10 @@ describe('Season-pass seat choice (E2E)', () => {
   }
 
   /** A price row for the tier plus `count` active seats (rows 'SP', numbers 1..count) in its real sector. */
-  async function seedTier(tier: Tier, count: number): Promise<{ price: SeasonPassPrice; seats: Seat[] }> {
+  async function seedTier(
+    tier: Tier,
+    count: number,
+  ): Promise<{ price: SeasonPassPrice; seats: Seat[] }> {
     const seatRepo = ctx.dataSource.getRepository(Seat);
     const seats: Seat[] = [];
     for (let n = 1; n <= count; n++) {
@@ -234,7 +237,11 @@ describe('Season-pass seat choice (E2E)', () => {
       expect(byId.get(seats[1].id)).toBe('available');
       expect(byId.get(seats[2].id)).toBe('available');
       // The map only ever speaks the season vocabulary; never "sold".
-      expect([...byId.values()].every((s) => ['available', 'season_pass', 'locked', 'disabled'].includes(s))).toBe(true);
+      expect(
+        [...byId.values()].every((s) =>
+          ['available', 'season_pass', 'locked', 'disabled'].includes(s),
+        ),
+      ).toBe(true);
 
       expect(await holdKeys()).toHaveLength(0);
     });
@@ -243,7 +250,10 @@ describe('Season-pass seat choice (E2E)', () => {
       const { seats } = await seedTier('upper', 3);
       const owner = await registerFan('cancelled-owner');
       const other = await registerFan('cancelled-other');
-      const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seats[0].id });
+      const pass = await seedSeasonPass(ctx.dataSource, {
+        userId: owner.userId,
+        seatId: seats[0].id,
+      });
       await ctx.dataSource
         .getRepository(SeasonPass)
         .update({ id: pass.id }, { status: SeasonPassStatus.CANCELLED });
@@ -571,7 +581,12 @@ describe('Season-pass seat choice (E2E)', () => {
       await seedTier('lower', 1);
       const fan = await registerFan('mismatch');
       const hold = await holdSeat(fan.accessToken, upper.seats[0].id);
-      const buy = await postPurchase(fan.accessToken, 'lower', upper.seats[0].id, hold.body.holdToken);
+      const buy = await postPurchase(
+        fan.accessToken,
+        'lower',
+        upper.seats[0].id,
+        hold.body.holdToken,
+      );
       expect(buy.status).toBe(400);
       expect(buy.body.code).toBe('seat_tier_mismatch');
       expect(ctx.stripeStub.paymentIntentsCreateMock).not.toHaveBeenCalled();

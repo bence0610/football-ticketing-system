@@ -132,6 +132,16 @@ $font-body: ('IBM Plex Sans', system-ui, sans-serif);
     --divider-on-brand: #{$divider-on-brand};
     --header-h: #{$header-height};
 
+    // The floating chat bubble (bottom-right). Whatever ends a page must leave
+    // --chat-clearance of empty space below its last interactive element, so that scrolled
+    // to the end the bubble sits on padding, never on a button or footer text.
+    // --dock-inset is how high a bar glued to the bottom edge (the phone seat summary) is;
+    // that bar sets it while it is on screen, and the bubble rides above it.
+    --chat-size: 56px;
+    --chat-offset: 16px;
+    --chat-clearance: calc(var(--chat-size) + var(--chat-offset) * 2);
+    --dock-inset: 0px;
+
     --font-display: #{$font-display};
     --font-body: #{$font-body};
 

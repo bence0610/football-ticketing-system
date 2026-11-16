@@ -93,13 +93,17 @@ export class EmailTemplateService implements OnModuleInit {
     }
   }
 
-  /** `subject` becomes the HTML <title>; it is not part of the typed context. */
+  /**
+   * `subject` becomes the HTML <title>; it is not part of the typed context. `crest` says the
+   * crest image is attached (the header then shows it; otherwise the "KTE" tile).
+   */
   render<T extends EmailTemplateName>(
     template: T,
     context: EmailContextMap[T],
     subject = '',
+    crest = true,
   ): string {
-    return this.delegate(this.compiledHtml, template)({ ...context, subject });
+    return this.delegate(this.compiledHtml, template)({ ...context, subject, crest });
   }
 
   renderText<T extends EmailTemplateName>(template: T, context: EmailContextMap[T]): string {
@@ -110,9 +114,10 @@ export class EmailTemplateService implements OnModuleInit {
     template: T,
     context: EmailContextMap[T],
     subject = '',
+    crest = true,
   ): RenderedEmail {
     return {
-      html: this.render(template, context, subject),
+      html: this.render(template, context, subject, crest),
       text: this.renderText(template, context),
     };
   }

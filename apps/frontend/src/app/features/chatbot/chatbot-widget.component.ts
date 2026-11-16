@@ -13,16 +13,20 @@ import { ChatbotPanelComponent } from './chatbot-panel.component';
 import { ChatbotStore } from './state/chatbot.signals';
 
 /**
- * Chatbot launcher: a round chat bubble in the shell's header toolbar. Pressing
- * it toggles a CDK overlay, anchored under the header, that hosts
+ * Chatbot launcher: a round chat bubble fixed to the bottom-right corner. Pressing
+ * it toggles a CDK overlay, opening upwards from the bubble, that hosts
  * {@link ChatbotPanelComponent}. The widget is a singleton - mounted once at the
  * app shell level - so that opening state survives route changes.
  *
- * It lives in the header on purpose. A launcher that floats over the page
- * (fixed, bottom-right) covers footers, card corners and, on a phone, the submit
- * button of whatever form is at the bottom - and no offset can make that safe,
- * because content scrolls underneath it. In the toolbar it can never be on top
- * of page content, at any width or scroll position.
+ * A bubble that floats can cover things, so the page makes room for it instead of the
+ * bubble dodging:
+ *  - every page ends in the shell footer, whose bottom padding is `--chat-clearance`
+ *    (bubble + gaps): scrolled to the end, the bubble sits on empty space, never on a
+ *    button or on footer text; the auth pages, which have no footer, pad their form the same;
+ *  - a bar docked to the bottom edge (the phone seat summary) publishes its height as
+ *    `--dock-inset` and the bubble rides above it, so it never covers that bar's button.
+ * Mid-scroll the bubble does pass over content, as any floating button does; it never
+ * hides anything that cannot be scrolled out from under it.
  */
 @Component({
   selector: 'kte-chatbot-widget',
@@ -46,13 +50,22 @@ import { ChatbotStore } from './state/chatbot.signals';
   `,
   styles: [
     `
-      :host { display: inline-flex; flex-shrink: 0; }
+      /* Floats bottom-right. A bar docked to the bottom edge (the phone seat summary) sets
+         --dock-inset to its height and the bubble rides above it. */
+      :host {
+        position: fixed;
+        right: var(--chat-offset, 16px);
+        bottom: calc(var(--chat-offset, 16px) + var(--dock-inset, 0px));
+        z-index: 30; /* over page content and the sticky header, under dialogs and menus */
+        display: inline-flex;
+        transition: bottom 0.15s ease;
+      }
 
       .kte-chatbot-fab {
-        width: var(--min-target, 44px);
-        height: var(--min-target, 44px);
+        width: var(--chat-size, 56px);
+        height: var(--chat-size, 56px);
         border-radius: 50%;
-        background: var(--kte-brand-mid);
+        background: var(--kte-brand-deep);
         color: #fff;
         border: none;
         cursor: pointer;
@@ -60,22 +73,23 @@ import { ChatbotStore } from './state/chatbot.signals';
         align-items: center;
         justify-content: center;
         padding: 0;
+        box-shadow: 0 6px 20px rgba(20, 18, 26, 0.3);
         transition: background 0.18s ease;
       }
       .kte-chatbot-fab:hover {
-        background: var(--kte-brand-deep);
+        background: var(--kte-brand-mid);
       }
       .kte-chatbot-fab:focus-visible {
-        outline: 2px solid #fff;
-        outline-offset: 2px;
+        outline: 3px solid var(--kte-brand-mid);
+        outline-offset: 3px;
       }
       .kte-chatbot-fab--open {
-        background: rgba(255, 255, 255, 0.16);
+        background: var(--kte-ink);
       }
       .kte-chatbot-fab mat-icon {
-        font-size: 24px;
-        width: 24px;
-        height: 24px;
+        font-size: 26px;
+        width: 26px;
+        height: 26px;
       }
     `,
   ],
@@ -104,11 +118,11 @@ export class ChatbotWidgetComponent implements OnDestroy {
     if (this.overlayRef) {
       return;
     }
-    // Under the header, in the right-hand gutter; the panel sizes itself to fit.
+    // Above the bubble, in the right-hand gutter; the panel sizes itself to fit.
     const positionStrategy = this.overlay
       .position()
       .global()
-      .top('calc(var(--header-h, 72px) + 8px)')
+      .bottom('calc(var(--chat-clearance, 88px) + var(--dock-inset, 0px))')
       .right('16px');
     const ref = this.overlay.create({
       positionStrategy,

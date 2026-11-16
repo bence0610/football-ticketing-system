@@ -64,7 +64,11 @@ describe('shared e-mail frame', () => {
       for (const fixture of variants()) {
         const { html } = render(fixture);
         expect(html).toMatch(/bgcolor="(#4a1d6a|#8A5300)"/);
-        expect(html).toContain('>KTE</td>');
+        // the crest sits on a white plate (it is purple: it would vanish on the band) and is a CID image
+        expect(html).toMatch(
+          /<td[^>]*bgcolor="#ffffff"[^>]*>\s*<img src="cid:crest@kte-jegyportal"[^>]*alt="KTE"/,
+        );
+        expect(html).toMatch(/<img src="cid:crest@kte-jegyportal" width="40" height="45"/);
         expect(html).toContain('KTE Jegyportál</td>');
         expect(html).toContain('bgcolor="#ece9f0"');
         expect(html).toContain('<table role="presentation" width="600"');
@@ -115,6 +119,23 @@ describe('shared e-mail frame', () => {
         expect((html.match(/<v:roundrect/g) ?? []).length).toBe(expected);
       }
     });
+  });
+
+  it('header: without the crest file the "KTE" tile stands in, with no dangling image', () => {
+    const fixture = find('password-reset');
+    const html = service.render(fixture.template, fixture.context as never, fixture.subject, false);
+    expect(html).not.toContain('crest@kte-jegyportal');
+    expect(html).toMatch(/bgcolor="#ffffff"[^>]*>KTE<\/td>/);
+    expect(html).toContain('KTE Jegyportál</td>');
+  });
+
+  it('header: blocked images leave a readable tile - alt text styled like the tile, name beside it', () => {
+    const { html } = render(find('password-reset'));
+    const img = /<img src="cid:crest[^>]*>/.exec(html)![0];
+    expect(img).toMatch(/alt="KTE"/);
+    expect(img).toMatch(/font-weight:bold/);
+    expect(img).toMatch(/color:#4a1d6a/);
+    expect(html).toContain('KTE Jegyportál</td>');
   });
 
   it('button URL appears as a link in the plain text too', () => {
@@ -180,7 +201,8 @@ describe('shared e-mail frame', () => {
       expect(html).toContain('Kiss Anna');
       expect(html).toContain('a te saját belépésed erre a meccsre érvénytelen');
       expect(html).toContain('következő meccsen újra működik');
-      expect(html).not.toContain('<img');
+      // no QR: the crest is the only image in the lender's mail
+      expect(html.match(/<img/g)).toHaveLength(1);
     });
 
     it('loan accepted (borrower): names the lender, not themselves', () => {

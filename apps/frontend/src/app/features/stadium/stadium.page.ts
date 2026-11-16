@@ -71,7 +71,7 @@ import { hasKickedOff, purchasableMatches } from '../../shared/utils/match-sale'
     <div class="kte-stadium">
       <header class="kte-stadium__header">
         <div>
-          <h1>Stadion ülésrend</h1>
+          <h1>Jegyvásárlás</h1>
           <p>Széktói Stadion · Foglalj le helyeket valós idejű ülésrenden.</p>
         </div>
         <kte-match-selector
@@ -98,7 +98,7 @@ import { hasKickedOff, purchasableMatches } from '../../shared/utils/match-sale'
           </div>
         </div>
 
-        <ng-container *ngIf="!(startedMatch$ | async)">
+        <ng-container *ngIf="(startedMatch$ | async) === null">
           <ng-container *ngIf="selectedMatch$ | async as activeMatch">
             <div *ngIf="isSoldOut(activeMatch)" class="kte-stadium__sold-out">
               <mat-icon>info</mat-icon>

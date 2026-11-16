@@ -522,7 +522,9 @@ describe('MatchSeatsController – integration', () => {
         ];
         setData(makeMatch(), seats, [makeTicket(MATCH_ID, idOf(3), TicketStatus.PAID)], [idOf(6)]);
 
-        const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+        const res = await request(app.getHttpServer())
+          .get(`/matches/${MATCH_ID}/seats`)
+          .expect(200);
         const k = res.body.sectorSummary.find((s: { section: string }) => s.section === 'K');
         expect(k.longestRun).toBe(3);
       });
@@ -531,7 +533,9 @@ describe('MatchSeatsController – integration', () => {
         const seats = Array.from({ length: 28 }, (_, i) => makeSeat(`w-${i + 1}`, 'K', '1', i + 1));
         setData(makeMatch(), seats);
 
-        const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+        const res = await request(app.getHttpServer())
+          .get(`/matches/${MATCH_ID}/seats`)
+          .expect(200);
         const k = res.body.sectorSummary.find((s: { section: string }) => s.section === 'K');
         expect(k.aisles).toEqual([14]);
         expect(k.longestRun).toBe(14);
@@ -544,7 +548,9 @@ describe('MatchSeatsController – integration', () => {
           makeSeat('s-1', 'K', '1', 1, { isActive: false }),
         ]);
 
-        const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+        const res = await request(app.getHttpServer())
+          .get(`/matches/${MATCH_ID}/seats`)
+          .expect(200);
         const by = Object.fromEntries(
           res.body.sectorSummary.map((s: Record<string, unknown>) => [s.section, s]),
         );

@@ -141,20 +141,43 @@ export class SeatsService {
 
     const rows = await this.seatRepository.find({
       where: { section: sectionCode },
-      select: ['id', 'section', 'row', 'number', 'category', 'priceModifier', 'isAccessible', 'isActive'],
+      select: [
+        'id',
+        'section',
+        'row',
+        'number',
+        'category',
+        'priceModifier',
+        'isAccessible',
+        'isActive',
+      ],
     });
     const tickets = await this.ticketRepository.find({
-      where: { matchId, seatId: In(rows.map((r) => r.id)), status: In([...OCCUPYING_TICKET_STATUSES]) },
+      where: {
+        matchId,
+        seatId: In(rows.map((r) => r.id)),
+        status: In([...OCCUPYING_TICKET_STATUSES]),
+      },
       select: ['seatId'],
     });
     const soldSeatIds = new Set(tickets.map((t) => t.seatId));
-    const lockedSeatIds = await this.fetchLockedSeatIds(matchId, rows.map((r) => r.id));
+    const lockedSeatIds = await this.fetchLockedSeatIds(
+      matchId,
+      rows.map((r) => r.id),
+    );
     const seasonPassSeatIds = await this.fetchSeasonPassSeatIds();
     const awaySections = this.awaySectionsOf(sectors);
     const basePrice = Number(match.basePrice);
 
     const seats = rows.map((seat) => {
-      const dto = this.toSeatStatus(seat, basePrice, soldSeatIds, lockedSeatIds, seasonPassSeatIds, awaySections);
+      const dto = this.toSeatStatus(
+        seat,
+        basePrice,
+        soldSeatIds,
+        lockedSeatIds,
+        seasonPassSeatIds,
+        awaySections,
+      );
       return { ...dto, free: dto.status === SeatAvailability.AVAILABLE };
     });
 

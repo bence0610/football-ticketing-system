@@ -159,9 +159,6 @@ interface HeldSeat {
                   <span class="sector__ribbon">Legnépszerűbb</span>
                 }
                 <h4 class="sector__name">{{ price.sectionName }}</h4>
-                @if (gateText(price); as g) {
-                  <p class="sector__gate" data-testid="sector-gate">{{ g }}</p>
-                }
                 @if (description(price); as d) {
                   <p class="sector__desc">{{ d }}</p>
                 }
@@ -671,11 +668,6 @@ interface HeldSeat {
       /* ---------- Sector cards ---------- */
       .block__note--lead {
         margin: 0 0 16px;
-      }
-      .sector__gate {
-        margin: 0 0 8px;
-        font-size: 12px;
-        color: var(--muted);
       }
       .sectors {
         display: grid;
@@ -1236,11 +1228,6 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
 
   protected isPlayed(match: SeasonHomeMatch): boolean {
     return match.status === 'finished' || new Date(match.kickoffAt).getTime() <= this.now;
-  }
-
-  /** Only facts the API gave: the gate, when one gate serves the whole tier. */
-  protected gateText(price: SeasonPassPrice): string | null {
-    return gateLabel(price.gate);
   }
 
   protected description(price: SeasonPassPrice): string {

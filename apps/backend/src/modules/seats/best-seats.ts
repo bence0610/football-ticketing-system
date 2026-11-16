@@ -102,7 +102,9 @@ export function findRuns(seats: readonly GridSeat[], width = sectorWidth(seats))
     };
     for (const seat of rowSeats) {
       const previous = current[current.length - 1];
-      const breaks = previous !== undefined && (seat.number !== previous.number + 1 || aisles.has(previous.number));
+      const breaks =
+        previous !== undefined &&
+        (seat.number !== previous.number + 1 || aisles.has(previous.number));
       if (breaks) flush();
       if (seat.free) current.push(seat);
       else flush();
@@ -186,7 +188,9 @@ export function bestSplit(
     // Best window of each size per run; the cheapest pair from two distinct runs wins.
     const bestLarge = runs.map((r) => rankWindows([r], large, rowIndexOf, ideal)[0] ?? null);
     const bestSmall =
-      small === large ? bestLarge : runs.map((r) => rankWindows([r], small, rowIndexOf, ideal)[0] ?? null);
+      small === large
+        ? bestLarge
+        : runs.map((r) => rankWindows([r], small, rowIndexOf, ideal)[0] ?? null);
     let best: SplitProposal | null = null;
     for (let i = 0; i < runs.length; i++) {
       const a = bestLarge[i];

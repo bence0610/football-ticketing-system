@@ -9,7 +9,7 @@
       brand-deep #4a1d6a, brand-tint #f3edf8, ink #14121a, muted #5b5566, border #efecf3,
       amber-bg #fbf1e0 / amber-edge #f0dcb8 / amber-ink #6b4100.
   - Amber band is #8A5300 (a deeper amber-icon) so white text keeps AA contrast.
-  Params: preheader (inbox preview text), amber (true => amber band), footerNote (plain text).
+  Params: crest (set by the sender: false when the crest file could not be attached), preheader (inbox preview text), amber (true => amber band), footerNote (plain text).
 --}}
 <head>
 <meta charset="utf-8" />
@@ -43,10 +43,13 @@
 
     <!-- Header band: brand mark + product name -->
     <tr>
-      <td class="kte-px" bgcolor="{{#if amber}}#8A5300{{else}}#4a1d6a{{/if}}" style="background-color:{{#if amber}}#8A5300{{else}}#4a1d6a{{/if}}; padding:20px 32px;">
+      <td class="kte-px" bgcolor="{{#if amber}}#8A5300{{else}}#4a1d6a{{/if}}" style="background-color:{{#if amber}}#8A5300{{else}}#4a1d6a{{/if}}; padding:16px 32px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td width="40" height="40" align="center" valign="middle" bgcolor="#ffffff" style="width:40px; height:40px; background-color:#ffffff; border-radius:8px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:40px; font-weight:bold; color:{{#if amber}}#8A5300{{else}}#4a1d6a{{/if}};">KTE</td>
+            <!-- The crest on a white plate (it is purple: on the band it would vanish). The image is a
+                 CID attachment. alt="KTE" is short on purpose: with images blocked the plate shows
+                 that word in the old tile's style, and "KTE Jegyportál" beside it still names the sender. -->
+            <td width="52" height="56" align="center" valign="middle" bgcolor="#ffffff" style="width:52px; height:56px; background-color:#ffffff; border-radius:10px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:20px; font-weight:bold; color:{{#if amber}}#8A5300{{else}}#4a1d6a{{/if}}; text-align:center;">{{#if crest}}<img src="cid:crest@kte-jegyportal" width="40" height="45" alt="KTE" style="display:block; margin:0 auto; width:40px; height:45px; border:0; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:20px; font-weight:bold; color:{{#if amber}}#8A5300{{else}}#4a1d6a{{/if}}; text-align:center;" />{{else}}KTE{{/if}}</td>
             <td style="padding-left:12px; font-family:Arial, Helvetica, sans-serif; font-size:18px; line-height:24px; font-weight:bold; color:#ffffff;">KTE Jegyportál</td>
           </tr>
         </table>

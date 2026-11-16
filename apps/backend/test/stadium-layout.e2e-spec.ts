@@ -239,7 +239,9 @@ describe('Stadium layout (E2E)', () => {
 
       const list = await request(server).get('/api/season-passes/prices');
       expect(list.status).toBe(200);
-      expect((list.body as Array<{ sectionId: string }>).map((p) => p.sectionId)).toEqual(['upper']);
+      expect((list.body as Array<{ sectionId: string }>).map((p) => p.sectionId)).toEqual([
+        'upper',
+      ]);
 
       const awaySeat = await ctx.dataSource
         .getRepository(Seat)

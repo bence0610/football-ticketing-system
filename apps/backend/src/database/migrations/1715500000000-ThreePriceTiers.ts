@@ -19,9 +19,7 @@ export class ThreePriceTiers1715500000000 implements MigrationInterface {
   name = 'ThreePriceTiers1715500000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      'ALTER TABLE `sectors` DROP CONSTRAINT `chk_sectors_price_category`',
-    );
+    await queryRunner.query('ALTER TABLE `sectors` DROP CONSTRAINT `chk_sectors_price_category`');
     await queryRunner.query(
       'ALTER TABLE `sectors` MODIFY COLUMN `price_category` varchar(16) NULL',
     );
@@ -60,9 +58,7 @@ export class ThreePriceTiers1715500000000 implements MigrationInterface {
    * Season pass prices are removed again; the (old) seed rewrites them.
    */
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      'ALTER TABLE `sectors` DROP CONSTRAINT `chk_sectors_price_category`',
-    );
+    await queryRunner.query('ALTER TABLE `sectors` DROP CONSTRAINT `chk_sectors_price_category`');
     await queryRunner.query(`
       UPDATE \`sectors\` SET \`price_category\` = CASE \`code\`
         WHEN 'D/1' THEN 'economy' WHEN 'D/2' THEN 'standard' WHEN 'C/1' THEN 'standard'

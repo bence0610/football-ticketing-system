@@ -282,8 +282,16 @@ describe('Admin overview (E2E)', () => {
       expect(matches.find((m) => m.matchId === m1.id)!.revenue).toBe(7500);
       expect(matches.find((m) => m.matchId === m2.id)!.revenue).toBe(5000);
 
-      expect(res.body.seasonPasses).toMatchObject({ basis: 'season', revenue: 67000, passCount: 2 });
-      const tiers = res.body.seasonPasses.byTier as Array<{ tier: string; passCount: number; revenue: number }>;
+      expect(res.body.seasonPasses).toMatchObject({
+        basis: 'season',
+        revenue: 67000,
+        passCount: 2,
+      });
+      const tiers = res.body.seasonPasses.byTier as Array<{
+        tier: string;
+        passCount: number;
+        revenue: number;
+      }>;
       expect(tiers.map((t) => [t.tier, t.passCount, t.revenue])).toEqual([
         ['vip', 1, 45000],
         ['upper', 1, 22000],
@@ -299,7 +307,11 @@ describe('Admin overview (E2E)', () => {
       const res = await request(server)
         .get('/api/admin/overview?period=30d')
         .set('Authorization', `Bearer ${admin.token}`);
-      expect(res.body.seasonPasses).toMatchObject({ basis: 'purchased_in_period', revenue: 67000, passCount: 2 });
+      expect(res.body.seasonPasses).toMatchObject({
+        basis: 'purchased_in_period',
+        revenue: 67000,
+        passCount: 2,
+      });
     });
 
     it('is zero, not an error, when no pass was sold', async () => {
@@ -325,9 +337,15 @@ describe('Admin overview (E2E)', () => {
       // tickets only: 2833 + 4667 + 5000 were created today, the passes are not in here
       expect(res.body.summary.todayRevenue).toBe(12500);
       expect(res.body.summary.todayTicketCount).toBe(3);
-      const byMatchTotal = (res.body.byMatch as Array<{ revenue: number }>).reduce((a, m) => a + m.revenue, 0);
+      const byMatchTotal = (res.body.byMatch as Array<{ revenue: number }>).reduce(
+        (a, m) => a + m.revenue,
+        0,
+      );
       expect(byMatchTotal).toBe(12500);
-      const dailyTotal = (res.body.daily as Array<{ amount: number }>).reduce((a, d) => a + d.amount, 0);
+      const dailyTotal = (res.body.daily as Array<{ amount: number }>).reduce(
+        (a, d) => a + d.amount,
+        0,
+      );
       expect(dailyTotal).toBe(12500);
 
       expect(res.body.seasonPasses).toMatchObject({
@@ -336,10 +354,13 @@ describe('Admin overview (E2E)', () => {
         todayPassCount: 2,
         monthPassCount: 2,
       });
-      const passDaily = (res.body.seasonPasses.daily as Array<{ amount: number; passCount: number }>);
+      const passDaily = res.body.seasonPasses.daily as Array<{ amount: number; passCount: number }>;
       expect(passDaily.reduce((a, d) => a + d.amount, 0)).toBe(67000);
       expect(passDaily.reduce((a, d) => a + d.passCount, 0)).toBe(2);
-      expect((res.body.seasonPasses.byTier as Array<{ tier: string }>).map((t) => t.tier)).toEqual(['vip', 'upper']);
+      expect((res.body.seasonPasses.byTier as Array<{ tier: string }>).map((t) => t.tier)).toEqual([
+        'vip',
+        'upper',
+      ]);
     });
   });
 });

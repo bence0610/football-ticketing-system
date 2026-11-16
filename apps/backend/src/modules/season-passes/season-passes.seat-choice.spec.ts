@@ -20,9 +20,36 @@ const SEAT = '11111111-1111-4111-8111-111111111111';
 const OTHER_SEAT = '22222222-2222-4222-8222-222222222222';
 
 const SECTORS = [
-  { code: 'D/1', name: 'D/1 szektor', covered: 1, arc: 'upper', position: 1, gate: 2, priceCategory: 'upper', isAway: 0 },
-  { code: 'VENDÉG', name: 'Vendég szektor', covered: 0, arc: 'lower', position: 1, gate: 3, priceCategory: null, isAway: 1 },
-  { code: 'K', name: 'K szektor', covered: 0, arc: 'lower', position: 5, gate: 2, priceCategory: 'lower', isAway: 0 },
+  {
+    code: 'D/1',
+    name: 'D/1 szektor',
+    covered: 1,
+    arc: 'upper',
+    position: 1,
+    gate: 2,
+    priceCategory: 'upper',
+    isAway: 0,
+  },
+  {
+    code: 'VENDÉG',
+    name: 'Vendég szektor',
+    covered: 0,
+    arc: 'lower',
+    position: 1,
+    gate: 3,
+    priceCategory: null,
+    isAway: 1,
+  },
+  {
+    code: 'K',
+    name: 'K szektor',
+    covered: 0,
+    arc: 'lower',
+    position: 5,
+    gate: 2,
+    priceCategory: 'lower',
+    isAway: 0,
+  },
 ];
 
 type SeatRowOpts = { free?: 0 | 1; taken?: 0 | 1; isActive?: 0 | 1; section?: string };
@@ -148,7 +175,9 @@ function harness(): Harness {
     { findOne: passFindOne } as never,
     { findOne: async () => null } as never,
     { findOne: async () => ({ id: 'm1', kickoffAt: new Date(Date.now() + 86400000) }) } as never,
-    { findOne: async ({ where }: { where: { id?: string } }) => (where.id === 'u1' ? BUYER : null) } as never,
+    {
+      findOne: async ({ where }: { where: { id?: string } }) => (where.id === 'u1' ? BUYER : null),
+    } as never,
     {
       findOne: async ({ where }: { where: { section?: string; id?: string } }) =>
         where.section === 'upper' || where.id === 'price-upper' ? PRICE_ROW : null,
@@ -158,12 +187,26 @@ function harness(): Harness {
     redis as never,
     config as never,
     { send: jest.fn() } as never,
-    { generateJti: () => 'jti', generateForTicket: jest.fn(async () => ({ dataUrl: 'd', token: 't' })) } as never,
+    {
+      generateJti: () => 'jti',
+      generateForTicket: jest.fn(async () => ({ dataUrl: 'd', token: 't' })),
+    } as never,
     { award } as never,
     { formatSeat: () => 'x' } as never,
     holds as never,
   );
-  return { service, seats, stripeCreate, refund, save, passFindOne, award, holds, redis, singleTicket };
+  return {
+    service,
+    seats,
+    stripeCreate,
+    refund,
+    save,
+    passFindOne,
+    award,
+    holds,
+    redis,
+    singleTicket,
+  };
 }
 
 const dto = (over: Partial<PurchaseSeasonPassDto> = {}): PurchaseSeasonPassDto => ({
@@ -174,7 +217,10 @@ const dto = (over: Partial<PurchaseSeasonPassDto> = {}): PurchaseSeasonPassDto =
   ...over,
 });
 
-function intent(over: Partial<Stripe.PaymentIntent> = {}, meta: Record<string, string> = {}): Stripe.PaymentIntent {
+function intent(
+  over: Partial<Stripe.PaymentIntent> = {},
+  meta: Record<string, string> = {},
+): Stripe.PaymentIntent {
   return {
     id: 'pi_1',
     status: 'succeeded',
@@ -197,9 +243,19 @@ describe('Season pass: the buyer chooses the seat', () => {
   describe('hold', () => {
     it('holds a free seat and returns the token, ttl and expiry (no holder identity)', async () => {
       const h = harness();
-      h.holds.hold.mockResolvedValue({ kind: 'held', holdToken: 'tok-9', ttlSeconds: 900, renewed: false });
+      h.holds.hold.mockResolvedValue({
+        kind: 'held',
+        holdToken: 'tok-9',
+        ttlSeconds: 900,
+        renewed: false,
+      });
       const res = await h.service.holdSeat('u1', SEAT);
-      expect(res).toEqual({ seatId: SEAT, holdToken: 'tok-9', ttlSeconds: 900, expiresAt: expect.any(String) });
+      expect(res).toEqual({
+        seatId: SEAT,
+        holdToken: 'tok-9',
+        ttlSeconds: 900,
+        expiresAt: expect.any(String),
+      });
       expect(h.holds.hold).toHaveBeenCalledWith('2026/2027', SEAT, 'u1');
     });
 
@@ -301,7 +357,11 @@ describe('Season pass: the buyer chooses the seat', () => {
       // once before charging, once after the intent exists
       expect(h.holds.verifyAndExtend).toHaveBeenCalledTimes(2);
       expect(h.save).toHaveBeenCalledWith(
-        expect.objectContaining({ seatId: SEAT, stripePaymentIntentId: 'pi_1', pricePaid: '22000.00' }),
+        expect.objectContaining({
+          seatId: SEAT,
+          stripePaymentIntentId: 'pi_1',
+          pricePaid: '22000.00',
+        }),
       );
       expect(h.award).toHaveBeenCalledTimes(1);
       expect(h.holds.releaseForOwner).toHaveBeenCalledWith('2026/2027', SEAT, 'u1');

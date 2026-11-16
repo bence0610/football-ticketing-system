@@ -55,10 +55,7 @@ import { STRIPE_CLIENT } from '../payments/stripe.provider';
 import { aislesAfter, GridSeat, longestRun, sectorWidth } from '../seats/best-seats';
 import { compareRows } from '../seats/seat-order';
 import { seatUnitPrice } from '../seats/seat-pricing';
-import {
-  SeasonPassHoldResult,
-  SeasonPassHoldService,
-} from '../../redis/season-pass-hold.service';
+import { SeasonPassHoldResult, SeasonPassHoldService } from '../../redis/season-pass-hold.service';
 import {
   PASS_SEAT_FROM_SQL,
   PASS_SEAT_SELECT_SQL,
@@ -911,37 +908,37 @@ export class SeasonPassesService {
   ): Promise<SeasonPass | null> {
     let failure: string;
     try {
-        return await this.dataSource.transaction(async (manager) => {
-          const seat = await this.loadPassSeat(manager, seatId, priceRow.seasonLabel);
-          const refusal = passSeatRefusal(seat);
-          if (refusal) {
-            throw new SeatNotIssuableError(`chosen seat ${seatId} refused: ${refusal}`);
-          }
-          if (seat!.tier !== priceRow.section) {
-            throw new SeatNotIssuableError(
-              `chosen seat ${seatId} is in tier ${String(seat!.tier)}, not ${priceRow.section}`,
-            );
-          }
-          const repo = manager.getRepository(SeasonPass);
-          return repo.save(
-            repo.create({
-              id: randomUUID(),
-              userId,
-              holderName: holder.name,
-              holderUserId: holder.userId,
-              seatId,
-              seasonLabel: priceRow.seasonLabel,
-              validFrom: priceRow.validFrom,
-              validUntil: priceRow.validUntil,
-              status: SeasonPassStatus.ACTIVE,
-              pricePaid: this.amountChargedHuf(intent, priceRow).toFixed(2),
-              currency: priceRow.currency,
-              qrCode: `KTE-SP-${randomUUID()}`,
-              autoRenew: false,
-              stripePaymentIntentId: intent.id,
-            }),
+      return await this.dataSource.transaction(async (manager) => {
+        const seat = await this.loadPassSeat(manager, seatId, priceRow.seasonLabel);
+        const refusal = passSeatRefusal(seat);
+        if (refusal) {
+          throw new SeatNotIssuableError(`chosen seat ${seatId} refused: ${refusal}`);
+        }
+        if (seat!.tier !== priceRow.section) {
+          throw new SeatNotIssuableError(
+            `chosen seat ${seatId} is in tier ${String(seat!.tier)}, not ${priceRow.section}`,
           );
-        });
+        }
+        const repo = manager.getRepository(SeasonPass);
+        return repo.save(
+          repo.create({
+            id: randomUUID(),
+            userId,
+            holderName: holder.name,
+            holderUserId: holder.userId,
+            seatId,
+            seasonLabel: priceRow.seasonLabel,
+            validFrom: priceRow.validFrom,
+            validUntil: priceRow.validUntil,
+            status: SeasonPassStatus.ACTIVE,
+            pricePaid: this.amountChargedHuf(intent, priceRow).toFixed(2),
+            currency: priceRow.currency,
+            qrCode: `KTE-SP-${randomUUID()}`,
+            autoRenew: false,
+            stripePaymentIntentId: intent.id,
+          }),
+        );
+      });
     } catch (err: unknown) {
       if (err instanceof SeatNotIssuableError) {
         failure = err.message;

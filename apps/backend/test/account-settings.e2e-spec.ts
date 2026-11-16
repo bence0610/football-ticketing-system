@@ -339,7 +339,12 @@ describe('Account settings', () => {
 
       const reg = await request(server)
         .post('/api/auth/register')
-        .send({ email: uniqueEmail('bytes'), password: over, firstName: 'Béla', lastName: 'Kovács' });
+        .send({
+          email: uniqueEmail('bytes'),
+          password: over,
+          firstName: 'Béla',
+          lastName: 'Kovács',
+        });
       expect(reg.status).toBe(400);
       expect((reg.body.message as string[]).join(' ')).toContain('72 bájt');
 
@@ -400,12 +405,17 @@ describe('Account settings', () => {
       expect(cleared.status).toBe(200);
       expect(cleared.body.dateOfBirth).toBeUndefined();
       expect((await getMe(fan)).body.dateOfBirth).toBeUndefined();
-      const [row] = await ctx.dataSource.query('SELECT date_of_birth AS d FROM users WHERE id = ?', [fan.id]);
+      const [row] = await ctx.dataSource.query(
+        'SELECT date_of_birth AS d FROM users WHERE id = ?',
+        [fan.id],
+      );
       expect(row.d).toBeNull();
 
       // an empty string is not "clear": that is null; and a date can be entered again
       expect((await patchMe(fan, { dateOfBirth: '' })).status).toBe(400);
-      expect((await patchMe(fan, { dateOfBirth: '1991-02-02' })).body.dateOfBirth).toBe('1991-02-02');
+      expect((await patchMe(fan, { dateOfBirth: '1991-02-02' })).body.dateOfBirth).toBe(
+        '1991-02-02',
+      );
     });
 
     it('round-trips dateOfBirth exactly, with no timezone shift', async () => {

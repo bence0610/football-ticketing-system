@@ -172,6 +172,17 @@
     }
   }
 
+  // The crest plate is the header less an 8px margin top and bottom (the crest itself sits
+  // inside the plate's padding); a little smaller on a phone so the menu button, crest, cart
+  // and avatar fit in 360px.
+  &__crest {
+    --crest-h: 40px;
+
+    @media (max-width: 599px) {
+      --crest-h: 34px;
+    }
+  }
+
   &__spacer {
     flex: 1 1 auto;
   }
@@ -182,8 +193,8 @@
     flex-shrink: 0;
   }
 
-  // The chat bubble joined the toolbar: on a phone the login button gives up a
-  // little padding so menu, logo, bubble, cart and login still fit in 360px.
+  // On a phone the login button gives up a little padding so menu, crest, cart and
+  // login still fit in 360px.
   &__login {
     @media (max-width: 419px) {
       padding: 0 12px;
@@ -271,13 +282,15 @@
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 8px 24px;
-    padding: 24px max(32px, calc((100% - 1180px) / 2 + 32px));
+    // The bottom padding is the room the chat bubble sits in when a page is scrolled to its
+    // end: footer text always ends above the bubble.
+    padding: 24px max(32px, calc((100% - 1180px) / 2 + 32px)) var(--chat-clearance);
     background: var(--ink);
     color: var(--faint);
     font-size: 14px;
 
     @media (max-width: 599px) {
-      padding: 24px 16px;
+      padding: 24px 16px var(--chat-clearance);
     }
   }
 }

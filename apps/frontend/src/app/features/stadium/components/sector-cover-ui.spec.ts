@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { SeatStatus, SectorSummary } from '../../../shared/models/seat.model';
+import { SectorSummary } from '../../../shared/models/seat.model';
 import { coverDescription, coverLabel } from '../../../shared/utils/sector-cover';
 import { SeatGridComponent } from './seat-grid/seat-grid.component';
 import { SectorSummaryComponent } from './sector-summary/sector-summary.component';
