@@ -16,6 +16,7 @@ export type VerdictKind =
   | 'invalid'
   | 'expired'
   | 'other_match'
+  | 'match_cancelled'
   | 'offline'
   | 'server'
   | 'denied';
@@ -110,6 +111,15 @@ export function verdictFromResponse(res: TicketScanResponse): Verdict {
       };
     case 'expired':
       return expired(common, 'A jegy érvényessége lejárt, nem léphet be.');
+    case 'match_cancelled':
+      return {
+        ...common,
+        kind: 'match_cancelled',
+        tone: 'bad',
+        glyph: 'event_busy',
+        title: 'ELMARADT A MÉRKŐZÉS',
+        instruction: 'A jegy valódi, de a mérkőzés elmarad. Nem léphet be. Küldd az ügyfélszolgálati pulthoz.',
+      };
     case 'wrong_match':
       return {
         ...common,

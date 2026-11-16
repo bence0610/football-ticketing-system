@@ -11,10 +11,17 @@ export function hasKickedOff(match: Pick<MatchListItem, 'kickoffAt'>, now: numbe
   return !(new Date(match.kickoffAt).getTime() > now);
 }
 
-/** The matches a visitor may still buy for, in the order given. */
-export function purchasableMatches<T extends Pick<MatchListItem, 'kickoffAt'>>(
-  matches: readonly T[],
-  now: number = Date.now(),
-): readonly T[] {
-  return matches.filter((m) => !hasKickedOff(m, now));
+/**
+ * "This match has been called off." Mirrors the server's `match_cancelled` refusal; the
+ * server is the real guard, this only keeps a cancelled match from being offered.
+ */
+export function isCancelled(match: Partial<Pick<MatchListItem, 'status'>>): boolean {
+  return match.status === 'cancelled';
+}
+
+/** The matches a visitor may still buy for (not started, not cancelled), in the order given. */
+export function purchasableMatches<
+  T extends Pick<MatchListItem, 'kickoffAt'> & Partial<Pick<MatchListItem, 'status'>>,
+>(matches: readonly T[], now: number = Date.now()): readonly T[] {
+  return matches.filter((m) => !isCancelled(m) && !hasKickedOff(m, now));
 }

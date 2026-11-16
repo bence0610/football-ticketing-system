@@ -27,6 +27,21 @@ const match = {
 };
 
 describe('gate verdicts', () => {
+  it('a cancelled match has its own refusal, not "used" and not "invalid"', () => {
+    const v = verdictFromResponse({
+      success: false,
+      result: 'match_cancelled',
+      holderName: 'Kiss Anna',
+      seat,
+      match,
+    });
+    expect(v.kind).toBe('match_cancelled');
+    expect(v.title).toBe('ELMARADT A MÉRKŐZÉS');
+    expect(v.tone).toBe('bad');
+    expect(v.fixture).toBe('KTE – Újpest');
+    expect(isAdmission(v)).toBeFalse();
+  });
+
   it('admits with the holder, seat and ticket type', () => {
     const v = verdictFromResponse({
       success: true,

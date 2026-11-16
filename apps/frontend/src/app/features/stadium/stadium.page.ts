@@ -45,7 +45,7 @@ import { BestSeatsPanelComponent, BestSeatsPlaced } from './components/best-seat
 import { SeatSummaryComponent } from './components/seat-summary/seat-summary.component';
 import { WaitlistJoinButtonComponent } from './components/waitlist-join-button/waitlist-join-button.component';
 import { lockErrorMessage } from '../../shared/utils/lock-error';
-import { hasKickedOff, purchasableMatches } from '../../shared/utils/match-sale';
+import { hasKickedOff, isCancelled, purchasableMatches } from '../../shared/utils/match-sale';
 
 @Component({
   selector: 'kte-stadium-page',
@@ -98,7 +98,23 @@ import { hasKickedOff, purchasableMatches } from '../../shared/utils/match-sale'
           </div>
         </div>
 
-        <ng-container *ngIf="(startedMatch$ | async) === null">
+        <div
+          *ngIf="cancelledMatch$ | async as called"
+          class="kte-stadium__started"
+          role="status"
+          data-testid="match-cancelled"
+        >
+          <mat-icon>event_busy</mat-icon>
+          <div>
+            <strong>Ez a mérkőzés elmarad.</strong>
+            <p>
+              {{ called.homeTeam }} – {{ called.awayTeam }}: a mérkőzésre nem vásárolható jegy.
+              Válassz egy másik mérkőzést a fenti listából.
+            </p>
+          </div>
+        </div>
+
+        <ng-container *ngIf="(startedMatch$ | async) === null && (cancelledMatch$ | async) === null">
           <ng-container *ngIf="selectedMatch$ | async as activeMatch">
             <div *ngIf="isSoldOut(activeMatch)" class="kte-stadium__sold-out">
               <mat-icon>info</mat-icon>
@@ -381,7 +397,11 @@ export class StadiumPageComponent implements OnInit {
   protected readonly selectedMatch$ = this.store.select(selectSelectedMatch);
   /** The match a deep link (?matchId=...) points at, when it has already kicked off. */
   protected readonly startedMatch$ = this.selectedMatch$.pipe(
-    map((match) => (match && hasKickedOff(match) ? match : null)),
+    map((match) => (match && !isCancelled(match) && hasKickedOff(match) ? match : null)),
+  );
+  /** The match a deep link points at, when it has been called off. */
+  protected readonly cancelledMatch$ = this.selectedMatch$.pipe(
+    map((match) => (match && isCancelled(match) ? match : null)),
   );
   protected readonly seats$ = this.store.select(selectSeats);
   protected readonly summaries$ = this.store.select(selectSectorSummary);
@@ -506,7 +526,7 @@ export class StadiumPageComponent implements OnInit {
       await this.onRemoveChosen(seat.id);
       return;
     }
-    if (hasKickedOff(this.currentMatch)) {
+    if (isCancelled(this.currentMatch) || hasKickedOff(this.currentMatch)) {
       this.snackBar.open('Erre a mérkőzésre már nem vásárolható jegy.', 'Bezárás', { duration: 4000 });
       return;
     }

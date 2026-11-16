@@ -1,4 +1,11 @@
-import { Ticket, TicketSource, TicketStatus, User, SeasonPass } from '../../database/entities';
+import {
+  MatchStatus,
+  Ticket,
+  TicketSource,
+  TicketStatus,
+  User,
+  SeasonPass,
+} from '../../database/entities';
 import { TicketsService } from './tickets.service';
 
 /**
@@ -73,6 +80,50 @@ describe('TicketsService.scanTicket payloads', () => {
   it('an expired ticket is refused without exposing a seat', async () => {
     const res = await service(ticket(TicketStatus.EXPIRED)).scanTicket(TICKET_ID, {});
     expect(res).toMatchObject({ success: false, result: 'expired' });
+  });
+
+  describe('a ticket for a cancelled match', () => {
+    const cancelled = (status: TicketStatus) => {
+      const t = ticket(status);
+      (t.match as { status?: MatchStatus }).status = MatchStatus.CANCELLED;
+      return t;
+    };
+
+    it('admits nobody, with its own verdict, and leaves the ticket untouched', async () => {
+      const paid = cancelled(TicketStatus.PAID);
+      const res = await service(paid).scanTicket(TICKET_ID, {});
+      expect(res).toMatchObject({
+        success: false,
+        result: 'match_cancelled',
+        holderName: 'Kiss Anna',
+        match: { awayTeam: 'Újpest' },
+        seat: { section: 'B' },
+      });
+      expect(res.result).not.toBe('invalid');
+      expect(res.result).not.toBe('already_used');
+      expect(paid.status).toBe(TicketStatus.PAID);
+      expect(paid.usedAt).toBeUndefined();
+    });
+
+    it('refuses even with a valid, unrevoked token', async () => {
+      const verify = jest.fn().mockResolvedValue({ valid: true, payload: { sub: TICKET_ID } });
+      const res = await service(cancelled(TicketStatus.PAID), verify).scanTicket(TICKET_ID, {
+        token: 'x'.repeat(30),
+      });
+      expect(res).toMatchObject({ success: false, result: 'match_cancelled' });
+    });
+
+    it('a ticket that was already used before the cancellation still reports already_used', async () => {
+      const res = await service(cancelled(TicketStatus.USED)).scanTicket(TICKET_ID, {});
+      expect(res).toMatchObject({ success: false, result: 'already_used' });
+    });
+
+    it('a match that is not cancelled still admits', async () => {
+      const t = ticket(TicketStatus.PAID);
+      (t.match as { status?: MatchStatus }).status = MatchStatus.ON_SALE;
+      const res = await service(t).scanTicket(TICKET_ID, {});
+      expect(res).toMatchObject({ success: true, result: 'ok' });
+    });
   });
 
   describe('a revoked token (the code was used before)', () => {

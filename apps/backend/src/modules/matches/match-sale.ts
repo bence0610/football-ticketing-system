@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import type { Match } from '../../database/entities';
+import { type Match, MatchStatus } from '../../database/entities';
 
 /**
  * The single definition of "this match can no longer be bought": its kickoff
@@ -11,6 +11,32 @@ import type { Match } from '../../database/entities';
 export function hasKickedOff(match: Pick<Match, 'kickoffAt'>, now: Date = new Date()): boolean {
   // Written so that a missing or unparseable kickoff counts as started: fail closed.
   return !(new Date(match.kickoffAt).getTime() > now.getTime());
+}
+
+/**
+ * Throws 409 `match_cancelled` when the match has been cancelled. This is only a guard
+ * against selling into a cancelled match; it does not refund, release or notify anything.
+ */
+export function assertMatchNotCancelled(match: Pick<Match, 'status'>): void {
+  if (match.status === MatchStatus.CANCELLED) {
+    throw new ConflictException({
+      statusCode: 409,
+      message: 'Ez a mérkőzés elmarad, ezért jegy nem vásárolható rá.',
+      code: 'match_cancelled',
+    });
+  }
+}
+
+/**
+ * Everything that must hold before a seat is sold: the match is not cancelled and has not
+ * kicked off. The seat lock and the payment intent both call this and nothing else.
+ */
+export function assertMatchOpenForSale(
+  match: Pick<Match, 'kickoffAt' | 'status'>,
+  now: Date = new Date(),
+): void {
+  assertMatchNotCancelled(match);
+  assertMatchNotStarted(match, now);
 }
 
 /** Throws 409 `match_started` when the match has kicked off. */

@@ -1,4 +1,4 @@
-import { assertMatchNotStarted } from '../matches/match-sale';
+import { assertMatchOpenForSale } from '../matches/match-sale';
 import {
   BadRequestException,
   ConflictException,
@@ -105,8 +105,9 @@ export class PaymentsService {
     if (!match) {
       throw new NotFoundException('Meccs nem található.');
     }
-    // Server-side guard: the client hides past matches, but it is not the only line of defence.
-    assertMatchNotStarted(match);
+    // Server-side guard: the client hides past and cancelled matches, but it is not the only
+    // line of defence.
+    assertMatchOpenForSale(match);
 
     const lines = await this.assertSeatsAvailable(dto.matchId, dto.seats, match);
 

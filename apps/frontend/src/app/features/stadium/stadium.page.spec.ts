@@ -60,7 +60,14 @@ const sector = (section: string, arc: 'upper' | 'lower', position: number): Sect
   aisles: [],
 });
 
-const MATCHES = [match('past', -DAY), match('live', -60_000), match('next', 3 * DAY), match('later', 9 * DAY)];
+// 'off' is cancelled with its kickoff still ahead: only its status keeps it out of the picker.
+const MATCHES: MatchListItem[] = [
+  match('past', -DAY),
+  match('live', -60_000),
+  match('next', 3 * DAY),
+  { ...match('off', 4 * DAY), status: 'cancelled' },
+  match('later', 9 * DAY),
+];
 
 describe('StadiumPageComponent', () => {
   let params$: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
@@ -103,7 +110,7 @@ describe('StadiumPageComponent', () => {
     return { el: fixture.nativeElement as HTMLElement, fixture };
   }
 
-  it('offers only the matches that have not kicked off', () => {
+  it('offers only the matches that have not kicked off and are not cancelled', () => {
     const { fixture } = render();
     const selector = fixture.debugElement.query(By.directive(MatchSelectorComponent))
       .componentInstance as MatchSelectorComponent;
@@ -167,5 +174,14 @@ describe('StadiumPageComponent', () => {
     expect(el.querySelector('kte-sector-summary')).toBeNull();
     expect(el.querySelector('kte-seat-grid')).toBeNull();
     expect((el.textContent ?? '').replace(/\s+/g, ' ')).toContain('már nem vásárolható jegy');
+  });
+
+  it('refuses a deep link to a cancelled match: no map, no seats, its own notice', () => {
+    const { el } = render('off');
+    expect(el.querySelector('[data-testid="match-cancelled"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="match-started"]')).toBeNull();
+    expect(el.querySelector('kte-stadium-map')).toBeNull();
+    expect(el.querySelector('kte-seat-grid')).toBeNull();
+    expect((el.textContent ?? '').replace(/\s+/g, ' ')).toContain('Ez a mérkőzés elmarad');
   });
 });

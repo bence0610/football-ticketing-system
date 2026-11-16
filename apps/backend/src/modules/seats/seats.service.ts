@@ -1,4 +1,4 @@
-import { assertMatchNotStarted } from '../matches/match-sale';
+import { assertMatchOpenForSale } from '../matches/match-sale';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
@@ -202,14 +202,15 @@ export class SeatsService {
 
   /**
    * Refuses a match that cannot be bought: unknown (404), or already kicked off
-   * (409 `match_started`). The seat lock calls this before anything else.
+   * (409 `match_started`), or cancelled (409 `match_cancelled`). The seat lock calls this
+   * before anything else.
    */
   async assertMatchOpenForSale(matchId: string): Promise<void> {
     const match = await this.matchRepository.findOne({ where: { id: matchId } });
     if (!match) {
       throw new NotFoundException(`Match ${matchId} not found`);
     }
-    assertMatchNotStarted(match);
+    assertMatchOpenForSale(match);
   }
 
   /**

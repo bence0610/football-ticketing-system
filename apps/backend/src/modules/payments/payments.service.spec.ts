@@ -11,7 +11,7 @@ import { EmailService } from '../email/email.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { QrService } from '../qr/qr.service';
 import { TicketRendererService } from '../tickets/ticket-renderer.service';
-import { LoyaltyTier, Match, Seat, Ticket } from '../../database/entities';
+import { LoyaltyTier, Match, MatchStatus, Seat, Ticket } from '../../database/entities';
 import { SeatAvailability } from '../seats/dto';
 import { SeatsService } from '../seats/seats.service';
 import { SeasonPassesService } from '../season-passes/season-passes.service';
@@ -205,6 +205,23 @@ describe('PaymentsService', () => {
       await expect(
         service.createPaymentIntent(userId, { matchId, seats: [{ seatId, ownerToken }] }),
       ).rejects.toMatchObject({ response: { code: 'match_started' } });
+      expect(mockStripe.paymentIntents.create).not.toHaveBeenCalled();
+      expect(mockSeatsService.resolveAvailabilityForSeats).not.toHaveBeenCalled();
+    });
+
+    it('refuses a cancelled match, before touching seats or Stripe', async () => {
+      mockMatchRepo.findOne.mockResolvedValue({
+        id: matchId,
+        homeTeam: 'KTE',
+        awayTeam: 'DVTK',
+        basePrice: '3000',
+        status: MatchStatus.CANCELLED,
+        kickoffAt: new Date(Date.now() + 86_400_000),
+      });
+
+      await expect(
+        service.createPaymentIntent(userId, { matchId, seats: [{ seatId, ownerToken }] }),
+      ).rejects.toMatchObject({ response: { code: 'match_cancelled' } });
       expect(mockStripe.paymentIntents.create).not.toHaveBeenCalled();
       expect(mockSeatsService.resolveAvailabilityForSeats).not.toHaveBeenCalled();
     });

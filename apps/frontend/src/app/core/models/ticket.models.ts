@@ -42,7 +42,13 @@ export interface TicketQrResponse {
   holderName?: string;
 }
 
-export type ScanResult = 'ok' | 'already_used' | 'invalid' | 'expired' | 'wrong_match';
+export type ScanResult =
+  | 'ok'
+  | 'already_used'
+  | 'invalid'
+  | 'expired'
+  | 'wrong_match'
+  | 'match_cancelled';
 
 export interface ScanMatchInfo {
   id: string;

@@ -10,6 +10,7 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import {
+  MatchStatus,
   PassLoan,
   PassLoanStatus,
   Seat,
@@ -155,6 +156,19 @@ export class TicketsService {
           result: 'invalid',
           ticketId: ticket.id,
           message: `ticket_status_${ticket.status}`,
+        };
+      }
+      // A paid ticket for a match that has been cancelled admits nobody. This is its own
+      // verdict (not "invalid", not "already used") so the steward knows the ticket is
+      // genuine and the match is off. Nothing is refunded or changed here.
+      if (ticket.match?.status === MatchStatus.CANCELLED) {
+        return {
+          success: false,
+          result: 'match_cancelled',
+          ticketId: ticket.id,
+          source: ticket.source,
+          holderName: await this.resolveEnteringName(manager, ticket),
+          ...(await this.scanDetails(ticket)),
         };
       }
       if (tokenRevoked) {

@@ -683,6 +683,22 @@ describe('MatchSeatsController – integration', () => {
           .expect(409);
       });
 
+      it('a cancelled match cannot be locked: 409 match_cancelled, and no lock is taken', async () => {
+        setData(
+          makeMatch({ status: MatchStatus.CANCELLED }),
+          [makeSeat(SEAT_ID_FREE, 'A', '1', 1)],
+          [],
+        );
+
+        const res = await request(app.getHttpServer())
+          .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
+          .expect(409);
+
+        expect(res.body.code).toBe('match_cancelled');
+        expect(res.body.message).toBe('Ez a mérkőzés elmarad, ezért jegy nem vásárolható rá.');
+        expect(seatLockAcquire).not.toHaveBeenCalled();
+      });
+
       it('is a 404, and takes no lock, when the match does not exist', async () => {
         setData(null, [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], []);
 

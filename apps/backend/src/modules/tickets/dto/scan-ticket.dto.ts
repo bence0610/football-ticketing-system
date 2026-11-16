@@ -56,8 +56,10 @@ export class TicketScanResponseDto {
   @ApiProperty({ example: true })
   success!: boolean;
 
-  @ApiProperty({ enum: ['ok', 'already_used', 'invalid', 'expired', 'wrong_match'] })
-  result!: 'ok' | 'already_used' | 'invalid' | 'expired' | 'wrong_match';
+  @ApiProperty({
+    enum: ['ok', 'already_used', 'invalid', 'expired', 'wrong_match', 'match_cancelled'],
+  })
+  result!: 'ok' | 'already_used' | 'invalid' | 'expired' | 'wrong_match' | 'match_cancelled';
 
   @ApiProperty({ required: false })
   ticketId?: string;
