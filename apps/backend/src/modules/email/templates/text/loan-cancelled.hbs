@@ -1,0 +1,29 @@
+{{#if isLender}}A kölcsön visszavonva
+
+{{#if recipientName}}Szia {{recipientName}},{{else}}Szia!{{/if}}
+
+{{Article matchTitle}} {{matchTitle}} mérkőzésre létrehozott bérletkölcsön sikeresen visszavonva.
+
+Mérkőzés: {{matchTitle}}
+Időpont: {{matchKickoffLabel}}
+{{#if reason}}
+Indok: {{reason}}
+{{/if}}
+{{else}}{{lenderName}} visszavonta a kölcsönt
+
+{{#if recipientName}}Szia {{recipientName}},{{else}}Szia!{{/if}}
+
+{{lenderName}} visszavonta {{article matchTitle}} {{matchTitle}} mérkőzésre szóló bérletkölcsönt.{{#if qrIssued}} A korábban kapott QR-kód nem fog működni a beléptetésnél.{{else}} A meghívó már nem érvényes.{{/if}}
+
+Mérkőzés: {{matchTitle}}
+Időpont: {{matchKickoffLabel}}
+
+Nem fizettél semmit, ezért nincs mit visszatéríteni.{{#if qrIssued}} A QR-kódot ne használd, a kapunál nem fogják elfogadni.{{/if}}
+{{#if reason}}
+Indok: {{reason}}
+{{/if}}
+
+Neked nincs további teendőd.
+{{/if}}
+
+{{> text-footer}}

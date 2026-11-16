@@ -29,12 +29,14 @@ export interface TicketConfirmationContext {
     gateLabel?: string;
   }>;
   totalLabel: string;
+  /** Loyalty points earned by this purchase: tickets x the flat per-ticket rule (never a share of the price). */
+  pointsEarned: number;
   ticketsUrl: string;
   qrImageDataUrls: Array<{ ticketId: string; seatLabel: string; dataUrl: string }>;
 }
 
 export interface LoanInvitationContext {
-  recipientName: string;
+  /** The invitee may have no account, so there is deliberately no recipient name. */
   lenderName: string;
   matchTitle: string;
   matchVenue: string;
@@ -46,6 +48,7 @@ export interface LoanInvitationContext {
 
 export interface LoanConfirmationContext {
   recipientName: string;
+  lenderName: string;
   borrowerName: string;
   matchTitle: string;
   matchVenue: string;
@@ -57,11 +60,15 @@ export interface LoanConfirmationContext {
 }
 
 export interface LoanCancelledContext {
-  recipientName: string;
+  /** Absent when the borrower has no account (we only know the address). */
+  recipientName?: string;
+  lenderName: string;
   matchTitle: string;
   matchKickoffLabel: string;
   reason?: string;
   isLender: boolean;
+  /** True when the borrower had already accepted, i.e. a QR code was issued that now stops working. */
+  qrIssued: boolean;
 }
 
 export interface TierUpgradedContext {
@@ -69,6 +76,9 @@ export interface TierUpgradedContext {
   newTierLabel: string;
   newDiscountPercent: number;
   pointsBalance: number;
+  /** The tier after this one, when there is one. */
+  nextTierLabel?: string;
+  pointsToNextTier?: number;
   loyaltyDashboardUrl: string;
 }
 
@@ -77,6 +87,8 @@ export interface WaitlistNotificationContext {
   matchTitle: string;
   matchVenue: string;
   matchKickoffLabel: string;
+  /** Display name of the sector the freed seat is in ("D/1 szektor"); absent when not known. */
+  freedSectorName?: string;
   windowMinutes: number;
   expiresAtLabel: string;
   confirmUrl: string;

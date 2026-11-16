@@ -31,6 +31,7 @@ import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import { EmailService } from '../email/email.service';
+import { matchSubject } from '../email/email-subject';
 import { allocateDiscount, normalizeDiscountPercent } from '../loyalty/loyalty-discount';
 import { definitionFor } from '../loyalty/loyalty.constants';
 import { LoyaltyService } from '../loyalty/loyalty.service';
@@ -767,7 +768,7 @@ export class PaymentsService {
 
         await this.emailService.send({
           to: first.user.email,
-          subject: `Jegy visszaigazolás - ${matchSummary.title}`,
+          subject: matchSubject('Megvan a jegyed', first.match),
           template: 'ticket-confirmation',
           context: {
             recipientName: first.user.firstName,
@@ -776,6 +777,8 @@ export class PaymentsService {
             matchKickoffLabel: matchSummary.kickoffLabel,
             tickets: sections,
             totalLabel: this.ticketRenderer.computeTotal(userTickets),
+            // Flat points per ticket (LOYALTY_TICKET_POINTS_PER_TICKET), not a share of the price.
+            pointsEarned: userTickets.length * this.loyaltyConfig.ticketPointsPerTicket,
             ticketsUrl: `${this.mailConfig.baseUrl}/profile`,
             qrImageDataUrls,
           },
@@ -836,12 +839,12 @@ export class PaymentsService {
     const match = await this.matchRepository.findOne({ where: { id: matchId } });
     if (!match) return;
 
-    const matchTitle = `${match.homeTeam} vs ${match.awayTeam}`;
+    const matchTitle = `${match.homeTeam} – ${match.awayTeam}`;
     const kickoffLabel = match.kickoffAt.toLocaleString('hu-HU', { timeZone: 'Europe/Budapest' });
 
     await this.emailService.send({
       to: user.email,
-      subject: `Visszatérítés folyamatban — ${matchTitle}`,
+      subject: matchSubject('Visszatérítés folyamatban', match),
       template: 'seat-refund',
       context: {
         recipientName: user.firstName,

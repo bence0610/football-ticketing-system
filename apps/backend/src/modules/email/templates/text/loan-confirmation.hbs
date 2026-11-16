@@ -1,0 +1,35 @@
+{{#if isLender}}{{borrowerName}} elfogadta a helyedet
+
+Szia {{recipientName}},
+
+{{borrowerName}} elfogadta a kölcsönzési meghívódat {{article matchTitle}} {{matchTitle}} mérkőzésre. Ezzel a te saját belépésed erre a meccsre érvénytelen, a helyet {{borrowerName}} használja.
+
+Elfogadta: {{borrowerName}}
+Mérkőzés: {{matchTitle}}
+Időpont: {{matchKickoffLabel}}
+Helyszín: {{matchVenue}}
+Hely: {{seatLabel}}
+
+A bérleted a következő meccsen újra működik, a mostani átadás csak erre az egy meccsre szól.
+
+Kölcsön megtekintése:
+{{qrUrl}}
+{{else}}Itt a belépőd: {{matchTitle}}
+
+Szia {{recipientName}},
+
+Elfogadtad {{lenderName}} bérletes helyét {{article matchTitle}} {{matchTitle}} mérkőzésre. A belépéshez szükséges QR-kód a levél HTML változatában van; ha nem látod, nyisd meg az alábbi oldalt.
+
+Ki adta át: {{lenderName}}
+Mérkőzés: {{matchTitle}}
+Időpont: {{matchKickoffLabel}}
+Helyszín: {{matchVenue}}
+Hely: {{seatLabel}}
+
+Belépő megnyitása (QR-kóddal):
+{{qrUrl}}
+
+A hely csak erre az egy meccsre szól. Ha a bérlet gazdája visszavonja, a QR-kód érvényét veszti, erről értesítést kapsz.
+{{/if}}
+
+{{> text-footer}}

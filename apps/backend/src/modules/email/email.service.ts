@@ -1,9 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport, Transporter } from 'nodemailer';
+import type { Attachment } from 'nodemailer/lib/mailer';
 import { MailConfig } from '../../config';
 import { EmailTemplateService } from './email-template.service';
-import { EmailTemplateName, SendEmailRequest } from './email.types';
+import { EmailContextMap, EmailTemplateName, SendEmailRequest } from './email.types';
 
 /**
  * Production-grade transactional email sender. Uses Nodemailer over SMTP
@@ -46,13 +47,19 @@ export class EmailService implements OnModuleDestroy {
   }
 
   async send<T extends EmailTemplateName>(request: SendEmailRequest<T>): Promise<void> {
-    const html = this.templateService.render(request.template, request.context);
-    await this.deliverWithRetry(request, html);
+    // Gmail and Outlook block data: images, so inline images travel as CID attachments.
+    const { context, attachments } = extractInlineImages(request.context);
+    const { html, text } = this.templateService.renderBoth(
+      request.template,
+      context as EmailContextMap[T],
+      request.subject,
+    );
+    await this.deliverWithRetry(request, { html, text, attachments });
   }
 
   private async deliverWithRetry(
     request: SendEmailRequest,
-    html: string,
+    body: { html: string; text: string; attachments: Attachment[] },
     attempt = 1,
   ): Promise<void> {
     try {
@@ -60,7 +67,9 @@ export class EmailService implements OnModuleDestroy {
         from: this.mailConfig.from,
         to: request.to,
         subject: request.subject,
-        html,
+        html: body.html,
+        text: body.text,
+        attachments: body.attachments,
       });
       this.logger.log(
         `Email sent template=${request.template} to=${request.to} attempt=${attempt} messageId=${info.messageId} corr=${request.correlationId ?? '-'}`,
@@ -80,7 +89,43 @@ export class EmailService implements OnModuleDestroy {
       await new Promise<void>((resolveDelay) =>
         setTimeout(resolveDelay, this.mailConfig.retryDelayMs),
       );
-      await this.deliverWithRetry(request, html, attempt + 1);
+      await this.deliverWithRetry(request, body, attempt + 1);
     }
   }
+}
+
+const DATA_IMAGE = /^data:(image\/(?:png|jpeg|gif));base64,(.+)$/s;
+
+/**
+ * Replaces every `data:image/...;base64,` string in a template context with a `cid:` reference
+ * and returns the matching inline attachments. Generic on purpose: callers keep passing the
+ * data URLs their QR service produces.
+ */
+export function extractInlineImages<C>(context: C): { context: C; attachments: Attachment[] } {
+  const attachments: Attachment[] = [];
+  const visit = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      const match = DATA_IMAGE.exec(value);
+      if (!match) {
+        return value;
+      }
+      const cid = `img${attachments.length + 1}@kte-jegyportal`;
+      attachments.push({
+        filename: `qr-${attachments.length + 1}.${match[1].split('/')[1]}`,
+        content: Buffer.from(match[2], 'base64'),
+        contentType: match[1],
+        cid,
+        contentDisposition: 'inline',
+      });
+      return `cid:${cid}`;
+    }
+    if (Array.isArray(value)) {
+      return value.map(visit);
+    }
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, visit(v)]));
+    }
+    return value;
+  };
+  return { context: visit(context) as C, attachments };
 }

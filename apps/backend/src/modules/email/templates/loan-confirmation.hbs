@@ -1,66 +1,37 @@
-<!DOCTYPE html>
-<html lang="hu">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>KTE bérlet kölcsönzés visszaigazolás</title>
-  </head>
-  <body style="margin:0; padding:0; background-color:#0F0F0F; color:#F5F5F5; font-family: 'Helvetica Neue', Arial, sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr>
-        <td align="center" style="padding: 24px 12px;">
-          <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; width:100%; background-color:#1A1A1A; border:1px solid #2E2E2E; border-radius:12px;">
-            <tr>
-              <td style="background-color:#C94B1E; padding:24px 32px;">
-                <h1 style="margin:0; font-size:22px; color:#FFFFFF; font-weight:700;">
-                  {{#if isLender}}Bérlet kölcsönzés visszaigazolva{{else}}Sikeres bérlet kölcsön elfogadás{{/if}}
-                </h1>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:32px;">
-                <p style="margin:0 0 16px; font-size:16px; line-height:24px;">Szia <strong>{{recipientName}}</strong>,</p>
-                {{#if isLender}}
-                  <p style="margin:0 0 16px; font-size:16px; line-height:24px;">
-                    <strong>{{borrowerName}}</strong> elfogadta a kölcsönzési meghívódat.
-                  </p>
-                {{else}}
-                  <p style="margin:0 0 16px; font-size:16px; line-height:24px;">
-                    Sikeresen elfogadtad <strong>{{borrowerName}}</strong> bérletkölcsönzését. Az alábbi QR kóddal léphetsz be a meccsre.
-                  </p>
-                {{/if}}
-
-                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0; background-color:#0F0F0F; border:1px solid #2E2E2E; border-radius:8px;">
-                  <tr>
-                    <td style="padding:16px 20px;">
-                      <div style="font-size:18px; font-weight:700;">{{matchTitle}}</div>
-                      <div style="font-size:14px; color:#AAAAAA; margin-top:4px;">{{matchVenue}} &middot; {{matchKickoffLabel}}</div>
-                      <div style="font-size:14px; color:#AAAAAA; margin-top:8px;">Helyszám: <strong style="color:#FFFFFF;">{{seatLabel}}</strong></div>
-                    </td>
-                  </tr>
-                </table>
-
-                {{#unless isLender}}
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                      <td align="center" style="padding:16px 0;">
-                        <img src="{{qrDataUrl}}" alt="QR" width="220" height="220" style="display:block; margin:0 auto; background:#FFFFFF; padding:10px; border-radius:8px;" />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td align="center">
-                        <a href="{{qrUrl}}" style="display:inline-block; background-color:#C94B1E; color:#FFFFFF; text-decoration:none; padding:14px 32px; border-radius:8px; font-weight:600; font-size:15px;">QR kód megnyitása</a>
-                      </td>
-                    </tr>
-                  </table>
-                {{/unless}}
-
-                <p style="margin:32px 0 0; font-size:12px; color:#777777;">A bérlet csak az adott meccsre kerül átadásra. Mérkőzés után automatikusan visszakapja a tulajdonos.</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
+{{#if isLender}}
+{{#> layout preheader=(concat borrowerName " elfogadta a helyedet: " matchTitle ", " matchKickoffLabel ".") footerNote="A bérleted a következő meccsen újra a megszokott módon működik."}}
+{{#> h1}}{{borrowerName}} elfogadta a helyedet{{/h1}}
+{{#> p}}Szia <strong>{{recipientName}}</strong>,{{/p}}
+{{#> p}}<strong>{{borrowerName}}</strong> elfogadta a kölcsönzési meghívódat {{article matchTitle}} <strong>{{matchTitle}}</strong> mérkőzésre. Ezzel a te saját belépésed erre a meccsre érvénytelen, a helyet {{borrowerName}} használja.{{/p}}
+{{#> details}}
+{{> row label="Elfogadta" value=borrowerName}}
+{{> row label="Mérkőzés" value=matchTitle}}
+{{> row label="Időpont" value=matchKickoffLabel}}
+{{> row label="Helyszín" value=matchVenue}}
+{{> row label="Hely" value=seatLabel}}
+{{/details}}
+{{#> p muted=true}}A bérleted a következő meccsen újra működik, a mostani átadás csak erre az egy meccsre szól.{{/p}}
+{{> button url=qrUrl label="Kölcsön megtekintése"}}
+{{/layout}}
+{{else}}
+{{#> layout preheader=(concat lenderName " helyét kaptad: " matchTitle ", " matchKickoffLabel ". A belépőd QR-kódja ebben a levélben van.") footerNote="A hely csak erre az egy meccsre szól. Ha a bérlet gazdája visszavonja, a QR-kód érvényét veszti, erről értesítést kapsz."}}
+{{#> h1}}Itt a belépőd: {{matchTitle}}{{/h1}}
+{{#> p}}Szia <strong>{{recipientName}}</strong>,{{/p}}
+{{#> p}}Elfogadtad <strong>{{lenderName}}</strong> bérletes helyét {{article matchTitle}} <strong>{{matchTitle}}</strong> mérkőzésre. Az alábbi QR-kóddal léphetsz be a stadionba.{{/p}}
+{{#> details}}
+{{> row label="Ki adta át" value=lenderName}}
+{{> row label="Mérkőzés" value=matchTitle}}
+{{> row label="Időpont" value=matchKickoffLabel}}
+{{> row label="Helyszín" value=matchVenue}}
+{{> row label="Hely" value=seatLabel}}
+{{/details}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td align="center" style="padding:4px 0 8px;">
+<img src="{{qrDataUrl}}" alt="Belépő QR-kód" width="200" height="200" style="display:block; width:200px; height:200px; border:1px solid #e1d5ec;" />
+</td>
+</tr>
+</table>
+{{> button url=qrUrl label="Belépő megnyitása"}}
+{{/layout}}
+{{/if}}

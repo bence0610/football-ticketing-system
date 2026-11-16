@@ -1,0 +1,23 @@
+Megvan a jegyed: {{matchTitle}}
+
+Szia {{recipientName}}, köszönjük a vásárlást! A fizetés megtörtént, az alábbi helyek a tieid.
+
+Mérkőzés: {{matchTitle}}
+Időpont: {{matchKickoffLabel}}
+Helyszín: {{matchVenue}}
+{{#each tickets}}
+Hely: {{seatLabel}}
+{{#if gateLabel}}Belépés: {{gateLabel}}
+{{/if}}Kategória / ár: {{categoryLabel}} · {{pricePaidLabel}}
+{{/each}}
+Összesen fizetve: {{totalLabel}}
+Gyűjtött hűségpont: +{{pointsEarned}} pont
+
+Belépéskor mutasd be a QR-kódot a telefonodon vagy kinyomtatva. Minden kód csak egyszer használható. A QR-kódok a levél HTML változatában, valamint a Jegyeim oldalon vannak.
+
+Jegyeim megnyitása:
+{{ticketsUrl}}
+
+A jegyeid és a QR-kódok bármikor megnyithatók a KTE Jegyportálon, a fiókodban.
+
+{{> text-footer}}

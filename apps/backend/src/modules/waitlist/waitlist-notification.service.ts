@@ -5,6 +5,7 @@ import { MailConfig, WaitlistConfig } from '../../config';
 import { Waitlist, WaitlistStatus } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { EmailService } from '../email/email.service';
+import { matchSubject } from '../email/email-subject';
 import { WaitlistService } from './waitlist.service';
 
 const NOTIFICATION_LOCK_TTL_SECONDS = 5;
@@ -38,7 +39,7 @@ export class WaitlistNotificationService {
    * concurrent triggers (e.g. cancel + cron) cannot promote the same slot
    * to two different users.
    */
-  async notifyNextInLine(matchId: string): Promise<ClaimSlotInfo | null> {
+  async notifyNextInLine(matchId: string, freedSectorName?: string): Promise<ClaimSlotInfo | null> {
     const lockKey = RedisKeys.waitlistNotificationLock(matchId);
     const lockAcquired = await this.redis.set(
       lockKey,
@@ -80,7 +81,7 @@ export class WaitlistNotificationService {
       // claim slot is still valid. The user can also see the notification
       // via the profile-page polling loop.
       try {
-        await this.sendNotificationEmail(next, notifiedAt, ttl);
+        await this.sendNotificationEmail(next, notifiedAt, ttl, freedSectorName);
       } catch (error) {
         this.logger.error(
           `Waitlist email failed for entry ${next.id}: ${(error as Error).message}`,
@@ -154,6 +155,7 @@ export class WaitlistNotificationService {
     entry: Waitlist,
     notifiedAt: Date,
     ttlSeconds: number,
+    freedSectorName?: string,
   ): Promise<void> {
     if (!entry.user || !entry.match) {
       throw new Error('User or match relation missing on waitlist entry');
@@ -165,13 +167,17 @@ export class WaitlistNotificationService {
     const minutes = Math.round(ttlSeconds / 60);
     await this.emailService.send({
       to: entry.user.email,
-      subject: `Felszabadult egy hely - ${matchTitle}`,
+      subject: matchSubject(
+        freedSectorName ? `Felszabadult egy hely: ${freedSectorName}` : 'Felszabadult egy hely',
+        entry.match,
+      ),
       template: 'waitlist-notification',
       context: {
         recipientName: entry.user.firstName,
         matchTitle,
         matchVenue: entry.match.venue,
         matchKickoffLabel,
+        freedSectorName,
         windowMinutes: minutes,
         expiresAtLabel: expiresLabel,
         confirmUrl: `${this.mailConfig.baseUrl}/profile?waitlistMatchId=${entry.matchId}`,

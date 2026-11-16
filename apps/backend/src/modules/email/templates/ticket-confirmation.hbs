@@ -1,96 +1,28 @@
-<!DOCTYPE html>
-<html lang="hu">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>KTE jegy visszaigazolás</title>
-  </head>
-  <body style="margin:0; padding:0; background-color:#0F0F0F; color:#F5F5F5; font-family: 'Helvetica Neue', Arial, sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0F0F0F;">
-      <tr>
-        <td align="center" style="padding: 24px 12px;">
-          <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; width:100%; background-color:#1A1A1A; border:1px solid #2E2E2E; border-radius:12px; overflow:hidden;">
-            <tr>
-              <td style="background-color:#C94B1E; padding:24px 32px;">
-                <h1 style="margin:0; font-size:22px; line-height:28px; color:#FFFFFF; font-weight:700; letter-spacing:0.5px;">KTE Jegyportál</h1>
-                <p style="margin:8px 0 0; font-size:14px; color:#FFE3D6;">Sikeres jegyvásárlás</p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:32px;">
-                <p style="margin:0 0 16px; font-size:16px; line-height:24px;">Szia <strong>{{recipientName}}</strong>,</p>
-                <p style="margin:0 0 16px; font-size:16px; line-height:24px;">Köszönjük a vásárlást! Az alábbi jegyek lettek lefoglalva:</p>
-
-                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0; background-color:#0F0F0F; border:1px solid #2E2E2E; border-radius:8px;">
-                  <tr>
-                    <td style="padding:16px 20px; border-bottom:1px solid #2E2E2E;">
-                      <div style="font-size:18px; font-weight:700; color:#FFFFFF;">{{matchTitle}}</div>
-                      <div style="font-size:14px; color:#AAAAAA; margin-top:4px;">{{matchVenue}} &middot; {{matchKickoffLabel}}</div>
-                    </td>
-                  </tr>
-                  {{#each tickets}}
-                    <tr>
-                      <td style="padding:14px 20px; border-bottom:1px solid #2E2E2E;">
-                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                          <tr>
-                            <td>
-                              <div style="font-size:15px; color:#FFFFFF;">Helyszám: <strong>{{seatLabel}}</strong></div>
-                              <div style="font-size:13px; color:#AAAAAA; margin-top:2px;">Kategória: {{categoryLabel}}</div>
-                              {{#if gateLabel}}<div style="font-size:13px; color:#AAAAAA; margin-top:2px;">Belépés: <strong style="color:#FFFFFF;">{{gateLabel}}</strong></div>{{/if}}
-                            </td>
-                            <td align="right" style="font-size:15px; color:#FFFFFF; font-weight:600;">{{pricePaidLabel}}</td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                  {{/each}}
-                  <tr>
-                    <td style="padding:16px 20px;">
-                      <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                        <tr>
-                          <td style="font-size:14px; color:#AAAAAA;">Összesen</td>
-                          <td align="right" style="font-size:18px; color:#C94B1E; font-weight:700;">{{totalLabel}}</td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-
-                <h2 style="margin:24px 0 12px; font-size:16px; color:#FFFFFF;">QR kódok</h2>
-                <p style="margin:0 0 16px; font-size:14px; line-height:22px; color:#AAAAAA;">A belépéskor mutasd be telefonon vagy nyomtatva. A kódok egyszer használhatók.</p>
-
-                <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                  {{#each qrImageDataUrls}}
-                    <tr>
-                      <td align="center" style="padding:16px 0; border-bottom:1px solid #2E2E2E;">
-                        <div style="font-size:13px; color:#AAAAAA; margin-bottom:8px;">Hely: <strong style="color:#FFFFFF;">{{seatLabel}}</strong></div>
-                        <img src="{{dataUrl}}" alt="QR" width="180" height="180" style="display:block; margin:0 auto; background:#FFFFFF; padding:8px; border-radius:8px;" />
-                      </td>
-                    </tr>
-                  {{/each}}
-                </table>
-
-                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:32px;">
-                  <tr>
-                    <td align="center">
-                      <a href="{{ticketsUrl}}" style="display:inline-block; background-color:#C94B1E; color:#FFFFFF; text-decoration:none; padding:14px 32px; border-radius:8px; font-weight:600; font-size:15px;">Jegyek megtekintése</a>
-                    </td>
-                  </tr>
-                </table>
-
-                <p style="margin:32px 0 0; font-size:12px; color:#777777; line-height:18px;">
-                  Ez egy automatikus értesítés, kérjük ne válaszolj rá. Kérdés esetén keresd ügyfélszolgálatunkat a jegyportál chatbotján keresztül.
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="background-color:#0F0F0F; padding:16px 32px; text-align:center; border-top:1px solid #2E2E2E;">
-                <p style="margin:0; font-size:12px; color:#777777;">© Kecskeméti TE - KTE Jegyportál</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
+{{#> layout preheader=(concat matchTitle ", " matchKickoffLabel ". Fizetve: " totalLabel ".") footerNote="A jegyeid és a QR-kódok bármikor megnyithatók a KTE Jegyportálon, a fiókodban."}}
+{{#> h1}}Megvan a jegyed: {{matchTitle}}{{/h1}}
+{{#> p}}Szia <strong>{{recipientName}}</strong>, köszönjük a vásárlást! A fizetés megtörtént, az alábbi helyek a tieid.{{/p}}
+{{#> details}}
+{{> row label="Mérkőzés" value=matchTitle}}
+{{> row label="Időpont" value=matchKickoffLabel}}
+{{> row label="Helyszín" value=matchVenue}}
+{{#each tickets}}
+{{> row label="Hely" value=seatLabel}}
+{{#if gateLabel}}{{> row label="Belépés" value=gateLabel}}{{/if}}
+{{> row label="Kategória / ár" value=(concat categoryLabel " · " pricePaidLabel)}}
+{{/each}}
+{{> row label="Összesen fizetve" value=totalLabel}}
+{{> row label="Gyűjtött hűségpont" value=(concat "+" pointsEarned " pont")}}
+{{/details}}
+{{#> p muted=true}}Belépéskor mutasd be a QR-kódot a telefonodon vagy kinyomtatva. Minden kód csak egyszer használható.{{/p}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+{{#each qrImageDataUrls}}
+<tr>
+<td align="center" style="padding:12px 0; border-top:1px solid #efecf3; font-family:Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#5b5566;">
+{{seatLabel}}<br />
+<img src="{{dataUrl}}" alt="Belépő QR-kód: {{seatLabel}}" width="180" height="180" style="display:block; margin:8px auto 0; width:180px; height:180px; border:1px solid #e1d5ec;" />
+</td>
+</tr>
+{{/each}}
+</table>
+{{> button url=ticketsUrl label="Jegyeim megnyitása"}}
+{{/layout}}

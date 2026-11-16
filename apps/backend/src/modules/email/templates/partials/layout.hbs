@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="hu" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+{{!--
+  Shared frame for every KTE e-mail. Email rules, not page rules:
+  - Arial only (clients do not load web fonts; the brand is the header band).
+  - Tables + inline styles + bgcolor/width attributes (Outlook = Word engine: no flex, grid,
+    float, position, max-width, background-image, reliable padding on <a>).
+  - Colours are the site tokens, written out (email has no CSS variables):
+      brand-deep #4a1d6a, brand-tint #f3edf8, ink #14121a, muted #5b5566, border #efecf3,
+      amber-bg #fbf1e0 / amber-edge #f0dcb8 / amber-ink #6b4100.
+  - Amber band is #8A5300 (a deeper amber-icon) so white text keeps AA contrast.
+  Params: preheader (inbox preview text), amber (true => amber band), footerNote (plain text).
+--}}
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="color-scheme" content="light" />
+<meta name="supported-color-schemes" content="light" />
+<title>{{subject}}</title>
+<!--[if mso]>
+<xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+<![endif]-->
+<style type="text/css">
+  body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+  table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
+  img { border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; }
+  @media only screen and (max-width:480px) {
+    .kte-px { padding-left:20px !important; padding-right:20px !important; }
+    .kte-stack { display:block !important; width:100% !important; box-sizing:border-box; }
+    .kte-label { padding-bottom:0 !important; }
+    .kte-cta { width:100% !important; }
+  }
+</style>
+</head>
+<body style="margin:0; padding:0; width:100%; background-color:#f3f1f6;" bgcolor="#f3f1f6">
+{{#if preheader}}<div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#f3f1f6;">{{preheader}}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>{{/if}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f3f1f6" style="background-color:#f3f1f6;">
+<tr>
+<td align="center" style="padding:24px 12px;">
+
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:600px;">
+
+    <!-- Header band: brand mark + product name -->
+    <tr>
+      <td class="kte-px" bgcolor="{{#if amber}}#8A5300{{else}}#4a1d6a{{/if}}" style="background-color:{{#if amber}}#8A5300{{else}}#4a1d6a{{/if}}; padding:20px 32px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td width="40" height="40" align="center" valign="middle" bgcolor="#ffffff" style="width:40px; height:40px; background-color:#ffffff; border-radius:8px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:40px; font-weight:bold; color:{{#if amber}}#8A5300{{else}}#4a1d6a{{/if}};">KTE</td>
+            <td style="padding-left:12px; font-family:Arial, Helvetica, sans-serif; font-size:18px; line-height:24px; font-weight:bold; color:#ffffff;">KTE Jegyportál</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- White body -->
+    <tr>
+      <td class="kte-px" bgcolor="#ffffff" style="background-color:#ffffff; padding:32px 32px 28px; font-family:Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#14121a;">
+        {{> @partial-block}}
+      </td>
+    </tr>
+
+    <!-- Grey footer -->
+    <tr>
+      <td class="kte-px" bgcolor="#ece9f0" style="background-color:#ece9f0; padding:20px 32px; font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:19px; color:#5b5566;">
+        {{#if footerNote}}<p style="margin:0 0 10px; font-size:13px; line-height:20px; color:#14121a;">{{footerNote}}</p>{{/if}}
+        <p style="margin:0;">Ezt az automatikus levelet a KTE Jegyportál küldte, kérjük, ne válaszolj rá.<br />Kecskeméti TE &middot; KTE Jegyportál</p>
+      </td>
+    </tr>
+
+  </table>
+
+</td>
+</tr>
+</table>
+</body>
+</html>

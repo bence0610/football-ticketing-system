@@ -261,17 +261,22 @@ export class LoyaltyService {
       TIER_DEFINITIONS.findIndex((t) => t.tier === previousTier);
 
     if (tierUpgraded) {
+      const nextTierDefinition = TIER_DEFINITIONS.find((t) => t.minPoints > newBalance);
       // Fire-and-forget tier upgrade email. Never block the caller on SMTP.
       void this.emailService
         .send({
           to: user.email,
-          subject: `Új hűségszintet értél el: ${newTierDefinition.label}`,
+          subject: `Új hűségszinted: ${newTierDefinition.label} — ${newTierDefinition.discountPercent}% kedvezmény a jegyekből`,
           template: 'tier-upgraded',
           context: {
             recipientName: user.firstName,
             newTierLabel: newTierDefinition.label,
             newDiscountPercent: newTierDefinition.discountPercent,
             pointsBalance: newBalance,
+            nextTierLabel: nextTierDefinition?.label,
+            pointsToNextTier: nextTierDefinition
+              ? Math.max(nextTierDefinition.minPoints - newBalance, 0)
+              : undefined,
             loyaltyDashboardUrl: `${this.mailConfig.baseUrl}/loyalty`,
           },
           correlationId: `tier-upgrade:${user.id}:${newTierDefinition.tier}`,

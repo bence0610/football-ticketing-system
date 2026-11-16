@@ -5,15 +5,30 @@ import * as Handlebars from 'handlebars';
 import { EmailContextMap, EmailTemplateName } from './email.types';
 import { capitalArticle, hungarianArticle } from '../../common/hungarian-article';
 
+/** Components shared by every HTML e-mail: `templates/partials/<name>.hbs`. */
+const HTML_PARTIALS = ['layout', 'button', 'row', 'details', 'note', 'h1', 'p'] as const;
+
+export interface RenderedEmail {
+  html: string;
+  text: string;
+}
+
 /**
  * Compiles Handlebars templates eagerly at boot and caches them in memory.
- * Templates live in `templates/<name>.hbs` and are KTE-branded HTML emails
- * with inline CSS so they render reliably in Gmail / Outlook / Apple Mail.
+ *
+ * Every e-mail has two bodies:
+ *  - `templates/<name>.hbs`      the HTML version, built on the shared `layout` partial
+ *    (tables + inline styles only, Arial; see partials/layout.hbs for the rules);
+ *  - `templates/text/<name>.hbs` the plain-text alternative.
  */
 @Injectable()
 export class EmailTemplateService implements OnModuleInit {
   private readonly logger = new Logger(EmailTemplateService.name);
-  private readonly compiled = new Map<EmailTemplateName, HandlebarsTemplateDelegate>();
+  private readonly html = Handlebars.create();
+  // Plain text must not HTML-escape ("&", quotes, "="), so it is its own environment.
+  private readonly plain = Handlebars.create();
+  private readonly compiledHtml = new Map<EmailTemplateName, HandlebarsTemplateDelegate>();
+  private readonly compiledText = new Map<EmailTemplateName, HandlebarsTemplateDelegate>();
 
   private readonly templates: Record<EmailTemplateName, string> = {
     'ticket-confirmation': 'ticket-confirmation.hbs',
@@ -31,38 +46,93 @@ export class EmailTemplateService implements OnModuleInit {
   };
 
   async onModuleInit(): Promise<void> {
-    Handlebars.registerHelper('eq', (a: unknown, b: unknown): boolean => a === b);
-    // Hungarian definite article for the following name: {{article name}} -> a / az,
-    // {{Article name}} -> A / Az (sentence start).
-    Handlebars.registerHelper('article', (name: unknown): string =>
-      hungarianArticle(String(name ?? '')),
-    );
-    Handlebars.registerHelper('Article', (name: unknown): string =>
-      capitalArticle(String(name ?? '')),
-    );
-    for (const [name, fileName] of Object.entries(this.templates)) {
-      const filePath = resolve(__dirname, 'templates', fileName);
-      try {
-        const source = await fs.readFile(filePath, 'utf8');
-        this.compiled.set(
-          name as EmailTemplateName,
-          Handlebars.compile(source, { noEscape: false }),
-        );
-      } catch (error) {
-        this.logger.error(
-          `Failed to load email template ${name} (${filePath}): ${(error as Error).message}`,
-        );
-        throw error;
-      }
+    for (const hb of [this.html, this.plain]) {
+      hb.registerHelper('eq', (a: unknown, b: unknown): boolean => a === b);
+      // Hungarian definite article for the following name: {{article name}} -> a / az,
+      // {{Article name}} -> A / Az (sentence start).
+      hb.registerHelper('article', (name: unknown): string => hungarianArticle(String(name ?? '')));
+      hb.registerHelper('Article', (name: unknown): string => capitalArticle(String(name ?? '')));
+      // (concat "a" b "c") -> "a<b>c": builds values for partial parameters.
+      hb.registerHelper('concat', (...parts: unknown[]): string =>
+        parts
+          .slice(0, -1)
+          .map((p) => String(p ?? ''))
+          .join(''),
+      );
     }
-    this.logger.log(`Compiled ${this.compiled.size} email templates`);
+
+    const dir = resolve(__dirname, 'templates');
+    for (const name of HTML_PARTIALS) {
+      this.html.registerPartial(name, await this.read(resolve(dir, 'partials', `${name}.hbs`)));
+    }
+    this.plain.registerPartial(
+      'text-footer',
+      await this.read(resolve(dir, 'partials', 'text-footer.hbs')),
+    );
+
+    for (const [name, fileName] of Object.entries(this.templates)) {
+      const key = name as EmailTemplateName;
+      this.compiledHtml.set(
+        key,
+        this.html.compile(await this.read(resolve(dir, fileName)), { noEscape: false }),
+      );
+      this.compiledText.set(
+        key,
+        this.plain.compile(await this.read(resolve(dir, 'text', fileName)), { noEscape: true }),
+      );
+    }
+    this.logger.log(`Compiled ${this.compiledHtml.size} email templates (html + text)`);
   }
 
-  render<T extends EmailTemplateName>(template: T, context: EmailContextMap[T]): string {
-    const delegate = this.compiled.get(template);
+  private async read(filePath: string): Promise<string> {
+    try {
+      return await fs.readFile(filePath, 'utf8');
+    } catch (error) {
+      this.logger.error(`Failed to load email template (${filePath}): ${(error as Error).message}`);
+      throw error;
+    }
+  }
+
+  /** `subject` becomes the HTML <title>; it is not part of the typed context. */
+  render<T extends EmailTemplateName>(
+    template: T,
+    context: EmailContextMap[T],
+    subject = '',
+  ): string {
+    return this.delegate(this.compiledHtml, template)({ ...context, subject });
+  }
+
+  renderText<T extends EmailTemplateName>(template: T, context: EmailContextMap[T]): string {
+    return this.normaliseText(this.delegate(this.compiledText, template)(context));
+  }
+
+  renderBoth<T extends EmailTemplateName>(
+    template: T,
+    context: EmailContextMap[T],
+    subject = '',
+  ): RenderedEmail {
+    return {
+      html: this.render(template, context, subject),
+      text: this.renderText(template, context),
+    };
+  }
+
+  private delegate(
+    map: Map<EmailTemplateName, HandlebarsTemplateDelegate>,
+    template: EmailTemplateName,
+  ): HandlebarsTemplateDelegate {
+    const delegate = map.get(template);
     if (!delegate) {
       throw new Error(`Email template not compiled: ${template}`);
     }
-    return delegate(context);
+    return delegate;
+  }
+
+  /** Collapses the blank-line runs that skipped {{#if}} blocks leave behind. */
+  private normaliseText(text: string): string {
+    return `${text
+      .replace(/\r\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()}\n`;
   }
 }

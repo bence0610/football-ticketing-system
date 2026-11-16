@@ -12,6 +12,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import {
   PassLoan,
   PassLoanStatus,
+  Seat,
   SeasonPass,
   Sector,
   Ticket,
@@ -256,6 +257,20 @@ export class TicketsService {
     return user ? formatFullName(user) || undefined : undefined;
   }
 
+  /** Display name of the sector a cancelled ticket's seat is in, for the waitlist mail; best effort. */
+  private async freedSectorName(ticket: Ticket): Promise<string | undefined> {
+    try {
+      const seat = await this.dataSource.getRepository(Seat).findOne({
+        where: { id: ticket.seatId },
+      });
+      if (!seat) return undefined;
+      const sectors = await loadSectorMap(this.ticketRepository.manager);
+      return sectors.get(seat.section)?.name ?? `${seat.section} szektor`;
+    } catch {
+      return undefined;
+    }
+  }
+
   /**
    * Cancels or refunds a ticket. The seat returns to the available pool, so
    * the next person on the match's waitlist (if any) is notified.
@@ -290,11 +305,13 @@ export class TicketsService {
 
     // Best-effort: invite the next waitlist member.
     if (this.waitlistNotifier) {
-      void this.waitlistNotifier.notifyNextInLine(ticket.matchId).catch((error: unknown) => {
-        this.logger.error(
-          `notifyNextInLine after cancel(${ticketId}) failed: ${(error as Error).message}`,
-        );
-      });
+      void this.freedSectorName(ticket)
+        .then((sectorName) => this.waitlistNotifier?.notifyNextInLine(ticket.matchId, sectorName))
+        .catch((error: unknown) => {
+          this.logger.error(
+            `notifyNextInLine after cancel(${ticketId}) failed: ${(error as Error).message}`,
+          );
+        });
     }
 
     return ticket;

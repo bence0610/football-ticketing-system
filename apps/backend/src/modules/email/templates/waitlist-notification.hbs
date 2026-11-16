@@ -1,53 +1,12 @@
-<!DOCTYPE html>
-<html lang="hu">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Felszabadult egy hely</title>
-  </head>
-  <body style="margin:0; padding:0; background-color:#0F0F0F; color:#F5F5F5; font-family: 'Helvetica Neue', Arial, sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr>
-        <td align="center" style="padding:24px 12px;">
-          <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; width:100%; background-color:#1A1A1A; border:1px solid #2E2E2E; border-radius:12px;">
-            <tr>
-              <td style="background-color:#C94B1E; padding:24px 32px;">
-                <h1 style="margin:0; font-size:22px; color:#FFFFFF; font-weight:700;">Felszabadult egy hely!</h1>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:32px;">
-                <p style="margin:0 0 16px; font-size:16px; line-height:24px;">Szia <strong>{{recipientName}}</strong>,</p>
-                <p style="margin:0 0 16px; font-size:16px; line-height:24px;">
-                  Felszabadult egy hely {{article matchTitle}} <strong>{{matchTitle}}</strong> mérkőzésen
-                  ({{matchVenue}}, {{matchKickoffLabel}}).
-                </p>
-                <p style="margin:0 0 16px; font-size:16px; line-height:24px;">
-                  A te számodra <strong>{{windowMinutes}} percig</strong> tartjuk fenn a vásárlási lehetőséget,
-                  legkésőbb <strong>{{expiresAtLabel}}</strong> időpontig.
-                </p>
-
-                <table cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
-                  <tr>
-                    <td style="border-radius:8px; background-color:#C94B1E;">
-                      <a href="{{confirmUrl}}" style="display:inline-block; padding:14px 28px; color:#FFFFFF; text-decoration:none; font-weight:700; font-size:16px;">Megerősítem a vásárlást</a>
-                    </td>
-                  </tr>
-                </table>
-
-                <p style="margin:0; font-size:13px; color:#AAAAAA;">
-                  Ha nem cselekszel a megadott időablakon belül, automatikusan a következő várakozó kapja meg a lehetőséget.
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:16px 32px; border-top:1px solid #2E2E2E; color:#888888; font-size:12px;">
-                Kecskeméti TE Jegyportál - jegy@kte.hu
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
+{{#> layout preheader=(concat "Felszabadult egy hely: " matchTitle ", " matchKickoffLabel ". Nincs lefoglalva, aki előbb vásárol, azé.") footerNote=(concat "Elsőként téged értesítünk. Ha " windowMinutes " percen belül (" expiresAtLabel "-ig) nem veszel jegyet, a várólista következő tagjának is szólunk.")}}
+{{#> h1}}Felszabadult egy hely{{/h1}}
+{{#> p}}Szia <strong>{{recipientName}}</strong>, {{article matchTitle}} <strong>{{matchTitle}}</strong> mérkőzésre várólistán vagy, és most felszabadult egy hely.{{/p}}
+{{#> details}}
+{{> row label="Mérkőzés" value=matchTitle}}
+{{> row label="Időpont" value=matchKickoffLabel}}
+{{> row label="Helyszín" value=matchVenue}}
+{{#if freedSectorName}}{{> row label="Felszabadult hely" value=freedSectorName}}{{/if}}
+{{/details}}
+{{#> note alert=true}}<strong>A hely nincs lefoglalva neked.</strong> Aki előbb megveszi, azé lesz, ezért ne várj vele.{{/note}}
+{{> button url=confirmUrl label="Tovább a jegyvásárláshoz"}}
+{{/layout}}

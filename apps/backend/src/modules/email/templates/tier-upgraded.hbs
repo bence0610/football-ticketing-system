@@ -1,45 +1,11 @@
-<!DOCTYPE html>
-<html lang="hu">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>KTE hűségszint emelkedett</title>
-  </head>
-  <body style="margin:0; padding:0; background-color:#0F0F0F; color:#F5F5F5; font-family: 'Helvetica Neue', Arial, sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr>
-        <td align="center" style="padding:24px 12px;">
-          <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; width:100%; background-color:#1A1A1A; border:1px solid #2E2E2E; border-radius:12px;">
-            <tr>
-              <td style="background-color:#C94B1E; padding:24px 32px;">
-                <h1 style="margin:0; font-size:22px; color:#FFFFFF; font-weight:700;">Új hűségszintet értél el!</h1>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:32px;">
-                <p style="margin:0 0 16px; font-size:16px; line-height:24px;">Szia <strong>{{recipientName}}</strong>,</p>
-                <p style="margin:0 0 16px; font-size:16px; line-height:24px;">
-                  Új hűségszinted: <strong style="color:#C94B1E;">{{newTierLabel}}</strong>!
-                </p>
-                <p style="margin:0 0 16px; font-size:16px; line-height:24px;">
-                  Új jegyvásárlások mellé <strong>{{newDiscountPercent}}%</strong> kedvezmény jár, és számos egyéb előnyt élvezhetsz.
-                </p>
-                <p style="margin:0 0 24px; font-size:14px; color:#AAAAAA;">
-                  Aktuális egyenleg: <strong style="color:#FFFFFF;">{{pointsBalance}} pont</strong>
-                </p>
-
-                <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td align="center">
-                      <a href="{{loyaltyDashboardUrl}}" style="display:inline-block; background-color:#C94B1E; color:#FFFFFF; text-decoration:none; padding:14px 32px; border-radius:8px; font-weight:600; font-size:15px;">Hűség dashboard</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
+{{#> layout preheader=(concat "Új hűségszintet értél el: " newTierLabel ". Ezentúl " newDiscountPercent "% kedvezmény jár a jegyvásárlásokból.")}}
+{{#> h1}}Új hűségszintet értél el: {{newTierLabel}}{{/h1}}
+{{#> p}}Szia <strong>{{recipientName}}</strong>, a hűségpontjaid elérték az új szint határát.{{/p}}
+{{#> details}}
+{{> row label="Új szint" value=newTierLabel}}
+{{> row label="Mit ad" value=(concat newDiscountPercent "% kedvezmény minden új jegyvásárlásból")}}
+{{> row label="Pontjaid" value=(concat pointsBalance " pont")}}
+{{#if nextTierLabel}}{{> row label="Következő szint" value=(concat nextTierLabel ", még " pointsToNextTier " pont")}}{{/if}}
+{{/details}}
+{{> button url=loyaltyDashboardUrl label="Hűségoldal megnyitása"}}
+{{/layout}}

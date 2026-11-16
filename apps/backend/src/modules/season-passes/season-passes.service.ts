@@ -46,6 +46,7 @@ import {
 import { AppConfig, CronConfig, LoyaltyConfig, MailConfig, StripeConfig } from '../../config';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { EmailService } from '../email/email.service';
+import { matchSubject } from '../email/email-subject';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { isHomeMatch } from '../matches/match-home';
 import { occupiesSeat } from '../tickets/ticket-occupancy';
@@ -1911,10 +1912,9 @@ export class SeasonPassesService {
     const acceptUrl = `${this.mailConfig.baseUrl}/loans/accept/${encodeURIComponent(loan.invitationToken)}`;
     await this.emailService.send({
       to: loan.borrowerEmail,
-      subject: `${lender.firstName} bérletet ajánlott fel - ${matchSummary.title}`,
+      subject: matchSubject(`${formatFullName(lender)} átadja a helyét`, match),
       template: 'loan-invitation',
       context: {
-        recipientName: loan.borrowerEmail.split('@')[0],
         lenderName: formatFullName(lender),
         matchTitle: matchSummary.title,
         matchVenue: matchSummary.venue,
@@ -1942,6 +1942,7 @@ export class SeasonPassesService {
       return;
     }
     const matchSummary = this.renderer.matchSummary(loan.match);
+    const lenderName = formatFullName(loan.lender);
     const seatLabel = loan.seasonPass.seat ? await this.seatLabelOf(loan.seasonPass.seat) : '-';
 
     // Generate QR from the LOAN Ticket so the gate scan path works
@@ -1954,10 +1955,11 @@ export class SeasonPassesService {
     // Borrower email (with QR)
     await this.emailService.send({
       to: borrower.email,
-      subject: `Bérlet kölcsön elfogadva - ${matchSummary.title}`,
+      subject: matchSubject(`${lenderName} helye a tiéd, itt a belépőd`, loan.match),
       template: 'loan-confirmation',
       context: {
         recipientName: borrower.firstName,
+        lenderName,
         borrowerName: formatFullName(borrower),
         matchTitle: matchSummary.title,
         matchVenue: matchSummary.venue,
@@ -1973,10 +1975,11 @@ export class SeasonPassesService {
     // Lender notification (no QR)
     await this.emailService.send({
       to: loan.lender.email,
-      subject: `${borrower.firstName} elfogadta a bérletkölcsönt - ${matchSummary.title}`,
+      subject: matchSubject(`${formatFullName(borrower)} elfogadta a helyedet`, loan.match),
       template: 'loan-confirmation',
       context: {
         recipientName: loan.lender.firstName,
+        lenderName,
         borrowerName: formatFullName(borrower),
         matchTitle: matchSummary.title,
         matchVenue: matchSummary.venue,
@@ -2006,16 +2009,14 @@ export class SeasonPassesService {
         ? await this.userRepository.findOne({ where: { id: loan.borrowerUserId } })
         : null);
 
-    const recipients: Array<{ email: string; name: string; isLender: boolean }> = [];
+    const lenderName = lender ? formatFullName(lender) : 'A bérlet gazdája';
+    const recipients: Array<{ email: string; name?: string; isLender: boolean }> = [];
     // Borrower always notified (they have a stake in the pass)
     if (borrower) {
       recipients.push({ email: borrower.email, name: borrower.firstName, isLender: false });
     } else {
-      recipients.push({
-        email: loan.borrowerEmail,
-        name: loan.borrowerEmail.split('@')[0],
-        isLender: false,
-      });
+      // No account: all we have is the address, so the mail greets without a name.
+      recipients.push({ email: loan.borrowerEmail, isLender: false });
     }
     if (wasAccepted && lender) {
       recipients.push({ email: lender.email, name: lender.firstName, isLender: true });
@@ -2024,10 +2025,15 @@ export class SeasonPassesService {
     for (const recipient of recipients) {
       await this.emailService.send({
         to: recipient.email,
-        subject: `Bérlet kölcsönzés visszavonva - ${matchSummary.title}`,
+        subject: matchSubject(
+          recipient.isLender ? 'Visszavontad a kölcsönt' : `${lenderName} visszavonta a kölcsönt`,
+          match,
+        ),
         template: 'loan-cancelled',
         context: {
           recipientName: recipient.name,
+          lenderName,
+          qrIssued: wasAccepted,
           matchTitle: matchSummary.title,
           matchKickoffLabel: matchSummary.kickoffLabel,
           reason: loan.cancellationReason,

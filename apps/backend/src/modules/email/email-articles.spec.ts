@@ -39,7 +39,9 @@ describe('e-mail templates use the right article', () => {
       ...base,
       matchTitle,
     } as never);
-    expect(html).toContain(`hely ${article} <strong>${matchTitle.replace(/&/g, '&amp;')}</strong>`);
+    expect(html).toContain(
+      `${article} <strong>${matchTitle.replace(/&/g, '&amp;')}</strong> mérkőzésre várólistán`,
+    );
     expect(html).not.toMatch(/\(z\)/);
   });
 
