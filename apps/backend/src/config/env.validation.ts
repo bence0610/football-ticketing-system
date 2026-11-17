@@ -100,6 +100,8 @@ export const envValidationSchema = Joi.object({
   LOYALTY_SEASON_PASS_POINTS: Joi.number().integer().min(0).default(500),
   LOYALTY_PASS_LOAN_POINTS: Joi.number().integer().min(0).default(25),
   LOYALTY_CARRYOVER_PERCENT: Joi.number().integer().min(0).max(100).default(70),
+  // The tier discount applies to at most this many tickets per buyer per match (the rest is full price).
+  LOYALTY_DISCOUNT_TICKETS_PER_MATCH: Joi.number().integer().min(0).default(2),
 
   // Cron
   LOAN_RELEASE_CRON: Joi.string().default('0 * * * *'),

@@ -8,6 +8,8 @@ export interface LoyaltyConfig {
   seasonPassPoints: number;
   passLoanPoints: number;
   carryoverPercent: number;
+  /** The tier discount applies to at most this many tickets per buyer per match. */
+  discountTicketLimit: number;
 }
 
 export default registerAs(
@@ -24,5 +26,6 @@ export default registerAs(
     seasonPassPoints: parseInt(process.env.LOYALTY_SEASON_PASS_POINTS ?? '500', 10),
     passLoanPoints: parseInt(process.env.LOYALTY_PASS_LOAN_POINTS ?? '25', 10),
     carryoverPercent: parseInt(process.env.LOYALTY_CARRYOVER_PERCENT ?? '70', 10),
+    discountTicketLimit: parseInt(process.env.LOYALTY_DISCOUNT_TICKETS_PER_MATCH ?? '2', 10),
   }),
 );

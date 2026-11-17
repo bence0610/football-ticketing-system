@@ -7,7 +7,9 @@ import {
   LoyaltyTransaction,
   LoyaltyTransactionSource,
   Match,
+  MatchStatus,
   Seat,
+  SeatCategory,
   Ticket,
   User,
   UserRole,
@@ -356,5 +358,165 @@ describe('Loyalty tier discount (E2E)', () => {
     // The DTO whitelist rejects unknown fields; either way the server never uses them.
     expect(response.status).toBe(400);
     expect(ctx.stripeStub.paymentIntentsCreateMock).not.toHaveBeenCalled();
+  });
+  /* ------------------- the discount reaches 2 tickets per buyer per match ------------------- */
+
+  describe('the discount is limited to 2 tickets per buyer per match', () => {
+    let extra: Seat[] = [];
+
+    beforeEach(async () => {
+      const repo = ctx.dataSource.getRepository(Seat);
+      extra = [];
+      for (let n = 3; n <= 8; n += 1) {
+        extra.push(
+          await repo.save(
+            repo.create({
+              section: 'A',
+              row: '1',
+              number: n,
+              category: SeatCategory.STANDARD,
+              priceModifier: '1.00',
+              isAccessible: false,
+              isActive: true,
+            }),
+          ),
+        );
+      }
+    });
+
+    interface Line {
+      seatId: string;
+      price: number;
+      discounted: boolean;
+      paidPrice: number;
+    }
+    interface LimitedIntent extends IntentBody {
+      lineItems: Line[];
+      discountedTickets: number;
+      discountLimit: number;
+    }
+
+    async function order(buyer: Buyer, seats: Seat[]): Promise<LimitedIntent> {
+      const tokens: string[] = [];
+      for (const seat of seats) tokens.push(await lock(buyer, seat.id));
+      const response = await request(server)
+        .post('/api/payments/create-intent')
+        .set('Authorization', `Bearer ${buyer.accessToken}`)
+        .send({
+          matchId: match.id,
+          seats: seats.map((seat, i) => ({ seatId: seat.id, ownerToken: tokens[i] })),
+        });
+      expect(response.status).toBe(201);
+      return response.body as LimitedIntent;
+    }
+
+    it('a Legenda buying 4 tickets gets the discount on 2, and the checkout says which', async () => {
+      const buyer = await registerBuyer(LoyaltyTier.PLATINUM, 2500);
+      const intent = await order(buyer, extra.slice(0, 4));
+
+      expect(intent.discountLimit).toBe(2);
+      expect(intent.discountedTickets).toBe(2);
+      expect(intent.lineItems.map((l) => l.discounted)).toEqual([true, true, false, false]);
+      // 4 x 3,333 list; 15% off the first two only: round(6,666 x 0.15) = 1,000
+      expect(intent.subtotal).toBe(4 * 3333);
+      expect(intent.discountAmount).toBe(1000);
+      expect(intent.amount).toBe(4 * 3333 - 1000);
+      expect(intent.lineItems[2].paidPrice).toBe(3333);
+      expect(intent.lineItems[3].paidPrice).toBe(3333);
+      expect(sum(intent.lineItems.map((l) => l.paidPrice))).toBe(intent.amount);
+
+      // what is recorded on the tickets is what was charged, per ticket
+      await confirm(buyer, intent.paymentIntentId);
+      const tickets = await ctx.dataSource
+        .getRepository(Ticket)
+        .find({ where: { stripePaymentIntentId: intent.paymentIntentId } });
+      expect(tickets).toHaveLength(4);
+      expect(sum(tickets.map((t) => Number(t.pricePaid)))).toBe(intent.amount);
+      expect(tickets.filter((t) => Number(t.pricePaid) < 3333)).toHaveLength(2);
+    });
+
+    it('a second order for the same match, after paying the first, gets no discount', async () => {
+      const buyer = await registerBuyer(LoyaltyTier.PLATINUM, 2500);
+      const first = await order(buyer, extra.slice(0, 2));
+      expect(first.discountedTickets).toBe(2);
+      await confirm(buyer, first.paymentIntentId);
+
+      const second = await order(buyer, extra.slice(2, 4));
+      expect(second.discountedTickets).toBe(0);
+      expect(second.discountAmount).toBe(0);
+      expect(second.lineItems.every((l) => !l.discounted)).toBe(true);
+      expect(second.amount).toBe(2 * 3333);
+    });
+
+    it('a second order opened before the first is paid does not get the places again either', async () => {
+      const buyer = await registerBuyer(LoyaltyTier.PLATINUM, 2500);
+      const first = await order(buyer, extra.slice(0, 2));
+      const second = await order(buyer, extra.slice(2, 4));
+      expect(first.discountedTickets).toBe(2);
+      expect(second.discountedTickets).toBe(0);
+      expect(second.amount).toBe(2 * 3333);
+    });
+
+    it('with one ticket already bought, one more gets the discount', async () => {
+      const buyer = await registerBuyer(LoyaltyTier.PLATINUM, 2500);
+      const first = await order(buyer, extra.slice(0, 1));
+      await confirm(buyer, first.paymentIntentId);
+      const second = await order(buyer, extra.slice(1, 4));
+      expect(second.lineItems.map((l) => l.discounted)).toEqual([true, false, false]);
+    });
+
+    it('opening the same order again (same locks) does not count against itself', async () => {
+      const buyer = await registerBuyer(LoyaltyTier.PLATINUM, 2500);
+      const seats = extra.slice(0, 2);
+      const tokens = [await lock(buyer, seats[0].id), await lock(buyer, seats[1].id)];
+      const body = {
+        matchId: match.id,
+        seats: seats.map((seat, i) => ({ seatId: seat.id, ownerToken: tokens[i] })),
+      };
+      const call = () =>
+        request(server)
+          .post('/api/payments/create-intent')
+          .set('Authorization', `Bearer ${buyer.accessToken}`)
+          .send(body);
+      const one = await call();
+      const two = await call();
+      expect(one.body.discountedTickets).toBe(2);
+      expect(two.body.discountedTickets).toBe(2);
+      expect(two.body.paymentIntentId).toBe(one.body.paymentIntentId);
+    });
+
+    it('another match is counted separately', async () => {
+      const buyer = await registerBuyer(LoyaltyTier.PLATINUM, 2500);
+      const first = await order(buyer, extra.slice(0, 2));
+      await confirm(buyer, first.paymentIntentId);
+
+      const other = await ctx.dataSource.getRepository(Match).save(
+        ctx.dataSource.getRepository(Match).create({
+          homeTeam: 'Kecskeméti TE',
+          awayTeam: 'Másik FC',
+          competition: match.competition,
+          venue: 'Széktói Stadion',
+          kickoffAt: new Date(Date.now() + 14 * 86_400_000),
+          status: MatchStatus.ON_SALE,
+          capacity: 10,
+          basePrice: '3333.00',
+          isSeasonPassEligible: false,
+        }),
+      );
+      const seat = extra[5];
+      const lockRes = await request(server)
+        .post(`/api/matches/${other.id}/seats/${seat.id}/lock`)
+        .set('Authorization', `Bearer ${buyer.accessToken}`);
+      expect(lockRes.status).toBe(201);
+      const intent = await request(server)
+        .post('/api/payments/create-intent')
+        .set('Authorization', `Bearer ${buyer.accessToken}`)
+        .send({
+          matchId: other.id,
+          seats: [{ seatId: seat.id, ownerToken: lockRes.body.ownerToken }],
+        });
+      expect(intent.status).toBe(201);
+      expect(intent.body.discountedTickets).toBe(1);
+    });
   });
 });

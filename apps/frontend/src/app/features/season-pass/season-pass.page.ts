@@ -491,7 +491,7 @@ interface HeldSeat {
           @if (season(); as s) {
             <li>
               <mat-icon aria-hidden="true">stars</mat-icon>
-              <span>+{{ s.loyaltyPoints }} hűségpont a bérlet megvásárlásakor.</span>
+              <span>+{{ s.loyaltyPoints }} hűségpont a bérlet birtokosának (a vevő nem kap pontot, ha másnak veszi).</span>
             </li>
           }
         </ul>

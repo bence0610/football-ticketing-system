@@ -47,6 +47,8 @@ export interface LoyaltyEarningRules {
   passLoanPoints: number;
   /** Share of the balance kept at the season-end conversion (0-100). */
   carryoverPercent: number;
+  /** The tier discount applies to at most this many tickets per buyer per match. */
+  discountTicketLimit?: number;
 }
 
 export interface LoyaltySnapshotResponse {

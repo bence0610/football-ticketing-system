@@ -5,6 +5,7 @@ import type { Response as SupertestResponse } from 'supertest';
 import { Server } from 'http';
 import {
   Competition,
+  LoyaltyTier,
   LoyaltyTransaction,
   LoyaltyTransactionSource,
   Match,
@@ -17,6 +18,7 @@ import {
   Ticket,
   TicketSource,
   TicketStatus,
+  User,
 } from '../src/database/entities';
 import { RedisKeys } from '../src/redis/redis.constants';
 import { closeTestApp, createTestApp, TestContext } from './helpers/app.helper';
@@ -632,6 +634,69 @@ describe('Season-pass seat choice (E2E)', () => {
       expect(own.holderUserId).toBe(buyer.userId);
       expect(own.holderName).toBe('Kovács Péter');
       expect(own.seatId).toBe(seats[0].id);
+    });
+  });
+
+  describe('who earns the season-pass points: the holder, not the buyer', () => {
+    const passRows = (userId: string): Promise<LoyaltyTransaction[]> =>
+      ctx.dataSource.getRepository(LoyaltyTransaction).find({
+        where: { userId, source: LoyaltyTransactionSource.SEASON_PASS_PURCHASE },
+      });
+    const pointsOf = async (userId: string): Promise<number> =>
+      (await ctx.dataSource.getRepository(User).findOneByOrFail({ id: userId })).loyaltyPoints;
+
+    it('a pass bought for an account holder credits the holder, not the buyer', async () => {
+      const { seats } = await seedTier('upper', 2);
+      const buyer = await registerFan('payer3');
+      const partner = await registerFan('partner3');
+      const before = await pointsOf(buyer.userId);
+
+      const pass = await buyPass(buyer, 'upper', seats[0], { holderEmail: partner.email });
+      expect(pass.holderUserId).toBe(partner.userId);
+
+      const theirs = await passRows(partner.userId);
+      expect(theirs).toHaveLength(1);
+      expect(theirs[0].points).toBe(500);
+      expect(theirs[0].referenceId).toBe(`season_pass:${pass.id}`);
+      expect(await passRows(buyer.userId)).toHaveLength(0);
+      expect(await pointsOf(buyer.userId)).toBe(before);
+    });
+
+    it('a pass for a name-only holder credits nobody', async () => {
+      const { seats } = await seedTier('upper', 2);
+      const buyer = await registerFan('payer4');
+      const pass = await buyPass(buyer, 'upper', seats[0], { holderName: 'Kovács Bence' });
+      expect(pass.holderUserId).toBeNull();
+
+      const rows = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
+        where: { source: LoyaltyTransactionSource.SEASON_PASS_PURCHASE },
+      });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('five passes for name-only holders leave the buyer’s points unchanged', async () => {
+      const { seats } = await seedTier('upper', 5);
+      const buyer = await registerFan('payer5');
+      const before = await pointsOf(buyer.userId);
+      for (let i = 0; i < 5; i += 1) {
+        await buyPass(buyer, 'upper', seats[i], { holderName: `Vendég ${i + 1}` });
+      }
+      expect(await pointsOf(buyer.userId)).toBe(before);
+      expect(await passRows(buyer.userId)).toHaveLength(0);
+      const buyerRow = await ctx.dataSource
+        .getRepository(User)
+        .findOneByOrFail({ id: buyer.userId });
+      expect(buyerRow.loyaltyTier).toBe(LoyaltyTier.BRONZE);
+    });
+
+    it('a pass the buyer holds themself credits them', async () => {
+      const { seats } = await seedTier('upper', 2);
+      const buyer = await registerFan('payer6');
+      const pass = await buyPass(buyer, 'upper', seats[0]);
+      expect(pass.holderUserId).toBe(buyer.userId);
+      const rows = await passRows(buyer.userId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].points).toBe(500);
     });
   });
 });

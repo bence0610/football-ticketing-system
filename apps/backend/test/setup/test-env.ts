@@ -47,6 +47,7 @@ export const TEST_ENV: Readonly<Record<string, string>> = Object.freeze({
   LOYALTY_SEASON_PASS_POINTS: '500',
   LOYALTY_PASS_LOAN_POINTS: '25',
   LOYALTY_CARRYOVER_PERCENT: '70',
+  LOYALTY_DISCOUNT_TICKETS_PER_MATCH: '2',
 
   STRIPE_SECRET_KEY: 'sk_test_placeholder_for_e2e_tests',
   STRIPE_WEBHOOK_SECRET: TEST_WEBHOOK_SECRET,

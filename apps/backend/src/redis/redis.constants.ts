@@ -21,6 +21,11 @@ export const RedisKeys = {
   // Payments — confirmation email idempotency lock
   emailConfirmLock: (paymentIntentId: string, userId: string): string =>
     `email:confirm-lock:${paymentIntentId}:${userId}`,
+  // Tier discount: tickets of one buyer for one match whose payment is still open and that already
+  // use up discounted places (hash: intent digest -> discounted ticket count). Without it a buyer
+  // could open several payments at once, none of them yet counted as bought tickets.
+  discountInFlight: (matchId: string, userId: string): string =>
+    `discount-inflight:${matchId}:${userId}`,
   // Season-pass purchase — per-attempt idempotency record (TTL 300 s)
   // `holderKey` identifies who the pass is for, so buying for several holders
   // in one section yields separate attempts (and separate PaymentIntents).

@@ -176,8 +176,13 @@ const LEDGER_PAGE = 50;
                   Szezonzáráskor (június 30.) a pontjaid {{ e.carryoverPercent }}%-a marad meg, a többi lejár.
                   A szezon közben elért szintedet a következő szezon végéig megtartod, akkor is, ha a pontjaid a határ alá csökkennek.
                 </p>
+                @if (e.discountTicketLimit) {
+                  <p class="card__fine" data-testid="loyalty-discount-limit">
+                    A szinted kedvezménye meccsenként legfeljebb {{ e.discountTicketLimit }} jegyre jár, a már megvett jegyeidet is beleszámolva; a további jegyek teljes áron vannak. A fizetésnél látod, melyik jegy kapta a kedvezményt.
+                  </p>
+                }
                 <p class="card__fine">
-                  A jegyvásárlás pontjait a fizetés megerősítésekor írjuk jóvá, a belépés ehhez nem szükséges.
+                  A jegyvásárlás nem ad pontot: a részvétel pontját a kapunál, az első beolvasott belépő után írjuk jóvá.
                 </p>
               </section>
             }

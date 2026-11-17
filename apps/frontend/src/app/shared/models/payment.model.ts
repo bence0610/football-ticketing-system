@@ -3,7 +3,12 @@ export interface PaymentIntentSeatLine {
   readonly section: string;
   readonly row: string;
   readonly seatNumber: number;
+  /** List price. */
   readonly price: number;
+  /** Did the server give this ticket the tier discount? (Limited to a few tickets per buyer per match.) */
+  readonly discounted: boolean;
+  /** What is charged for this ticket, after the discount. */
+  readonly paidPrice: number;
 }
 
 export interface PaymentIntentResponse {
@@ -19,6 +24,10 @@ export interface PaymentIntentResponse {
   /** HUF taken off the subtotal by the server. */
   readonly discountAmount: number;
   readonly lineItems: readonly PaymentIntentSeatLine[];
+  /** How many tickets of this payment got the discount. */
+  readonly discountedTickets: number;
+  /** The discount applies to at most this many tickets per buyer per match (already bought ones count). */
+  readonly discountLimit: number;
 }
 
 export interface CreatePaymentIntentRequest {

@@ -358,7 +358,7 @@ export function buildSchedule(
  * The home matches of the seasons before last season, `count` of them, as copies of last season's
  * shifted back 52 weeks at a time. Loyalty measures attendance and a person can earn at most
  * about 1,300 points a season (a pass and every home match), so reaching KTE Legenda by attending
- * takes three seasons: this is the history of the one account that has done that.
+ * takes four seasons: this is the history of the one account that has done that.
  */
 export function olderSeasons(
   previous: readonly MatchPlan[],

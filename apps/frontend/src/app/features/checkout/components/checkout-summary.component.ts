@@ -42,7 +42,16 @@ import { seatDescription } from '../../cart/logic/cart-logic';
 
       <ul class="summary__lines">
         <li *ngFor="let item of items" class="summary__line" data-testid="summary-seat">
-          <span>{{ describe(item) }}</span>
+          <span>
+            {{ describe(item) }}
+            <small
+              *ngIf="discount"
+              class="summary__tag"
+              [class.summary__tag--on]="isDiscounted(item)"
+              [attr.data-testid]="isDiscounted(item) ? 'seat-discounted' : 'seat-full-price'"
+              >{{ isDiscounted(item) ? 'kedvezményes' : 'teljes ár' }}</small
+            >
+          </span>
           <span class="summary__price">{{ item.price | hufCurrency }}</span>
         </li>
       </ul>
@@ -187,6 +196,22 @@ import { seatDescription } from '../../cart/logic/cart-logic';
         color: var(--muted);
       }
 
+      .summary__tag {
+        margin-left: 6px;
+        padding: 1px 7px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+
+      .summary__tag--on {
+        border-color: var(--tier-pill-border, var(--brand-mid));
+        background: var(--tier-pill-bg, var(--brand-tint));
+        color: var(--tier-pill-fg, var(--brand-deep));
+      }
+
       .summary__points {
         margin: 0;
         display: flex;
@@ -218,6 +243,13 @@ export class CheckoutSummaryComponent {
   @Input() subtotal: number | null = null;
   @Input() discount: TierDiscount | null = null;
   @Input() total: number | null = null;
+  /** The seats the server gave the tier discount (the rest are full price). */
+  @Input() discountedSeatIds: readonly string[] = [];
+
+  protected isDiscounted(item: CartItem): boolean {
+    return this.discountedSeatIds.includes(item.seatId);
+  }
+
   /** Points for attending a match (once per match); null when unknown. */
   @Input() points: number | null = null;
   @Input() processing = false;

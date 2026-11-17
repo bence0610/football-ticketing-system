@@ -1106,10 +1106,19 @@ export class SeasonPassesService {
     }
   }
 
+  /**
+   * The pass points go to the pass HOLDER's account, not to whoever paid: loyalty rewards the
+   * person who has the pass, and crediting the buyer would let anyone mint a tier by buying many
+   * passes for holders without an account (the one-pass-per-holder rule only binds holders with
+   * one). A pass for a name-only holder (a child, a guest) credits nobody.
+   */
   private async awardSeasonPassLoyalty(pass: SeasonPass): Promise<void> {
+    if (!pass.holderUserId) {
+      return;
+    }
     try {
       await this.loyaltyService.award({
-        userId: pass.userId,
+        userId: pass.holderUserId,
         type: LoyaltyTransactionType.EARN,
         source: LoyaltyTransactionSource.SEASON_PASS_PURCHASE,
         points: this.loyaltyConfig.seasonPassPoints,

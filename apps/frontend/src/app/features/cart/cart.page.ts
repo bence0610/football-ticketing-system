@@ -19,7 +19,7 @@ import { CartEmptyComponent, SectorHighlight } from './components/cart-empty.com
 import { CartExpiredCardComponent } from './components/cart-expired-card.component';
 import { CartMatchCardComponent } from './components/cart-match-card.component';
 import { CartDiscount, CartSummaryComponent } from './components/cart-summary.component';
-import { discountAmount, groupByMatch, shortestHoldMs } from './logic/cart-logic';
+import { groupByMatch, limitedDiscountAmount, shortestHoldMs } from './logic/cart-logic';
 
 @Component({
   selector: 'kte-cart-page',
@@ -209,11 +209,13 @@ export class CartPageComponent implements OnInit {
     if (!s || s.tier.discountPercent <= 0) {
       return null;
     }
+    const limit = s.earning?.discountTicketLimit ?? null;
     return {
       tier: s.tier.tier,
       label: s.tier.label,
       percent: s.tier.discountPercent,
-      amount: discountAmount(this.subtotal(), s.tier.discountPercent),
+      amount: limitedDiscountAmount(this.cart.items(), s.tier.discountPercent, limit),
+      limit,
     };
   });
 

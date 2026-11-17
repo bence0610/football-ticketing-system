@@ -1,3 +1,4 @@
+import { NgIf } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { LoyaltyTier } from '../../../core/models/loyalty.models';
@@ -9,6 +10,8 @@ export interface TierDiscount {
   readonly percent: number;
   /** Forints deducted. */
   readonly amount: number;
+  /** The discount applies to at most this many tickets per match; null when unknown. */
+  readonly limit?: number | null;
 }
 
 /**
@@ -20,7 +23,7 @@ export interface TierDiscount {
   selector: 'kte-tier-discount-row',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconModule, HufCurrencyPipe],
+  imports: [NgIf, MatIconModule, HufCurrencyPipe],
   template: `
     <div class="row" [attr.data-tier]="discount.tier" data-testid="summary-discount">
       <span class="row__label">
@@ -29,6 +32,10 @@ export interface TierDiscount {
       </span>
       <strong>−{{ discount.amount | hufCurrency }}</strong>
     </div>
+    <p class="limit" *ngIf="discount.limit" data-testid="discount-limit">
+      A kedvezmény meccsenként legfeljebb {{ discount.limit }} jegyre jár (a már megvett jegyeket is
+      beleszámolva), a többi jegy teljes áron megy.
+    </p>
   `,
   styles: [
     `
@@ -48,6 +55,12 @@ export interface TierDiscount {
         color: var(--tier-pill-fg);
         font-size: 14px;
         font-weight: 600;
+      }
+
+      .limit {
+        margin: 6px 2px 0;
+        font-size: 12.5px;
+        color: var(--muted);
       }
 
       .row__label {

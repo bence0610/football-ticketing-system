@@ -13,8 +13,17 @@ export class PaymentIntentSeatLineDto {
   @ApiProperty()
   seatNumber!: number;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Listaár.' })
   price!: number;
+
+  @ApiProperty({
+    description:
+      'Kapott-e kedvezményt ez a jegy. A kedvezmény meccsenként és vevőnként legfeljebb `discountLimit` jegyre jár (a már megvett jegyeket is beleszámolva); a többi jegy teljes áron megy.',
+  })
+  discounted!: boolean;
+
+  @ApiProperty({ description: 'A jegyért ténylegesen fizetendő összeg (kedvezmény után).' })
+  paidPrice!: number;
 }
 
 export class PaymentIntentResponseDto {
@@ -59,4 +68,13 @@ export class PaymentIntentResponseDto {
     example: 700,
   })
   discountAmount!: number;
+
+  @ApiProperty({ description: 'Hány jegy kapott kedvezményt ebben a fizetésben.', example: 2 })
+  discountedTickets!: number;
+
+  @ApiProperty({
+    description: 'Legfeljebb ennyi jegyre jár a kedvezmény meccsenként és vevőnként.',
+    example: 2,
+  })
+  discountLimit!: number;
 }

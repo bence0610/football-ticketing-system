@@ -173,7 +173,7 @@ export class SeasonPassesController {
 
   @Get('season')
   @ApiOperation({
-    summary: 'Az aktív szezon hazai mérkőzései és a bérletvásárlás hűségpontja',
+    summary: 'Az aktív szezon hazai mérkőzései és a bérletvásárlás hűségpontja (a birtokosé)',
   })
   @ApiOkResponse({ type: SeasonOverviewDto })
   async getSeasonOverview(): Promise<SeasonOverviewDto> {

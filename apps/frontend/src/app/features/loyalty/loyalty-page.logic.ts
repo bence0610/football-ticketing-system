@@ -71,7 +71,12 @@ export function earningRules(rules: LoyaltyEarningRules): readonly EarningRule[]
       detail:
         'meccsenként egyszer, jeggyel vagy bérlettel: az első beolvasott belépő után jár, akárhány jegyed van arra a meccsre. Kölcsönkapott belépővel is jár; jegyvásárlásért nem jár pont, a fix összeg nem függ a jegy árától',
     },
-    { label: 'Bérletvásárlás', amount: `+${points(rules.seasonPassPoints)}` },
+    {
+      label: 'Bérletvásárlás',
+      amount: `+${points(rules.seasonPassPoints)}`,
+      detail:
+        'a bérlet birtokosának jár, nem a vevőnek; ha a birtokosnak nincs fiókja (gyerek, vendég), senki nem kapja',
+    },
     {
       label: 'Bérlet kölcsönadása',
       amount: `+${points(rules.passLoanPoints)}`,

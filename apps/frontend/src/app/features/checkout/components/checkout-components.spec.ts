@@ -119,6 +119,31 @@ describe('CheckoutSummaryComponent', () => {
     expect(el.querySelector('[data-testid="summary-points"]')).toBeNull();
   });
 
+  it('shows which seats got the discount and which are full price, and the limit', () => {
+    const items = [
+      item({ seatId: 'a', seatNumber: 1 }),
+      item({ seatId: 'b', seatNumber: 2 }),
+      item({ seatId: 'c', seatNumber: 3 }),
+      item({ seatId: 'd', seatNumber: 4 }),
+    ];
+    const el = render({
+      items,
+      discount: { tier: 'platinum', label: 'KTE Legenda', percent: 15, amount: 1575, limit: 2 },
+      discountedSeatIds: ['a', 'b'],
+    }).nativeElement as HTMLElement;
+    expect(el.querySelectorAll('[data-testid="seat-discounted"]').length).toBe(2);
+    expect(el.querySelectorAll('[data-testid="seat-full-price"]').length).toBe(2);
+    expect(el.querySelector('[data-testid="discount-limit"]')?.textContent).toContain(
+      'meccsenként legfeljebb 2 jegyre jár',
+    );
+  });
+
+  it('tags no seat when there is no discount', () => {
+    const el = render({ items: [item({ seatId: 'a' })], discount: null }).nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="seat-discounted"]')).toBeNull();
+    expect(el.querySelector('[data-testid="seat-full-price"]')).toBeNull();
+  });
+
   it('the pay button is disabled until payment can start', () => {
     const btn = (render({ canPay: false }).nativeElement as HTMLElement).querySelector('.summary__pay') as HTMLButtonElement;
     expect(btn.disabled).toBeTrue();

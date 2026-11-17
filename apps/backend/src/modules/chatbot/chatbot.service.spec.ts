@@ -49,6 +49,7 @@ const SNAPSHOT: ChatbotContextSnapshot = {
       passLoan: 25,
     },
     carryoverPercent: 50,
+    discountTicketLimit: 2,
   },
   upcomingMatches: [
     {

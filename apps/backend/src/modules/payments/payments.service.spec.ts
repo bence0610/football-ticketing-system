@@ -22,11 +22,20 @@ describe('PaymentsService', () => {
   const mockTicketRepo = {
     find: jest.fn(),
     findOne: jest.fn(),
+    count: jest.fn().mockResolvedValue(0),
     createQueryBuilder: jest.fn(),
   };
   const mockMatchRepo = { findOne: jest.fn() };
   const mockSeatRepo = { find: jest.fn() };
-  const mockRedis = { del: jest.fn(), set: jest.fn(), get: jest.fn() };
+  const mockRedis = {
+    del: jest.fn(),
+    set: jest.fn(),
+    get: jest.fn(),
+    hgetall: jest.fn().mockResolvedValue({}),
+    hset: jest.fn(),
+    hdel: jest.fn().mockResolvedValue(1),
+    expire: jest.fn(),
+  };
   const mockSeatsService = { resolveAvailabilityForSeats: jest.fn() };
   const mockStripe = {
     paymentIntents: { create: jest.fn(), retrieve: jest.fn() },
@@ -56,7 +65,7 @@ describe('PaymentsService', () => {
     getOrThrow: jest.fn().mockImplementation((key: string) => {
       if (key === 'app') return { homeTeamName: 'KTE' };
       if (key === 'stripe') return { currency: 'HUF', webhookSecret: 'whsec_test' };
-      if (key === 'loyalty') return { ticketPointsPerTicket: 10 };
+      if (key === 'loyalty') return { attendancePoints: 10, discountTicketLimit: 2 };
       if (key === 'mail') return { retryDelayMs: 3000, baseUrl: 'http://localhost:4200' };
       throw new Error(`Unexpected config key: ${key}`);
     }),
@@ -331,7 +340,7 @@ describe('PaymentsService', () => {
         const [params, options] = mockStripe.paymentIntents.create.mock.calls[0];
         expect(params.amount).toBe(7083 * 100);
         expect(params.metadata.discountPercent).toBe('15');
-        expect(options.idempotencyKey).toMatch(/_d15$/);
+        expect(options.idempotencyKey).toMatch(/_d15_n2$/);
         expect(result.amount).toBe(7083);
         expect(result.discountPercent).toBe(15);
         expect(result.discountAmount).toBe(1250);
@@ -350,7 +359,7 @@ describe('PaymentsService', () => {
         const [params, options] = mockStripe.paymentIntents.create.mock.calls[0];
         expect(params.amount).toBe(8333 * 100);
         expect(params.metadata.discountPercent).toBe('0');
-        expect(options.idempotencyKey).toMatch(/_d0$/);
+        expect(options.idempotencyKey).toMatch(/_d0_n0$/);
         expect(result.amount).toBe(8333);
         expect(result.discountAmount).toBe(0);
       });
@@ -367,7 +376,7 @@ describe('PaymentsService', () => {
           >
         ).map((c) => c[1].idempotencyKey);
         expect(keys[0]).not.toBe(keys[1]);
-        expect(keys[0].replace(/_d\d+$/, '')).toBe(keys[1].replace(/_d\d+$/, ''));
+        expect(keys[0].replace(/_d\d+_n\d+$/, '')).toBe(keys[1].replace(/_d\d+_n\d+$/, ''));
       });
     });
 

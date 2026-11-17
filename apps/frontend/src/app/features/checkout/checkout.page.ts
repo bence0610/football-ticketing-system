@@ -146,6 +146,7 @@ const MAX_RETRY_ATTEMPTS = 3;
               [venue]="venue()"
               [subtotal]="subtotal()"
               [discount]="discount()"
+              [discountedSeatIds]="discountedSeatIds()"
               [total]="total()"
               [points]="points()"
               [processing]="processing()"
@@ -401,10 +402,19 @@ export class CheckoutPageComponent implements AfterViewInit, OnDestroy {
       label: s.tier.label,
       percent: i.discountPercent,
       amount: i.discountAmount,
+      limit: i.discountLimit,
     };
   });
 
   protected readonly total = computed<number | null>(() => this.intent()?.amount ?? null);
+
+  /** The seats the server gave the discount (the first ones of the order, up to the limit). */
+  protected readonly discountedSeatIds = computed<readonly string[]>(
+    () =>
+      this.intent()
+        ?.lineItems.filter((l) => l.discounted)
+        .map((l) => l.seatId) ?? [],
+  );
 
   /** Points for attending a match (once per match), from /loyalty/me. */
   protected readonly points = computed(() => this.snapshot()?.earning?.attendancePoints ?? null);

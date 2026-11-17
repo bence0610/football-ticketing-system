@@ -64,3 +64,33 @@ export function allocateDiscount(prices: readonly number[], percent: number): Di
   const discounts = lines.map((p, i) => p - cuts[i]);
   return { discounts, total: sum - discountTotal, discountTotal };
 }
+
+export interface LimitedDiscountAllocation extends DiscountAllocation {
+  /** Per line, same order as the input: did this ticket get the discount? */
+  readonly discounted: boolean[];
+}
+
+/**
+ * The tier discount, limited to the first `discountedCount` lines (in the order given); every
+ * further line is full price. The discount is computed once on the subtotal of the discounted
+ * lines, exactly as {@link allocateDiscount} does for a whole order. `discountedCount` is how many
+ * more tickets the buyer may still get the discount on for this match (the limit minus the tickets
+ * already bought), decided by the server, never by the client.
+ */
+export function allocateLimitedDiscount(
+  prices: readonly number[],
+  percent: number,
+  discountedCount: number,
+): LimitedDiscountAllocation {
+  const allowed = Math.max(0, Math.floor(Number.isFinite(discountedCount) ? discountedCount : 0));
+  const lines = prices.map((p) => (Number.isFinite(p) && p > 0 ? Math.round(p) : 0));
+  const head = allocateDiscount(lines.slice(0, allowed), percent);
+  const discounts = [...head.discounts, ...lines.slice(allowed)];
+  const sum = lines.reduce((acc, p) => acc + p, 0);
+  return {
+    discounts,
+    total: head.total + lines.slice(allowed).reduce((acc, p) => acc + p, 0),
+    discountTotal: head.discountTotal,
+    discounted: lines.map((p, i) => i < allowed && head.discountTotal > 0 && p > 0 && sum > 0),
+  };
+}

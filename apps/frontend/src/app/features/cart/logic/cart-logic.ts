@@ -77,6 +77,32 @@ export function ticketTypeLabel(category: SeatCategory): string {
   return TICKET_TYPES[category] ?? 'Jegy';
 }
 
+/**
+ * The loyalty discount of a cart, the way the server will grant it: per match, only the first
+ * `limit` tickets (in cart order) get the discount, the rest are full price. The cart cannot know
+ * tickets the user bought earlier for the same match, so this is an upper bound: checkout shows the
+ * real figure from the server. Without a limit (an older server) every ticket counts.
+ */
+export function limitedDiscountAmount(
+  items: readonly CartItem[],
+  percent: number,
+  limit: number | null | undefined,
+): number {
+  const perMatch = new Map<string, number[]>();
+  for (const item of items) {
+    perMatch.set(item.matchId, [...(perMatch.get(item.matchId) ?? []), item.price]);
+  }
+  let total = 0;
+  for (const prices of perMatch.values()) {
+    const eligible = limit == null ? prices : prices.slice(0, Math.max(0, limit));
+    total += discountAmount(
+      eligible.reduce((sum, p) => sum + p, 0),
+      percent,
+    );
+  }
+  return total;
+}
+
 /** Loyalty discount in whole forints, rounded the way checkout rounds it. */
 export function discountAmount(subtotal: number, percent: number): number {
   return Math.round((subtotal * percent) / 100);

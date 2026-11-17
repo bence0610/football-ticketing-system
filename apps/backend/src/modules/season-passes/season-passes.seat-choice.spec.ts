@@ -464,7 +464,12 @@ describe('Season pass: the buyer chooses the seat', () => {
       const h = harness();
       h.passFindOne
         .mockResolvedValueOnce(null) // idempotency check: not there yet
-        .mockResolvedValueOnce({ id: 'pass-winner', userId: 'u1', seatId: SEAT }); // after the dup
+        .mockResolvedValueOnce({
+          id: 'pass-winner',
+          userId: 'u1',
+          holderUserId: 'u1',
+          seatId: SEAT,
+        }); // after the dup
       h.save.mockRejectedValueOnce(dupError('uq_season_passes_seat_season'));
       await h.service.finalizeSeasonPassFromIntent(intent());
       expect(h.refund).not.toHaveBeenCalled();

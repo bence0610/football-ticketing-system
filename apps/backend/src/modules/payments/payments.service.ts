@@ -30,7 +30,11 @@ import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import { EmailService } from '../email/email.service';
 import { matchSubject } from '../email/email-subject';
-import { allocateDiscount, normalizeDiscountPercent } from '../loyalty/loyalty-discount';
+import {
+  allocateDiscount,
+  allocateLimitedDiscount,
+  normalizeDiscountPercent,
+} from '../loyalty/loyalty-discount';
 import { definitionFor } from '../loyalty/loyalty.constants';
 import { SeatAvailability } from '../seats/dto';
 import { SeatsService } from '../seats/seats.service';
@@ -114,9 +118,18 @@ export class PaymentsService {
     // the same rounding as the cart. The percent travels in the intent
     // metadata so finalization can record the per-ticket price actually paid.
     const discountPercent = await this.discountPercentForUser(userId);
-    const allocation = allocateDiscount(
+    // The discount is limited to a few tickets per buyer per match, counting the tickets already
+    // bought for it (and the discounted tickets of payments still open): the rest is full price.
+    const ownerTokenDigest = this.digestOf(dto);
+    const discountLimit = this.loyaltyConfig.discountTicketLimit;
+    const placesLeft =
+      discountPercent > 0
+        ? await this.discountedPlacesLeft(userId, dto.matchId, ownerTokenDigest, discountLimit)
+        : 0;
+    const allocation = allocateLimitedDiscount(
       lines.map((line) => line.price),
       discountPercent,
+      placesLeft,
     );
     const totalAmount = allocation.total;
     if (totalAmount <= 0) {
@@ -128,18 +141,11 @@ export class PaymentsService {
     // → a different hash → a fresh PaymentIntent, no 24-hour Stripe block.
     // Double-clicks with the same lock tokens hash to the same value and
     // collapse to one PaymentIntent via Stripe's idempotency.
-    const ownerTokenDigest = createHash('sha256')
-      .update(
-        dto.seats
-          .map((s) => s.ownerToken)
-          .sort()
-          .join(','),
-      )
-      .digest('hex')
-      .slice(0, 16);
-    // The discount percent is part of the key: if the same lock hold is reused
-    // after a tier change, Stripe would otherwise reject the changed amount.
-    const idempotencyKey = `intent_${userId}_${dto.matchId}_${ownerTokenDigest}_d${discountPercent}`;
+    // The discount percent and the number of discounted tickets are part of the key: if the same
+    // lock hold is reused after a tier change, or after other tickets were bought, Stripe would
+    // otherwise reject the changed amount.
+    const discountedCount = allocation.discounted.filter(Boolean).length;
+    const idempotencyKey = `intent_${userId}_${dto.matchId}_${ownerTokenDigest}_d${discountPercent}_n${discountedCount}`;
 
     const stripeAmount = this.toStripeAmount(totalAmount);
     this.logger.debug(
@@ -161,6 +167,8 @@ export class PaymentsService {
           // records exactly these, so a price change between payment creation and
           // confirmation can never make the ticket disagree with the charge.
           paidPrices: allocation.discounts.join(','),
+          discountedCount: String(discountedCount),
+          discountDigest: ownerTokenDigest,
         },
         description: `KTE Jegyportál — ${match.homeTeam} vs ${match.awayTeam}`,
       },
@@ -171,12 +179,18 @@ export class PaymentsService {
       throw new ConflictException('A fizetési szándék nem hozott létre client_secret-et.');
     }
 
-    const lineItems: PaymentIntentSeatLineDto[] = lines.map(({ seat, price }) => ({
+    // Reserve the discounted places of this open payment, so a second payment opened before this
+    // one is paid cannot use them again. Released when the tickets exist (finalization).
+    await this.reserveDiscountedPlaces(userId, dto.matchId, ownerTokenDigest, discountedCount);
+
+    const lineItems: PaymentIntentSeatLineDto[] = lines.map(({ seat, price }, i) => ({
       seatId: seat.id,
       section: seat.section,
       row: seat.row,
       seatNumber: seat.number,
       price,
+      discounted: allocation.discounted[i],
+      paidPrice: allocation.discounts[i],
     }));
 
     return {
@@ -188,7 +202,77 @@ export class PaymentsService {
       lineItems,
       discountPercent,
       discountAmount: allocation.discountTotal,
+      discountedTickets: discountedCount,
+      discountLimit,
     };
+  }
+
+  /** Identifies one lock hold (the same digest the idempotency key has always used). */
+  private digestOf(dto: CreatePaymentIntentDto): string {
+    return createHash('sha256')
+      .update(
+        dto.seats
+          .map((s) => s.ownerToken)
+          .sort()
+          .join(','),
+      )
+      .digest('hex')
+      .slice(0, 16);
+  }
+
+  /**
+   * How many more tickets of this buyer may get the tier discount for this match: the limit
+   * minus the single tickets already bought for it (any ticket that occupies a seat) and the
+   * discounted tickets of the buyer's other payments that are still open. This payment's own
+   * earlier reservation (same lock hold) is not counted against itself.
+   */
+  private async discountedPlacesLeft(
+    userId: string,
+    matchId: string,
+    digest: string,
+    limit: number,
+  ): Promise<number> {
+    const bought = await this.ticketRepository.count({
+      where: {
+        userId,
+        matchId,
+        source: TicketSource.SINGLE,
+        status: In([...OCCUPYING_TICKET_STATUSES]),
+      },
+    });
+    let inFlight = 0;
+    try {
+      const open = await this.redis.hgetall(RedisKeys.discountInFlight(matchId, userId));
+      for (const [key, value] of Object.entries(open)) {
+        if (key !== digest) inFlight += Number(value) || 0;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not read open discounted places: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return Math.max(0, limit - bought - inFlight);
+  }
+
+  private async reserveDiscountedPlaces(
+    userId: string,
+    matchId: string,
+    digest: string,
+    count: number,
+  ): Promise<void> {
+    const key = RedisKeys.discountInFlight(matchId, userId);
+    try {
+      if (count > 0) {
+        await this.redis.hset(key, digest, String(count));
+        await this.redis.expire(key, 3600);
+      } else {
+        await this.redis.hdel(key, digest);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not reserve discounted places: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**
@@ -618,6 +702,14 @@ export class PaymentsService {
           error instanceof Error ? error.message : String(error)
         }`,
       );
+    }
+
+    // The tickets now exist and count against the buyer's discounted places: release the open
+    // payment's reservation so they are not counted twice.
+    if (intent.metadata.discountDigest) {
+      await this.redis
+        .hdel(RedisKeys.discountInFlight(matchId, userId), intent.metadata.discountDigest)
+        .catch(() => undefined);
     }
 
     // Buying a ticket earns no loyalty points: they are earned by entering the match (see

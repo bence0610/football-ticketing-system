@@ -234,15 +234,15 @@ const NAMED: readonly NamedSpec[] = [
     purpose: 'Arany szint: 10% kedvezmény, kedvezményes jegyárak a kosárban és a jegyeken.',
   },
   {
-    // A supporter since 2023 with a pass of their own in every season, who has been to every home match (a scanned
-    // pass entry; the cup ties with a ticket): 50 points per match, once, and 500 per pass. Three seasons of that (with the pass bought for a guest this season) is
+    // A supporter since 2022 with a pass of their own in every season, who has been to every home match (a scanned
+    // pass entry; the cup ties with a ticket): 50 points per match, once, and 500 per pass. Four seasons of that is
     // what reaching KTE Legenda by attending takes.
     key: 'legenda',
     firstName: 'Sándor',
     lastName: 'Lakatos',
     role: UserRole.FAN,
     fanClass: 'scripted',
-    createdDaysAgo: 1100,
+    createdDaysAgo: 1600,
     profileDone: true,
     forced: [scanned('cur:cup1', 1), scanned('prev:cup1', 1)],
     expectedTier: LoyaltyTier.PLATINUM,

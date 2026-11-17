@@ -140,6 +140,7 @@ export function buildFixtures(qrDataUrl: string): EmailFixture[] {
         pointsToNextTier: nextTier.minPoints - 550,
         attendancePoints,
         carryoverPercent: loyaltyConfig().carryoverPercent,
+        discountTicketLimit: loyaltyConfig().discountTicketLimit,
         loyaltyDashboardUrl: `${BASE_URL}/loyalty`,
       },
     },

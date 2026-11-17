@@ -89,7 +89,11 @@ export class LoyaltyEarningRulesDto {
   })
   attendancePoints!: number;
 
-  @ApiProperty({ example: 500 })
+  @ApiProperty({
+    example: 500,
+    description:
+      "The season-pass points go to the pass holder's account (not the buyer); a pass for a holder without an account credits nobody.",
+  })
   seasonPassPoints!: number;
 
   @ApiProperty({ example: 25 })
@@ -100,6 +104,13 @@ export class LoyaltyEarningRulesDto {
     description: 'Percent of the balance kept at the season-end conversion.',
   })
   carryoverPercent!: number;
+
+  @ApiProperty({
+    example: 2,
+    description:
+      'The tier discount applies to at most this many tickets per buyer per match, counting the ones already bought for it; further tickets are full price.',
+  })
+  discountTicketLimit!: number;
 }
 
 export class LoyaltySnapshotResponseDto {

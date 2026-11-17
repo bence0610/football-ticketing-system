@@ -65,8 +65,11 @@ export const LIFETIME_TICKET_CAP = 85;
  * previous season sells this share of what a current-season match of the same pull would.
  */
 export const PREVIOUS_SEASON_SHARE = 0.8;
-/** One season before last season: the lifelong supporter's history (two seasons cannot reach KTE Legenda by attending). */
-export const OLDER_SEASONS = 1;
+/**
+ * Two seasons before last season: the lifelong supporter's history. Three seasons are not enough to
+ * reach KTE Legenda by attending (a pass bought for a guest credits nobody), four are.
+ */
+export const OLDER_SEASONS = 2;
 /** The invitation lifetime the application uses (LOAN_INVITATION_TTL_HOURS). */
 const LOAN_TTL_HOURS = 72;
 
@@ -658,8 +661,11 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
       unitPrices: o.seats.map((s) => seatUnitPrice(o.plan.basePrice, s.priceModifier)),
     });
   }
-  for (const p of passes)
-    events.push({ kind: 'pass', userId: p.buyerId, at: p.createdAt, passId: p.id });
+  // The pass points go to the pass HOLDER's account; a pass for a holder without one credits nobody.
+  for (const p of passes) {
+    if (p.holderId)
+      events.push({ kind: 'pass', userId: p.holderId, at: p.createdAt, passId: p.id });
+  }
   // Attendance: the first time a person enters a match they earn the attendance points, once per
   // person per match. Whose entry it is: a single ticket, its buyer; a pass entry, the pass HOLDER's
   // account (a holder without one has nobody to credit); a borrowed entry, the borrower.

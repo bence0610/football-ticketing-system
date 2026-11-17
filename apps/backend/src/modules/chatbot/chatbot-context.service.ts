@@ -114,6 +114,8 @@ export interface ChatbotLoyaltySnapshot {
   };
   /** Share of the balance kept at the yearly season-end reset. */
   carryoverPercent: number;
+  /** The tier discount applies to at most this many tickets per buyer per match. */
+  discountTicketLimit: number;
 }
 
 export interface ChatbotContextSnapshot {
@@ -291,6 +293,7 @@ export class ChatbotContextService {
         passLoan: c.passLoanPoints,
       },
       carryoverPercent: c.carryoverPercent,
+      discountTicketLimit: c.discountTicketLimit,
     };
   }
 

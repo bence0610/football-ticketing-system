@@ -3,6 +3,7 @@ import {
   URGENT_BELOW_MS,
   discountAmount,
   groupByMatch,
+  limitedDiscountAmount,
   seatDescription,
   shortestHoldMs,
   ticketTypeLabel,
@@ -92,5 +93,31 @@ describe('discountAmount', () => {
     expect(discountAmount(3_500, 5)).toBe(175);
     expect(discountAmount(3_333, 5)).toBe(167);
     expect(discountAmount(5_000, 0)).toBe(0);
+  });
+});
+
+describe('limitedDiscountAmount: the discount reaches the first N tickets of each match', () => {
+  it('takes 15% off the first 2 of 4 tickets for one match', () => {
+    const items = [1, 2, 3, 4].map((n) => item({ seatId: `s${n}`, price: 3333 }));
+    expect(limitedDiscountAmount(items, 15, 2)).toBe(discountAmount(2 * 3333, 15));
+  });
+
+  it('counts each match separately', () => {
+    const items = [
+      item({ seatId: 'a', matchId: 'm1', price: 3000 }),
+      item({ seatId: 'b', matchId: 'm1', price: 3000 }),
+      item({ seatId: 'c', matchId: 'm1', price: 3000 }),
+      item({ seatId: 'd', matchId: 'm2', price: 4000 }),
+    ];
+    expect(limitedDiscountAmount(items, 10, 2)).toBe(600 + 400);
+  });
+
+  it('applies to every ticket when there is no limit (an older server)', () => {
+    const items = [1, 2, 3].map((n) => item({ seatId: `s${n}`, price: 1000 }));
+    expect(limitedDiscountAmount(items, 10, null)).toBe(300);
+  });
+
+  it('gives nothing for a limit of 0', () => {
+    expect(limitedDiscountAmount([item({ price: 1000 })], 10, 0)).toBe(0);
   });
 });

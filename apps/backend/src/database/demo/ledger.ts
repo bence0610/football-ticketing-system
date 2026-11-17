@@ -3,7 +3,7 @@ import {
   LoyaltyTransactionSource,
   LoyaltyTransactionType,
 } from '../entities/loyalty-transaction.entity';
-import { allocateDiscount } from '../../modules/loyalty/loyalty-discount';
+import { allocateLimitedDiscount } from '../../modules/loyalty/loyalty-discount';
 import { definitionFor } from '../../modules/loyalty/loyalty.constants';
 import {
   StoredTier,
@@ -29,6 +29,8 @@ export interface LoyaltyRules {
   seasonPassPoints: number;
   passLoanPoints: number;
   carryoverPercent: number;
+  /** The tier discount applies to at most this many tickets per buyer per match. */
+  discountTicketLimit: number;
 }
 
 export type LoyaltyEvent =
@@ -189,7 +191,11 @@ export function simulateLoyalty(
           break;
         case 'order': {
           const percent = definitionFor(kept.tier).discountPercent;
-          orderPrices.set(e.orderId, allocateDiscount(e.unitPrices, percent).discounts);
+          // The discount is limited to a few tickets per buyer per match (one order per match here).
+          orderPrices.set(
+            e.orderId,
+            allocateLimitedDiscount(e.unitPrices, percent, rules.discountTicketLimit).discounts,
+          );
           // Buying earns no points: only the discount depends on it (the buyer's tier right now).
           break;
         }

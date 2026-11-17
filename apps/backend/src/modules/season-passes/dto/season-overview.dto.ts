@@ -20,7 +20,8 @@ export class SeasonOverviewDto {
 
   @ApiProperty({
     example: 500,
-    description: 'A bérletvásárlásért járó hűségpont (LOYALTY_SEASON_PASS_POINTS).',
+    description:
+      'A bérletvásárlásért járó hűségpont (LOYALTY_SEASON_PASS_POINTS): a bérlet birtokosának jár, nem a vevőnek; birtokos-fiók nélkül senkinek.',
   })
   loyaltyPoints!: number;
 

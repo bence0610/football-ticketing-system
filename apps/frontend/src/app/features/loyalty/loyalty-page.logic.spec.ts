@@ -33,6 +33,13 @@ describe('earningRules', () => {
     expect(JSON.stringify(rows)).not.toMatch(/100 Ft|Ft =/);
   });
 
+  it('says the pass points go to the holder, not the buyer', () => {
+    const pass = earningRules(rules).find((r) => r.label === 'Bérletvásárlás');
+    expect(pass?.amount).toBe('+500 pont');
+    expect(pass?.detail).toContain('a bérlet birtokosának jár, nem a vevőnek');
+    expect(pass?.detail).toContain('senki nem kapja');
+  });
+
   it('follows the configuration', () => {
     const attendance = earningRules({ ...rules, attendancePoints: 80 }).find((r) => r.label === 'Részvétel');
     expect(attendance?.amount).toBe('+80 pont');

@@ -75,6 +75,8 @@ export interface LoyaltyEarningRules {
   passLoanPoints: number;
   /** Share of the balance kept at the season-end conversion (0-100). */
   carryoverPercent: number;
+  /** The tier discount applies to at most this many tickets per buyer per match. */
+  discountTicketLimit: number;
 }
 
 export interface TransactionMatch {
@@ -168,6 +170,7 @@ export class LoyaltyService {
         seasonPassPoints: this.config.seasonPassPoints,
         passLoanPoints: this.config.passLoanPoints,
         carryoverPercent: this.config.carryoverPercent,
+        discountTicketLimit: this.config.discountTicketLimit,
       },
       matchesAttended,
       totalTransactions,
@@ -352,6 +355,7 @@ export class LoyaltyService {
               : undefined,
             attendancePoints: this.config.attendancePoints,
             carryoverPercent: this.config.carryoverPercent,
+            discountTicketLimit: this.config.discountTicketLimit,
             loyaltyDashboardUrl: `${this.mailConfig.baseUrl}/loyalty`,
           },
           correlationId: `tier-upgrade:${user.id}:${newTierDefinition.tier}`,
