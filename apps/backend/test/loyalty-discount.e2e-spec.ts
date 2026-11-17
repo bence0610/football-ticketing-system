@@ -43,7 +43,6 @@ import {
 
 const PASSWORD = 'FanPass123';
 const LIST_TOTAL = 8333;
-const POINTS_PER_TICKET = 50; // LOYALTY_TICKET_POINTS_PER_TICKET default, flat per ticket
 
 interface Buyer {
   userId: string;
@@ -263,12 +262,11 @@ describe('Loyalty tier discount (E2E)', () => {
         c.total,
       );
 
-      // The discount does not touch loyalty points: flat per ticket.
-      expect(status.body.pointsCredited).toBe(2 * POINTS_PER_TICKET);
+      // Buying earns no loyalty points at all (they are earned by entering the match).
       const earned = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
         where: { userId: buyer.userId, source: LoyaltyTransactionSource.TICKET_PURCHASE },
       });
-      expect(sum(earned.map((t) => t.points))).toBe(2 * POINTS_PER_TICKET);
+      expect(earned).toHaveLength(0);
 
       expect(ctx.stripeStub.getRefunds()).toHaveLength(0);
     });

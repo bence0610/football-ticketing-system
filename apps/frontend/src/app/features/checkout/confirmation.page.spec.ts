@@ -27,7 +27,6 @@ const issued: PaymentStatusResponse = {
   ticketIds: ['t1', 't2'],
   amountPaid: 8312,
   currency: 'huf',
-  pointsCredited: 100,
   confirmationEmailSentAt: '2026-11-08T19:00:05.000Z',
   match: { id: 'm1', homeTeam: 'Kecskeméti TE', awayTeam: 'Újpest FC', venue: 'Széktói Stadion', kickoffAt: '2026-11-09T19:00:00.000Z' },
   seats: [
@@ -36,7 +35,7 @@ const issued: PaymentStatusResponse = {
   ],
 };
 const issuedUnsent: PaymentStatusResponse = { ...issued, confirmationEmailSentAt: null };
-const processing: PaymentStatusResponse = { ...issued, status: 'processing', ticketIds: [], amountPaid: 0, pointsCredited: 0, match: null, seats: [] };
+const processing: PaymentStatusResponse = { ...issued, status: 'processing', ticketIds: [], amountPaid: 0, match: null, seats: [] };
 const failed: PaymentStatusResponse = { ...processing, status: 'failed' };
 
 describe('ConfirmationPageComponent', () => {
@@ -127,7 +126,8 @@ describe('ConfirmationPageComponent', () => {
     expect(text()).toContain('Vissza a mérkőzésekhez');
     expect(el().querySelector('[data-testid="confirm-id"]')?.textContent).toContain(PI);
     expect(el().querySelector('[data-testid="confirm-amount"]')?.textContent).toMatch(/8\s?312/);
-    expect(el().querySelector('[data-testid="confirm-points"]')?.textContent).toContain('+100 pont');
+    // buying earns no points, so the confirmation does not claim any
+    expect(el().querySelector('[data-testid="confirm-points"]')).toBeNull();
     expect(el().querySelector('.badge--ok')).not.toBeNull();
   });
 

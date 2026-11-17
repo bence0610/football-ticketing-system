@@ -11,7 +11,7 @@ const HOME = 'Kecskeméti TE';
 const LOYALTY_CONFIG = {
   registrationPoints: 11,
   profileCompletionPoints: 22,
-  ticketPointsPerTicket: 33,
+  attendancePoints: 33,
   seasonPassPoints: 44,
   passLoanPoints: 55,
   carryoverPercent: 66,
@@ -291,7 +291,7 @@ describe('ChatbotContextService', () => {
       expect(loyalty.earning).toEqual({
         registration: 11,
         profileCompletion: 22,
-        perTicket: 33,
+        attendance: 33,
         seasonPass: 44,
         passLoan: 55,
       });

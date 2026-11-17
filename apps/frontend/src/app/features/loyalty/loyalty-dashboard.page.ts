@@ -21,7 +21,7 @@ import { upcomingHomeMatches } from '../home/logic/match-availability';
 import { MatchPricesService } from '../home/logic/match-prices.service';
 import { loyaltyProgress } from '../home/logic/loyalty-progress';
 import { withArticle } from '../../shared/utils/hungarian-article';
-import { checkoutExample, earningRules, ledgerRow } from './loyalty-page.logic';
+import { checkoutExample, earningRules, ledgerRow, tierKeptText } from './loyalty-page.logic';
 
 /** Rows the "more" button fetches at a time. */
 const LEDGER_PAGE = 50;
@@ -45,6 +45,9 @@ const LEDGER_PAGE = 50;
               <p class="eyebrow">Jelenlegi szinted</p>
               <h1 id="band-title" class="band__name" data-testid="loyalty-tier-badge">{{ s.tier.label }}</h1>
               <p class="band__discount">{{ discountText(s.tier.discountPercent) }}</p>
+              @if (keptText(s); as kept) {
+                <p class="band__discount" data-testid="loyalty-tier-kept">{{ kept }}</p>
+              }
             </div>
           </div>
 
@@ -117,7 +120,6 @@ const LEDGER_PAGE = 50;
                 <thead>
                   <tr>
                     <th scope="col">Esemény</th>
-                    <th scope="col">Forrás</th>
                     <th scope="col" class="num">Pont</th>
                     <th scope="col" class="num">Egyenleg</th>
                   </tr>
@@ -126,12 +128,8 @@ const LEDGER_PAGE = 50;
                   @for (r of rows(); track r.id) {
                     <tr data-testid="loyalty-transaction-row">
                       <td data-label="Esemény">
-                        <span class="ledger__event">{{ r.event }}</span>
+                        <span class="ledger__event">{{ r.event }}@if (r.match) { · {{ r.match }} }</span>
                         <span class="ledger__date">{{ r.createdAt | date: 'yyyy. MM. dd. HH:mm' }}</span>
-                      </td>
-                      <td data-label="Forrás">
-                        <code class="mono">{{ r.source }}</code>
-                        <code class="mono mono--ref">{{ r.reference ?? '—' }}</code>
                       </td>
                       <td data-label="Pont" class="num" [class.pos]="r.points > 0" [class.neg]="r.points < 0">
                         {{ r.pointsText }}
@@ -176,6 +174,7 @@ const LEDGER_PAGE = 50;
                 </ul>
                 <p class="card__fine">
                   Szezonzáráskor (június 30.) a pontjaid {{ e.carryoverPercent }}%-a marad meg, a többi lejár.
+                  A szezon közben elért szintedet a következő szezon végéig megtartod, akkor is, ha a pontjaid a határ alá csökkennek.
                 </p>
                 <p class="card__fine">
                   A jegyvásárlás pontjait a fizetés megerősítésekor írjuk jóvá, a belépés ehhez nem szükséges.
@@ -380,8 +379,6 @@ const LEDGER_PAGE = 50;
       .ledger .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
       .ledger__event { display: block; font-weight: 600; }
       .ledger__date { display: block; margin-top: 2px; color: var(--muted); font-size: 13px; }
-      .mono { display: block; font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 12.5px; overflow-wrap: anywhere; }
-      .mono--ref { margin-top: 2px; color: var(--muted); }
       .pos { color: var(--chip-paid); font-weight: 600; }
       .neg { color: var(--chip-expired); font-weight: 600; }
       .more {
@@ -469,8 +466,6 @@ const LEDGER_PAGE = 50;
         .ledger td > span, .ledger td > code { text-align: right; }
         .ledger td:first-child { display: block; text-align: left; }
         .ledger td:first-child::before { content: none; }
-        .ledger td[data-label='Forrás'] > :first-of-type { margin-left: auto; }
-        .ledger td[data-label='Forrás'] { flex-wrap: wrap; }
       }
 
       @media (prefers-reduced-motion: no-preference) {
@@ -583,6 +578,10 @@ export class LoyaltyDashboardPageComponent implements OnInit {
         this.loadingMore.set(false);
       },
     });
+  }
+
+  protected keptText(s: LoyaltySnapshotResponse): string | null {
+    return tierKeptText(s);
   }
 
   protected discountText(percent: number): string {

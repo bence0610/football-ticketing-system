@@ -52,6 +52,14 @@ export class User extends BaseEntity {
   @Column({ type: 'enum', enum: LoyaltyTier, default: LoyaltyTier.BRONZE, name: 'loyalty_tier' })
   loyaltyTier!: LoyaltyTier;
 
+  /**
+   * When the stored tier was reached. A tier reached in a season is kept until the end of the next
+   * one even if the 30 June carryover takes the points below its threshold (see
+   * loyalty-tier-keeping.ts); null for a tier held by points alone.
+   */
+  @Column({ type: 'timestamp', nullable: true, name: 'loyalty_tier_reached_at' })
+  loyaltyTierReachedAt?: Date | null;
+
   @Column({ type: 'int', unsigned: true, default: 0, name: 'loyalty_points' })
   loyaltyPoints!: number;
 

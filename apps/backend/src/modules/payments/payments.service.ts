@@ -16,8 +16,6 @@ import Stripe from 'stripe';
 import { DataSource, In, Repository } from 'typeorm';
 import { AppConfig, LoyaltyConfig, MailConfig, StripeConfig } from '../../config';
 import {
-  LoyaltyTransactionSource,
-  LoyaltyTransactionType,
   Match,
   Seat,
   Sector,
@@ -34,7 +32,6 @@ import { EmailService } from '../email/email.service';
 import { matchSubject } from '../email/email-subject';
 import { allocateDiscount, normalizeDiscountPercent } from '../loyalty/loyalty-discount';
 import { definitionFor } from '../loyalty/loyalty.constants';
-import { LoyaltyService } from '../loyalty/loyalty.service';
 import { SeatAvailability } from '../seats/dto';
 import { SeatsService } from '../seats/seats.service';
 import { QrService } from '../qr/qr.service';
@@ -84,7 +81,6 @@ export class PaymentsService {
     private readonly seatLockService: SeatLockService,
     private readonly seatsService: SeatsService,
     private readonly dataSource: DataSource,
-    private readonly loyaltyService: LoyaltyService,
     private readonly qrService: QrService,
     private readonly emailService: EmailService,
     private readonly ticketRenderer: TicketRendererService,
@@ -295,16 +291,11 @@ export class PaymentsService {
     });
     if (tickets.length > 0) {
       const match = tickets[0].match;
-      const pointsCredited = await this.loyaltyService.pointsCreditedFor(
-        userId,
-        tickets.map((t) => `ticket:${t.id}`),
-      );
       return {
         status: 'issued',
         ticketIds: tickets.map((t) => t.id),
         amountPaid: tickets.reduce((sum, t) => sum + Number(t.pricePaid), 0),
         currency: tickets[0].currency,
-        pointsCredited,
         confirmationEmailSentAt: this.emailSentAt(tickets),
         match: match
           ? {
@@ -341,7 +332,6 @@ export class PaymentsService {
       ticketIds: [],
       amountPaid: 0,
       currency: intent.currency,
-      pointsCredited: 0,
       confirmationEmailSentAt: null,
       match: null,
       seats: [],
@@ -630,27 +620,8 @@ export class PaymentsService {
       );
     }
 
-    // Award loyalty points (one EARN transaction per ticket). The service is
-    // idempotent through `(source, referenceId)`, so retried Stripe webhook
-    // deliveries do not double-credit the user.
-    for (const ticket of createdTickets) {
-      try {
-        await this.loyaltyService.award({
-          userId: ticket.userId,
-          type: LoyaltyTransactionType.EARN,
-          source: LoyaltyTransactionSource.TICKET_PURCHASE,
-          points: this.loyaltyConfig.ticketPointsPerTicket,
-          referenceId: `ticket:${ticket.id}`,
-          description: 'Jegyvásárlás bónusz',
-        });
-      } catch (error) {
-        this.logger.error(
-          `Loyalty award failed for ticket=${ticket.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-    }
+    // Buying a ticket earns no loyalty points: they are earned by entering the match (see
+    // TicketsService.awardAttendance).
 
     // Schedule the confirmation email after this function returns so the
     // webhook response is never held up by SMTP latency or retries.
@@ -665,7 +636,7 @@ export class PaymentsService {
     });
 
     this.logger.log(
-      `Finalized payment ${intent.id}: ${createdTickets.length} ticket(s) PAID for user ${userId}, loyalty awarded.`,
+      `Finalized payment ${intent.id}: ${createdTickets.length} ticket(s) PAID for user ${userId}.`,
     );
     return createdTickets;
   }
@@ -780,8 +751,7 @@ export class PaymentsService {
             matchKickoffLabel: matchSummary.kickoffLabel,
             tickets: sections,
             totalLabel: this.ticketRenderer.computeTotal(userTickets),
-            // Flat points per ticket (LOYALTY_TICKET_POINTS_PER_TICKET), not a share of the price.
-            pointsEarned: userTickets.length * this.loyaltyConfig.ticketPointsPerTicket,
+            attendancePoints: this.loyaltyConfig.attendancePoints,
             ticketsUrl: `${this.mailConfig.baseUrl}/profile`,
             qrImageDataUrls,
           },

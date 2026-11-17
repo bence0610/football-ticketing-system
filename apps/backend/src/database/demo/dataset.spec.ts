@@ -1,4 +1,5 @@
 import { tierForPoints } from '../../modules/loyalty/loyalty.constants';
+import { tierRank } from '../../modules/loyalty/loyalty-tier-keeping';
 import { Competition, MatchStatus } from '../entities/match.entity';
 import { LoyaltyTier } from '../entities/user.entity';
 import { SEASON_PASS_TIER_PRICE, STADIUM_LAYOUT, priceModifierFor } from '../stadium-layout';
@@ -41,10 +42,10 @@ function stadium(): { seats: SeatRef[]; sectors: SectorRef[] } {
 const RULES = {
   registrationPoints: 100,
   profileCompletionPoints: 50,
-  ticketPointsPerTicket: 50,
+  attendancePoints: 50,
   seasonPassPoints: 500,
   passLoanPoints: 25,
-  carryoverPercent: 50,
+  carryoverPercent: 70,
 };
 
 function input(): DemoInput {
@@ -434,12 +435,60 @@ describe('the demo dataset', () => {
   describe('loyalty', () => {
     const rowsOf = (userId: string) => d.ledger.filter((l) => l.userId === userId);
 
-    it("keeps each account's points equal to its ledger, and its tier to its points", () => {
+    it("keeps each account's points equal to its ledger, and its tier at or above what its points give", () => {
       for (const u of d.users) {
         const rows = rowsOf(u.id);
         expect(u.loyaltyPoints).toBe(rows.reduce((a, r) => a + r.points, 0));
-        expect(u.loyaltyTier).toBe(tierForPoints(u.loyaltyPoints).tier);
+        const derived = tierRank(tierForPoints(u.loyaltyPoints).tier);
+        expect(tierRank(u.loyaltyTier)).toBeGreaterThanOrEqual(derived);
+        // a tier above the points is a kept tier, and carries when it was reached
+        if (tierRank(u.loyaltyTier) > derived) expect(u.loyaltyTierReachedAt).not.toBeNull();
       }
+    });
+
+    it('credits every person who entered a match the attendance points once for it, and buying earns nothing', () => {
+      // whose entry it is: a single ticket, its buyer; a pass entry, the holder; a loan, the borrower
+      const holderOf = new Map(d.passes.map((p) => [p.id, p.holderUserId]));
+      const entered = new Set<string>();
+      for (const t of d.tickets.filter((x) => x.status === 'used')) {
+        const who = t.source === 'season_pass' ? holderOf.get(t.seasonPassId!) : t.userId;
+        if (who) entered.add(`match:${t.matchId}:${who}`);
+      }
+      const attendance = d.ledger.filter((l) => l.source === 'attendance');
+      expect(attendance.map((l) => l.referenceId).sort()).toEqual([...entered].sort());
+      expect(attendance.every((l) => l.points === 50)).toBe(true);
+      expect(
+        attendance.every(
+          (l) => l.referenceId === `match:${l.referenceId.split(':')[1]}:${l.userId}`,
+        ),
+      ).toBe(true);
+      // buying a ticket writes no ledger row, and the old per-entry pass award is gone
+      expect(
+        d.ledger.filter((l) => ['ticket_purchase', 'pass_attendance'].includes(l.source)),
+      ).toEqual([]);
+    });
+
+    it('credits a borrower for the match they entered, and gives the lender only the loan points', () => {
+      const used = d.loans.filter((l) => l.status === 'used');
+      expect(used.length).toBeGreaterThan(0);
+      for (const l of used) {
+        const borrowed = d.tickets.find(
+          (t) =>
+            t.source === 'loan' && t.seasonPassId === l.seasonPassId && t.matchId === l.matchId,
+        )!;
+        const refs = d.ledger.filter((r) => r.source === 'attendance').map((r) => r.referenceId);
+        expect(refs).toContain(`match:${borrowed.matchId}:${borrowed.userId}`);
+        const lender = rowsOf(l.lenderUserId ?? '').filter((r) => r.source === 'pass_loan');
+        expect(lender.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('a person with several tickets and a pass entry for one match earned once for it', () => {
+      const perMatch = new Map<string, number>();
+      for (const l of d.ledger.filter((x) => x.source === 'attendance')) {
+        perMatch.set(l.referenceId, (perMatch.get(l.referenceId) ?? 0) + 1);
+      }
+      expect([...perMatch.values()].every((n) => n === 1)).toBe(true);
     });
 
     it('keeps a running balance that never goes below zero, with no two rows in one second', () => {
@@ -458,28 +507,44 @@ describe('the demo dataset', () => {
       }
     });
 
-    it('uses each (source, reference) once, and earns for every ticket, pass and finished loan exactly once', () => {
+    it('uses each (source, reference) once, and every pass and finished loan paid exactly once', () => {
       const keys = d.ledger.map((r) => `${r.source}|${r.referenceId}`);
       expect(new Set(keys).size).toBe(keys.length);
       const refs = new Set(d.ledger.map((r) => r.referenceId));
-      for (const t of singles()) expect(refs.has(`ticket:${t.id}`)).toBe(true);
       for (const p of d.passes) expect(refs.has(`season_pass:${p.id}`)).toBe(true);
       for (const l of d.loans.filter((x) => ['used', 'completed'].includes(x.status))) {
         expect(refs.has(`loan:${l.id}`)).toBe(true);
       }
-      expect(d.ledger.filter((r) => r.source === 'ticket_purchase')).toHaveLength(singles().length);
     });
 
-    it('halves the balance once at the season turn, as the carry-over job does', () => {
+    it('converts the balance at each season turn, keeping 70% as the carry-over job does', () => {
       const rows = rowsOf(user('arany').id);
-      const carry = rows.find((r) => r.source === 'season_carryover')!;
-      const before = rows
-        .filter((r) => r.createdAt < carry.createdAt)
-        .reduce((a, r) => a + r.points, 0);
-      expect(carry.points).toBe(-Math.floor(before / 2));
-      expect(carry.type).toBe('expiry');
-      expect(carry.referenceId).toBe(`season:2026-06-30:${user('arany').id}`);
-      expect(rows.filter((r) => r.source === 'season_carryover')).toHaveLength(1);
+      const conversions = rows.filter((r) => r.source === 'season_carryover');
+      expect(conversions.length).toBeGreaterThanOrEqual(1);
+      for (const carry of conversions) {
+        const before = rows
+          .filter((r) => r.createdAt < carry.createdAt)
+          .reduce((a, r) => a + r.points, 0);
+        expect(carry.points).toBe(-Math.floor((before * 30) / 100));
+        expect(carry.type).toBe('expiry');
+        expect(carry.referenceId).toMatch(new RegExp(`^season:\\d{4}-06-30:${user('arany').id}$`));
+      }
+      expect(new Set(conversions.map((c) => c.referenceId)).size).toBe(conversions.length);
+    });
+
+    it('gets KTE Legenda by attending, not by buying: a pass in five seasons, every home match, five conversions', () => {
+      const legenda = user('legenda');
+      const rows = rowsOf(legenda.id);
+      expect(legenda.loyaltyTier).toBe(LoyaltyTier.PLATINUM);
+      // no purchase points at all, and the points are registration, profile, passes and attendance
+      expect(rows.filter((r) => r.source === 'ticket_purchase')).toHaveLength(0);
+      const bySource = (src: string) => rows.filter((r) => r.source === src).length;
+      expect(bySource('season_pass_purchase')).toBeGreaterThanOrEqual(5);
+      expect(bySource('attendance')).toBeGreaterThan(60);
+      expect(bySource('season_carryover')).toBeGreaterThanOrEqual(4);
+      // single tickets of this account: only the two cup ties (the pass covers the league matches)
+      const bought = d.tickets.filter((t) => t.userId === legenda.id && t.source === 'single');
+      expect(bought.length).toBeLessThanOrEqual(2);
     });
 
     it('puts one named account in each tier, by real points', () => {
@@ -489,14 +554,15 @@ describe('the demo dataset', () => {
       expect(user('legenda').loyaltyTier).toBe(LoyaltyTier.PLATINUM);
     });
 
-    it('spreads the crowd over all four tiers instead of leaving everyone at Lila', () => {
+    it('spreads the crowd over all four tiers: most fans are Lila (they attend a few matches), a few reach the top', () => {
+      // Loyalty measures attendance: 50 points a match, at most about 1,300 a season even with a pass,
+      // so the tiers above Ezüst are rare by design.
       const fans = d.users.filter((u) => u.role === 'fan');
-      const share = (tier: LoyaltyTier) =>
-        fans.filter((u) => u.loyaltyTier === tier).length / fans.length;
-      expect(share(LoyaltyTier.BRONZE)).toBeLessThan(0.8);
-      expect(share(LoyaltyTier.SILVER)).toBeGreaterThan(0.12);
-      expect(share(LoyaltyTier.GOLD)).toBeGreaterThan(0.04);
-      expect(fans.some((u) => u.loyaltyTier === LoyaltyTier.PLATINUM)).toBe(true);
+      const count = (tier: LoyaltyTier) => fans.filter((u) => u.loyaltyTier === tier).length;
+      expect(count(LoyaltyTier.BRONZE) / fans.length).toBeLessThan(0.92);
+      expect(count(LoyaltyTier.SILVER) / fans.length).toBeGreaterThan(0.05);
+      expect(count(LoyaltyTier.GOLD)).toBeGreaterThanOrEqual(1);
+      expect(count(LoyaltyTier.PLATINUM)).toBeGreaterThanOrEqual(1);
     });
   });
 

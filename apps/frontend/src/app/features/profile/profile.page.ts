@@ -21,7 +21,7 @@ import {
   LoyaltySnapshotResponse,
   TIER_COLORS,
   TIER_LABELS,
-  TRANSACTION_SOURCE_LABELS,
+  LoyaltyTransactionResponse,
 } from '../../core/models/loyalty.models';
 import { IncomingLoan, SeasonPassResponse } from '../../core/models/season-pass.models';
 import { TICKET_STATUS_LABELS, TicketResponse } from '../../core/models/ticket.models';
@@ -31,6 +31,7 @@ import { SeasonPassesService } from '../../core/services/season-passes.service';
 import { TicketsService } from '../../core/services/tickets.service';
 import { formatFullName } from '../../shared/utils/format-name';
 import { withArticle } from '../../shared/utils/hungarian-article';
+import { ledgerRow, tierKeptText } from '../loyalty/loyalty-page.logic';
 import { sectorName } from '../../shared/utils/sector-name';
 import { HufCurrencyPipe } from '../../shared/pipes/huf-currency.pipe';
 import { UserProfile } from '../../shared/models/auth.model';
@@ -294,6 +295,9 @@ export function untilLabel(kickoffIso: string, now: number): string {
                     <p class="tier__next">
                       Még {{ s.pointsToNextTier }} pont {{ withArticle(s.nextTier.label) }} szintig
                     </p>
+                    @if (keptText(s); as kept) {
+                      <p class="tier__next" data-testid="tier-kept">{{ kept }}</p>
+                    }
                   } @else {
                     <p class="tier__next" data-testid="top-tier">
                       Elérted a legmagasabb szintet.
@@ -312,7 +316,7 @@ export function untilLabel(kickoffIso: string, now: number): string {
                   @for (tx of ledger(); track tx.id) {
                     <li>
                       <div class="ledger__text">
-                        <span class="ledger__reason">{{ reason(tx.source) }}</span>
+                        <span class="ledger__reason">{{ reason(tx) }}</span>
                         <span class="ledger__date">
                           {{ tx.createdAt | date: 'yyyy. MMM d.' : '' : 'hu-HU' }}
                         </span>
@@ -848,10 +852,14 @@ export class ProfilePageComponent implements OnInit {
         ? 'Kölcsönkapott belépő'
         : 'Egyedi jegy';
   }
-  protected reason(source: keyof typeof TRANSACTION_SOURCE_LABELS): string {
-    return TRANSACTION_SOURCE_LABELS[source] ?? 'Pontmozgás';
+  /** The event in plain words, with its match: "Részvétel · Kecskeméti TE – Diósgyőri VTK, nov. 28." */
+  protected reason(tx: LoyaltyTransactionResponse): string {
+    const row = ledgerRow(tx);
+    return row.match ? `${row.event} · ${row.match}` : row.event;
   }
+
   protected withArticle = withArticle;
+  protected keptText = tierKeptText;
   protected sectorName = sectorName;
   protected abs(n: number): number {
     return Math.abs(n);

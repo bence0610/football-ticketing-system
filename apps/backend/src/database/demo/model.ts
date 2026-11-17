@@ -56,7 +56,7 @@ export type PassTier = 'vip' | 'lower' | 'upper';
 
 export interface DemoPass {
   id: string;
-  season: 'current' | 'previous';
+  season: 'current' | 'previous' | 'older';
   seasonLabel: string;
   tier: PassTier;
   buyerId: string;
@@ -103,6 +103,7 @@ export interface UserRow {
   dateOfBirth: Date | null;
   role: UserRole;
   loyaltyTier: LoyaltyTier;
+  loyaltyTierReachedAt: Date | null;
   loyaltyPoints: number;
   emailVerified: boolean;
   twoFactorEnabled: boolean;

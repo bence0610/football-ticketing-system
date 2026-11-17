@@ -10,6 +10,7 @@ export enum LoyaltyTransactionType {
 }
 
 export enum LoyaltyTransactionSource {
+  /** History only: buying a ticket earned points until attendance replaced it. */
   TICKET_PURCHASE = 'ticket_purchase',
   SEASON_PASS_PURCHASE = 'season_pass_purchase',
   PROMOTION = 'promotion',
@@ -19,6 +20,10 @@ export enum LoyaltyTransactionSource {
   PASS_LOAN = 'pass_loan',
   SEASON_CARRYOVER = 'season_carryover',
   REGISTRATION = 'registration',
+  /** History only: the per-entry pass award that attendance replaced; reference `ticket:<entry id>`. */
+  PASS_ATTENDANCE = 'pass_attendance',
+  /** Entering a match, once per user per match; the reference is `match:<match id>:<user id>`. */
+  ATTENDANCE = 'attendance',
 }
 
 @Entity({ name: 'loyalty_transactions' })

@@ -14,7 +14,7 @@ export type CartDiscount = TierDiscount;
 /**
  * Sticky summary card: ticket count and subtotal, the loyalty discount row
  * (when one applies), the amount to pay, the checkout button, a note on the
- * shortest hold and the loyalty points this purchase earns.
+ * shortest hold and a note on how loyalty points are earned (by attending, not by buying).
  *
  * The discount row takes the tier's own identity (global `data-tier` styles),
  * so it is gold only for the Arany tier.
@@ -65,7 +65,7 @@ export type CartDiscount = TierDiscount;
 
       <p class="summary__points" *ngIf="points !== null && points > 0" data-testid="summary-points">
         <mat-icon inline aria-hidden="true">check_circle</mat-icon>
-        <span>Ezzel a vásárlással <strong>{{ points }} hűségpontot</strong> gyűjtesz.</span>
+        <span>Hűségpontot a részvételért kapsz: meccsenként egyszer <strong>{{ points }} pont</strong>, miután beolvasták a jegyed. A vásárlásért nem jár pont.</span>
       </p>
     </aside>
   `,
@@ -189,7 +189,7 @@ export class CartSummaryComponent {
   @Input() total = 0;
   /** Shortest remaining hold in ms, or null with nothing in the cart. */
   @Input() shortestMs: number | null = null;
-  /** Loyalty points this purchase earns; null when unknown (guest). */
+  /** Points for attending a match (once per match); null when unknown (guest). */
   @Input() points: number | null = null;
   @Output() readonly checkout = new EventEmitter<void>();
 }

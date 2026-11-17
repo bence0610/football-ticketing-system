@@ -219,11 +219,8 @@ export class CartPageComponent implements OnInit {
 
   protected readonly total = computed(() => this.subtotal() - (this.discount()?.amount ?? 0));
 
-  /** Points per ticket come from the server (/loyalty/me); unknown for guests. */
-  protected readonly points = computed(() => {
-    const perTicket = this.snapshot()?.ticketPointsPerTicket;
-    return perTicket === undefined ? null : perTicket * this.count();
-  });
+  /** Points for attending a match come from the server (/loyalty/me); unknown for guests. */
+  protected readonly points = computed(() => this.snapshot()?.earning?.attendancePoints ?? null);
 
   // ---- venue of each match in the cart (GET /matches/:id) --------------------
   protected readonly venues = signal<Readonly<Record<string, string | undefined>>>({});

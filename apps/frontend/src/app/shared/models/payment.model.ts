@@ -43,7 +43,6 @@ export interface PaymentStatusResponse {
   readonly amountPaid: number;
   readonly currency: string;
   /** Points credited for these tickets (loyalty ledger); 0 until credited. */
-  readonly pointsCredited: number;
   /**
    * When the confirmation email was handed to the mail server. Null until it
    * has been sent (it goes out shortly AFTER the tickets are issued, and may

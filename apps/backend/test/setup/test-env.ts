@@ -40,6 +40,14 @@ export const TEST_ENV: Readonly<Record<string, string>> = Object.freeze({
   JWT_REFRESH_EXPIRES_IN: '7d',
   BCRYPT_ROUNDS: '10',
 
+  // The loyalty rules the suites assert on, pinned so a developer's .env cannot change them.
+  LOYALTY_REGISTRATION_POINTS: '100',
+  LOYALTY_PROFILE_COMPLETION_POINTS: '50',
+  LOYALTY_ATTENDANCE_POINTS: '50',
+  LOYALTY_SEASON_PASS_POINTS: '500',
+  LOYALTY_PASS_LOAN_POINTS: '25',
+  LOYALTY_CARRYOVER_PERCENT: '70',
+
   STRIPE_SECRET_KEY: 'sk_test_placeholder_for_e2e_tests',
   STRIPE_WEBHOOK_SECRET: TEST_WEBHOOK_SECRET,
   STRIPE_CURRENCY: 'huf',

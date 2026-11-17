@@ -38,13 +38,6 @@ export class PaymentStatusResponseDto {
   currency!: string;
 
   @ApiProperty({
-    example: 100,
-    description:
-      'Loyalty points credited for these tickets, read from the loyalty ledger. 0 until credited.',
-  })
-  pointsCredited!: number;
-
-  @ApiProperty({
     type: String,
     format: 'date-time',
     nullable: true,

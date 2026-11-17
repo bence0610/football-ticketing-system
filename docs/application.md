@@ -45,10 +45,10 @@ Biztonságos kijelentkezés és session kezelés.
 4. Loyalty (Hűségprogram) Rendszer
 A hűségprogram célja, hogy jutalmazzon minden interakciót, és erősítse a szurkolói elköteleződést.
 Pontszerzési lehetőségek
-EseményPontJegyvásárlás+50 pont / jegyBérletvásárlás+500 pontBérlet kölcsönadása+25 pontRegisztráció+100 pont (egyszeri)Profil kitöltése+50 pont (egyszeri)Meccsre bejelentkezés (QR scan)+10 pont
+EseményPontRészvétel (az első beolvasott belépő egy meccsen: jegy, bérletes belépő vagy kölcsönkapott belépő)+50 pont, meccsenként és személyenként egyszer, akárhány jegy van arra a meccsreBérletvásárlás+500 pontJegyvásárlás0 pont (a hűségpont a részvételt jutalmazza, nem a költést)Bérlet kölcsönadása+25 pontRegisztráció+100 pont (egyszeri)Profil kitöltése+50 pont (egyszeri)
 Szintek és jutalmak
 SzintPonthatárJutalom🟣 Lila Szurkoló0–499 pontAlap hozzáférés⚪ Ezüst Szurkoló500–1499 pont5% kedvezmény jegyekre🟡 Arany Szurkoló1500–2999 pont10% kedvezmény, korai jegyelővétel🔴 KTE Legenda3000+ pont15% kedvezmény, VIP előtérhozzáférés, dedikált support
-A pontok és szintek a felhasználó profiljában valós időben frissülnek, és az előfizetési évad végén részlegesen (50%) átvihetők a következő szezonba.
+A pontok és szintek a felhasználó profiljában valós időben frissülnek (a részvételi pont a kapunál a beolvasáskor kerül jóváírásra, a belépést sosem akadályozza), és az évad végén (június 30.) részlegesen (70%) átvihetők a következő szezonba. A szezon közben elért szintet a rendszer a következő szezon végéig megtartja akkor is, ha a pontkonverzió után a pontok a szint határa alá esnek (a szint és az elérésének ideje tárolt adat, nem csak a pontokból számolt).
 
 5. AI Chatbot Asszisztens
 Az alkalmazásba beépített KTE Chatbot egy Claude API-alapú természetes nyelvi asszisztens, amely a szurkolók kérdéseire válaszol.

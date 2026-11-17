@@ -22,7 +22,7 @@ START TRANSACTION;
 CREATE TEMPORARY TABLE tmp_affected_users AS
   SELECT DISTINCT user_id
   FROM loyalty_transactions
-  WHERE source IN ('ticket_purchase', 'season_pass_purchase', 'pass_loan');
+  WHERE source IN ('ticket_purchase', 'attendance', 'pass_attendance', 'season_pass_purchase', 'pass_loan');
 
 -- 1. Children before parents, so no foreign key blocks a delete:
 --      pass_loans    -> season_passes (CASCADE) and matches/users (RESTRICT)
@@ -36,7 +36,7 @@ DELETE FROM season_passes;
 --    'season_pass:<id>', 'loan:<id>'), not a foreign key, so nothing cascades:
 --    these rows would otherwise point at tickets and passes that no longer exist.
 DELETE FROM loyalty_transactions
-WHERE source IN ('ticket_purchase', 'season_pass_purchase', 'pass_loan');
+WHERE source IN ('ticket_purchase', 'attendance', 'pass_attendance', 'season_pass_purchase', 'pass_loan');
 
 -- 3. Every surviving row stores the balance after it. Rebuild that running total in
 --    the order the rows were written (never below zero, as the application does).

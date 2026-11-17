@@ -204,7 +204,7 @@ const NAMED: readonly NamedSpec[] = [
     purpose: 'Lila szint: a belépő szint, 0% kedvezmény, a következő szintig hátralévő pontok.',
   },
   {
-    // Last season 8 tickets: 150 + 400 = 550, halved to 275; this season 12 tickets: +600 = 875: Ezüst (500-1499).
+    // Attends 5 matches last season (150 + 250 = 400, 70% kept = 280) and 6 this season (+300): 580, Ezüst (500-1499).
     key: 'ezust',
     firstName: 'Tamás',
     lastName: 'Balogh',
@@ -213,16 +213,15 @@ const NAMED: readonly NamedSpec[] = [
     createdDaysAgo: 700,
     profileDone: true,
     forced: [
-      ...repeat(['cur:r01', 'cur:r05', 'cur:r09', 'cur:r11'], 3),
-      ...repeat(['prev:l02', 'prev:l05'], 3),
-      scanned('prev:l09', 2),
+      ...repeat(['cur:r01', 'cur:r03', 'cur:r05', 'cur:r07', 'cur:r09', 'cur:r11'], 2),
+      ...repeat(['prev:l02', 'prev:l05', 'prev:l09', 'prev:l11', 'prev:l13'], 2),
     ],
     expectedTier: LoyaltyTier.SILVER,
     purpose:
-      'Ezüst szint: 5% kedvezmény látható az árakban, szezonváltáskori pontfelezés a főkönyvben.',
+      'Ezüst szint: 5% kedvezmény látható az árakban, szezonváltáskori pontkonverzió (70% marad) a főkönyvben.',
   },
   {
-    // Last season 30 tickets: 150 + 1500 = 1650, halved to 825; this season 20 tickets: +1000 = 1825: Arany (1500-2999).
+    // A pass holder who attends most home matches, with a few tickets for friends besides: about 1,700 points, Arany (1500-2999).
     key: 'arany',
     firstName: 'Zoltán',
     lastName: 'Takács',
@@ -230,58 +229,22 @@ const NAMED: readonly NamedSpec[] = [
     fanClass: 'scripted',
     createdDaysAgo: 760,
     profileDone: true,
-    forced: [
-      ...repeat(['cur:r03', 'cur:r05', 'cur:r07', 'cur:r09', 'cur:r11'], 4),
-      ...repeat(
-        [
-          'prev:l01',
-          'prev:l02',
-          'prev:l04',
-          'prev:l05',
-          'prev:l07',
-          'prev:l08',
-          'prev:l10',
-          'prev:l11',
-          'prev:l13',
-          'prev:l14',
-        ],
-        3,
-      ),
-    ],
+    forced: [...repeat(['cur:r05', 'cur:r09', 'prev:l04', 'prev:l08', 'prev:l11'], 2)],
     expectedTier: LoyaltyTier.GOLD,
     purpose: 'Arany szint: 10% kedvezmény, kedvezményes jegyárak a kosárban és a jegyeken.',
   },
   {
-    // Last season 40 tickets: 150 + 2000 = 2150, halved to 1075; this season 40 tickets (+2000) and one pass
-    // bought for a guest (+500) = 3575: KTE Legenda (3000+). 80 tickets in all.
+    // A supporter since 2022 with a pass of their own in every season, who has been to every home match (a scanned
+    // pass entry; the cup ties with a ticket): 50 points per match, once, and 500 per pass. Five seasons of that is
+    // what reaching KTE Legenda by attending takes.
     key: 'legenda',
     firstName: 'Sándor',
     lastName: 'Lakatos',
     role: UserRole.FAN,
     fanClass: 'scripted',
-    createdDaysAgo: 820,
+    createdDaysAgo: 1700,
     profileDone: true,
-    forced: [
-      ...repeat(
-        ['cur:r01', 'cur:r03', 'cur:r05', 'cur:r07', 'cur:r09', 'cur:r11', 'cur:r13', 'cur:cup1'],
-        5,
-      ),
-      ...repeat(
-        [
-          'prev:l01',
-          'prev:l02',
-          'prev:l04',
-          'prev:l05',
-          'prev:l07',
-          'prev:l08',
-          'prev:l10',
-          'prev:l11',
-          'prev:l13',
-          'prev:l14',
-        ],
-        4,
-      ),
-    ],
+    forced: [scanned('cur:cup1', 1), scanned('prev:cup1', 1)],
     expectedTier: LoyaltyTier.PLATINUM,
     purpose: 'KTE Legenda szint: a legmagasabb szint, 15% kedvezmény, a ranglista tetején.',
   },

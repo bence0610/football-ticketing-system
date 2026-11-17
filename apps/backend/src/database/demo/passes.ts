@@ -18,6 +18,8 @@ export interface PassBuildInput {
   now: Date;
   season: { label: string; validFrom: Date; validUntil: Date; prices: Record<PassTier, number> };
   previous: { label: string; validFrom: Date; validUntil: Date; prices: Record<PassTier, number> };
+  /** The seasons before the previous one, nearest first: only the lifelong supporter has a pass in them. */
+  older: ReadonlyArray<{ label: string; validFrom: Date; validUntil: Date }>;
   /** Seats held by passes that are not demo data. */
   foreignPassSeatIds: ReadonlySet<string>;
 }
@@ -148,6 +150,27 @@ export function buildPasses(input: PassBuildInput, rng: Rng): DemoPass[] {
     alwaysAttends: true,
   });
 
+  // The lifelong supporter holds a pass of their own and goes to every home match, season after season
+  // (the older seasons are below). Loyalty measures attendance, so this is the only way to KTE Legenda.
+  const legenda = claim(get('legenda'));
+  slots.push({
+    tier: takeTier('lower'),
+    buyer: legenda,
+    holder: legenda,
+    holderName: nameOf(legenda),
+    sector: 'H',
+    alwaysAttends: true,
+  });
+  // The Arany account holds a pass too (attending most of the matches, not all).
+  const arany = claim(get('arany'));
+  slots.push({
+    tier: takeTier('lower'),
+    buyer: arany,
+    holder: arany,
+    holderName: nameOf(arany),
+    sector: 'G',
+  });
+
   // A patron who bought five passes for guests, two of them VIP.
   const patron = nextFree(regulars);
   for (const t of ['upper', 'upper', 'upper', 'vip', 'vip'] as const) {
@@ -227,7 +250,10 @@ export function buildPasses(input: PassBuildInput, rng: Rng): DemoPass[] {
     const holder = cur.holderId ? (userById.get(cur.holderId) as DemoUser) : null;
     const createdAt = floorSecond(prevSale());
     const old = (u: DemoUser): boolean => u.createdAt.getTime() < createdAt.getTime() - 2 * DAY_MS;
-    if (!rng.chance(0.72) || !old(buyer) || (holder && !old(holder))) continue;
+    const renews = rng.chance(0.72);
+    // The lifelong supporter never lets the pass lapse.
+    const lifelong = cur.alwaysAttends === true && cur.holderId === legenda.id;
+    if (!(renews || lifelong) || !old(buyer) || (holder && !old(holder))) continue;
     takenPrev.add(cur.seat.id);
     passes.push({
       ...cur,
@@ -240,8 +266,28 @@ export function buildPasses(input: PassBuildInput, rng: Rng): DemoPass[] {
       validUntil: input.previous.validUntil,
       status: 'expired',
       qrCode: `KTE-SP-${rng.uuid()}`,
-      alwaysAttends: false,
+      alwaysAttends: lifelong,
     });
+    // ...and the seasons before that: the same seat, bought a few days into each season.
+    if (lifelong) {
+      for (const w of input.older) {
+        passes.push({
+          ...cur,
+          id: rng.uuid(),
+          season: 'older',
+          seasonLabel: w.label,
+          createdAt: floorSecond(
+            w.validFrom.getTime() + DAY_MS * (2 + Math.floor(rng.exponential(6))),
+          ),
+          price: price(input.previous.label, cur.tier),
+          validFrom: w.validFrom,
+          validUntil: w.validUntil,
+          status: 'expired',
+          qrCode: `KTE-SP-${rng.uuid()}`,
+          alwaysAttends: true,
+        });
+      }
+    }
   }
   const currentHolders = new Set(holders);
   const lapsed = rng.shuffle(

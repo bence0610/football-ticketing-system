@@ -1,6 +1,7 @@
 import './setup/test-env';
 
 import request from 'supertest';
+import { In } from 'typeorm';
 import type { Response as SupertestResponse } from 'supertest';
 import { Server } from 'http';
 import {
@@ -238,16 +239,18 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     const residualLock = await ctx.redis.get(RedisKeys.seatLock(match.id, seatA.id));
     expect(residualLock).toBeNull();
 
-    // k. loyalty transaction
-    const loyaltyRows = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
+    // k. buying a ticket earns no loyalty points: they are earned by entering the match
+    const earnedByBuying = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
       where: {
         userId: fan.userId,
-        source: LoyaltyTransactionSource.TICKET_PURCHASE,
+        source: In([
+          LoyaltyTransactionSource.TICKET_PURCHASE,
+          LoyaltyTransactionSource.ATTENDANCE,
+          LoyaltyTransactionSource.PASS_ATTENDANCE,
+        ]),
       },
     });
-    expect(loyaltyRows).toHaveLength(1);
-    expect(loyaltyRows[0].points).toBeGreaterThan(0);
-    expect(loyaltyRows[0].referenceId).toBe(`ticket:${ticketId}`);
+    expect(earnedByBuying).toHaveLength(0);
 
     // l. seat now SOLD
     const seatsAfter = await request(server).get(`/api/matches/${match.id}/seats`);
@@ -275,6 +278,14 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     expect(firstScan.status).toBe(200);
     expect(firstScan.body.success).toBe(true);
     expect(firstScan.body.result).toBe('ok');
+
+    // The entry earns the attendance points, once for the match (the reference is the match and the person).
+    const attended = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
+      where: { userId: fan.userId, source: LoyaltyTransactionSource.ATTENDANCE },
+    });
+    expect(attended).toHaveLength(1);
+    expect(attended[0].points).toBe(50);
+    expect(attended[0].referenceId).toBe(`match:${match.id}:${fan.userId}`);
 
     // o. second scan — already_used
     //    The QR token's jti was revoked on first scan, so re-presenting
@@ -618,6 +629,20 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       .findOneOrFail({ where: { id: ticketId } });
     expect(ticket.status).toBe(TicketStatus.USED);
     expect(ticket.source).toBe(TicketSource.SEASON_PASS);
+
+    // The scanned entry earned the HOLDER the attendance points, through the ledger, with the match
+    // and the holder as the reference. Scanning it again changes nothing.
+    const again = await request(server)
+      .patch(`/api/tickets/${ticketId}/scan`)
+      .set('Authorization', `Bearer ${gateToken}`)
+      .send({ token });
+    expect(again.body.result).not.toBe('ok');
+    const rows = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
+      where: { userId: holder.userId, source: LoyaltyTransactionSource.ATTENDANCE },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].points).toBe(50);
+    expect(rows[0].referenceId).toBe(`match:${match.id}:${holder.userId}`);
   });
 
   it('scenario 2 — full loan: owner lends, borrower accepts, borrower enters at gate', async () => {
@@ -652,6 +677,14 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     expect(scanResp.body.success).toBe(true);
     expect(scanResp.body.result).toBe('ok');
     expect(scanResp.body.source).toBe(TicketSource.LOAN);
+
+    // The borrower was there: they earn the attendance points. The lender earns none at the gate
+    // (the loan points are paid when the loan closes).
+    const attendance = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
+      where: { source: LoyaltyTransactionSource.ATTENDANCE },
+    });
+    expect(attendance.map((r) => r.userId)).toEqual([borrower.userId]);
+    expect(attendance[0].referenceId).toBe(`match:${match.id}:${borrower.userId}`);
   });
 
   it('scenario 3 — after acceptance the owner cannot enter that match on that seat', async () => {
@@ -1324,6 +1357,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
     expect(tickets).toHaveLength(1);
 
     const ticketId = tickets[0].id;
+    // Delivered twice, and still no loyalty row: buying earns nothing.
     const loyaltyRows = await ctx.dataSource.getRepository(LoyaltyTransaction).find({
       where: {
         userId: fan.userId,
@@ -1331,7 +1365,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
         referenceId: `ticket:${ticketId}`,
       },
     });
-    expect(loyaltyRows).toHaveLength(1);
+    expect(loyaltyRows).toHaveLength(0);
   });
 
   /* ------------------------------------------------------------------ */

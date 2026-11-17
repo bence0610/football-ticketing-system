@@ -334,8 +334,9 @@ export class ChatbotService {
     return [
       'Hűségprogram szabályai:',
       tiers,
-      `  Pontszerzés: regisztráció +${e.registration}, profil kitöltése +${e.profileCompletion}, jegyvásárlás +${e.perTicket} jegyenként, bérletvásárlás +${e.seasonPass}, bérletkölcsönzés +${e.passLoan}.`,
-      `  Szezon végén (június 30.) a pontegyenleg ${l.carryoverPercent}%-a megmarad, a többi lejár; a szint ezután újraszámolódik.`,
+      `  Pontszerzés: regisztráció +${e.registration}, profil kitöltése +${e.profileCompletion}, részvétel +${e.attendance} meccsenként egyszer (az első beolvasott belépő után a kapunál: akár jegy, akár bérletes belépő, akár kölcsönkapott belépő; ugyanarra a meccsre több jeggyel sem jár több), bérletvásárlás +${e.seasonPass}, bérletkölcsönzés (a kölcsönadónak) +${e.passLoan}. Jegyvásárlásért NEM jár pont: a hűségpont a részvételt jutalmazza, nem a költést.`,
+      `  Szezon végén (június 30.) a pontegyenleg ${l.carryoverPercent}%-a megmarad, a többi lejár.`,
+      '  A szezon közben elért szintet a következő szezon végéig megtartja a szurkoló akkor is, ha a pontkonverzió után a pontjai a szint határa alá esnek; a kedvezmény ezalatt is jár. A megtartás lejártakor a szint a pontokból újraszámolódik.',
     ].join('\n');
   }
 

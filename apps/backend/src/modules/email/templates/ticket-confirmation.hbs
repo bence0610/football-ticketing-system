@@ -11,8 +11,8 @@
 {{> row label="Kategória / ár" value=(concat categoryLabel " · " pricePaidLabel)}}
 {{/each}}
 {{> row label="Összesen fizetve" value=totalLabel}}
-{{> row label="Gyűjtött hűségpont" value=(concat "+" pointsEarned " pont")}}
 {{/details}}
+{{#> p muted=true}}Hűségpontot a meccsen való részvételért kapsz: miután az első jegyedet beolvasták a kapunál, meccsenként egyszer {{attendancePoints}} pont jár, akárhány jegyed is van arra a meccsre. A jegyvásárlásért nem jár pont.{{/p}}
 {{#> p muted=true}}Belépéskor mutasd be a QR-kódot a telefonodon vagy kinyomtatva. Minden kód csak egyszer használható.{{/p}}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 {{#each qrImageDataUrls}}

@@ -109,10 +109,10 @@ describe('CheckoutSummaryComponent', () => {
     );
   });
 
-  it('shows the loyalty discount in the tier look, and the points line only when known', () => {
+  it('shows the loyalty discount in the tier look, and the attendance-points note only when known', () => {
     let el = render({ discount: { tier: 'silver', label: 'Ezüst', percent: 5, amount: 438 }, points: 100 }).nativeElement as HTMLElement;
     expect(el.querySelector('[data-testid="summary-discount"]')?.getAttribute('data-tier')).toBe('silver');
-    expect(el.querySelector('[data-testid="summary-points"]')?.textContent).toContain('100 hűségpontot');
+    expect(el.querySelector('[data-testid="summary-points"]')?.textContent).toContain('meccsenként egyszer');
 
     el = render().nativeElement as HTMLElement;
     expect(el.querySelector('[data-testid="summary-discount"]')).toBeNull();

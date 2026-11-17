@@ -80,6 +80,10 @@ export async function savingsByTier(
   });
 }
 
+/** Position of a tier on the ladder (0 = lowest), as SQL, for the stored enum column. */
+const tierRankSql = (column: string): string =>
+  `FIELD(${column}, ${TIER_DEFINITIONS.map((t) => `'${t.tier}'`).join(', ')})`;
+
 const tierCase = (column: string): string =>
   'CASE ' +
   [...TIER_DEFINITIONS]
@@ -125,8 +129,23 @@ export async function auditDemoData(manager: EntityManager): Promise<AuditResult
       [P],
     ],
     [
-      "every account's tier matches its points",
-      `SELECT COUNT(*) n FROM users u WHERE u.id LIKE ? AND u.loyalty_tier <> ${tierCase('u.loyalty_points')}`,
+      "no account's tier is below what its points give",
+      `SELECT COUNT(*) n FROM users u WHERE u.id LIKE ? AND ${tierRankSql('u.loyalty_tier')} < ${tierRankSql(tierCase('u.loyalty_points'))}`,
+      [P],
+    ],
+    [
+      'a tier above what the points give is a kept tier: it has the time it was reached',
+      `SELECT COUNT(*) n FROM users u WHERE u.id LIKE ? AND ${tierRankSql('u.loyalty_tier')} > ${tierRankSql(tierCase('u.loyalty_points'))} AND u.loyalty_tier_reached_at IS NULL`,
+      [P],
+    ],
+    [
+      'every person who entered a match earned the attendance points once for it (match:<match>:<person>), and nobody else did',
+      "SELECT (SELECT COUNT(*) FROM (SELECT DISTINCT CASE WHEN t.source = 'season_pass' THEN sp.holder_user_id ELSE t.user_id END uid, t.match_id mid FROM tickets t LEFT JOIN season_passes sp ON sp.id = t.season_pass_id WHERE t.id LIKE ? AND t.status = 'used') e LEFT JOIN loyalty_transactions l ON l.source = 'attendance' AND l.reference_id = CONCAT('match:', e.mid, ':', e.uid) WHERE e.uid IS NOT NULL AND l.id IS NULL) + (SELECT COUNT(*) FROM loyalty_transactions l WHERE l.source = 'attendance' AND l.user_id LIKE ? AND NOT EXISTS (SELECT 1 FROM tickets t LEFT JOIN season_passes sp ON sp.id = t.season_pass_id WHERE t.id LIKE ? AND t.status = 'used' AND CONCAT('match:', t.match_id, ':', CASE WHEN t.source = 'season_pass' THEN sp.holder_user_id ELSE t.user_id END) = l.reference_id)) n",
+      [P, P, P],
+    ],
+    [
+      'a borrower earns attendance for the match they entered, and the lender has only loan points for it',
+      "SELECT COUNT(*) n FROM tickets t LEFT JOIN loyalty_transactions l ON l.source = 'attendance' AND l.reference_id = CONCAT('match:', t.match_id, ':', t.user_id) WHERE t.id LIKE ? AND t.source = 'loan' AND t.status = 'used' AND l.id IS NULL",
       [P],
     ],
     [
@@ -135,13 +154,8 @@ export async function auditDemoData(manager: EntityManager): Promise<AuditResult
       [P],
     ],
     [
-      'every single ticket earned its points exactly once (ticket:<id>)',
-      "SELECT COUNT(*) n FROM tickets t LEFT JOIN loyalty_transactions l ON l.source = 'ticket_purchase' AND l.reference_id = CONCAT('ticket:', t.id) WHERE t.id LIKE ? AND t.source = 'single' AND l.id IS NULL",
-      [P],
-    ],
-    [
-      'no ticket-purchase points without a ticket',
-      "SELECT COUNT(*) n FROM loyalty_transactions l LEFT JOIN tickets t ON l.reference_id = CONCAT('ticket:', t.id) WHERE l.source = 'ticket_purchase' AND l.user_id LIKE ? AND t.id IS NULL",
+      'buying a ticket earns nothing: no ticket-purchase or old pass-entry rows (loyalty measures attendance, not spending)',
+      "SELECT COUNT(*) n FROM loyalty_transactions WHERE user_id LIKE ? AND source IN ('ticket_purchase', 'pass_attendance')",
       [P],
     ],
     [
@@ -348,6 +362,19 @@ export async function demoFigures(
         const n = Number(tiers.find((x) => x.tier === t.tier)?.n ?? 0);
         return `${t.label} ${n} (${pct(n, fans)})`;
       }).join(', '),
+  );
+
+  const [keptTier] = await rows<{ n: string }>(
+    `SELECT COUNT(*) n FROM users WHERE id LIKE ? AND role = 'fan' AND ${tierRankSql('loyalty_tier')} > ${tierRankSql(tierCase('loyalty_points'))}`,
+    [P],
+  );
+  out.push(`Fans holding a kept tier above what their points give: ${keptTier.n}`);
+  const [attend] = await rows<{ n: string; points: string }>(
+    "SELECT COUNT(*) n, COALESCE(SUM(points), 0) points FROM loyalty_transactions WHERE user_id LIKE ? AND source = 'attendance'",
+    [P],
+  );
+  out.push(
+    `Attendance ledger rows (one per person per match entered): ${attend.n} (${attend.points} points)`,
   );
 
   const perAccount = await rows<{ n: string }>(

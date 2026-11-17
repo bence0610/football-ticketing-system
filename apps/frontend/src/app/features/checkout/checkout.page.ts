@@ -406,10 +406,8 @@ export class CheckoutPageComponent implements AfterViewInit, OnDestroy {
 
   protected readonly total = computed<number | null>(() => this.intent()?.amount ?? null);
 
-  protected readonly points = computed(() => {
-    const perTicket = this.snapshot()?.ticketPointsPerTicket;
-    return perTicket === undefined ? null : perTicket * this.items().length;
-  });
+  /** Points for attending a match (once per match), from /loyalty/me. */
+  protected readonly points = computed(() => this.snapshot()?.earning?.attendancePoints ?? null);
 
   /** Payment can start only with a mounted element and every held seat still held. */
   protected readonly canPay = computed(

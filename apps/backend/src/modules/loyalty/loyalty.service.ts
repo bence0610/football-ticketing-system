@@ -7,6 +7,8 @@ import {
   LoyaltyTransaction,
   LoyaltyTransactionSource,
   LoyaltyTransactionType,
+  Match,
+  PassLoan,
   Ticket,
   User,
 } from '../../database/entities';
@@ -18,6 +20,7 @@ import {
   TIER_DEFINITIONS,
   TierDefinition,
 } from './loyalty.constants';
+import { minPointsOf, tierAfterAward, tierKeptUntil, tierRank } from './loyalty-tier-keeping';
 
 export interface AwardOptions {
   userId: string;
@@ -47,8 +50,13 @@ export interface LoyaltySnapshot {
   tier: TierDefinition;
   nextTier?: TierDefinition;
   pointsToNextTier?: number;
-  /** Points awarded per purchased ticket (LOYALTY_TICKET_POINTS_PER_TICKET). */
-  ticketPointsPerTicket: number;
+  /**
+   * Set while the tier is kept without the points to match it (the season-end conversion took the
+   * balance below its threshold): the last day it is kept, `yyyy-mm-dd`.
+   */
+  tierKeptUntil?: string;
+  /** With `tierKeptUntil`: how many points the balance is short of the kept tier's threshold. */
+  pointsToKeepTier?: number;
   /** The real earning rules (from LoyaltyConfig), so the UI never hard-codes them. */
   earning: LoyaltyEarningRules;
   /** Distinct matches the user actually entered (a ticket with a scan). */
@@ -61,11 +69,19 @@ export interface LoyaltySnapshot {
 export interface LoyaltyEarningRules {
   registrationPoints: number;
   profileCompletionPoints: number;
-  ticketPointsPerTicket: number;
+  /** Points for entering a match: once per person per match, with a ticket, a pass entry or a borrowed entry. */
+  attendancePoints: number;
   seasonPassPoints: number;
   passLoanPoints: number;
   /** Share of the balance kept at the season-end conversion (0-100). */
   carryoverPercent: number;
+}
+
+export interface TransactionMatch {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
+  kickoffAt: string;
 }
 
 export const SNAPSHOT_TRANSACTION_LIMIT = 25;
@@ -126,19 +142,29 @@ export class LoyaltyService {
       this.loyaltyRepository.count({ where: { userId } }),
       this.countMatchesAttended(userId),
     ]);
+    // The stored tier (it can be above what the points give: see loyalty-tier-keeping.ts), and the
+    // tier above it, not the first threshold above the points.
     const currentTier = definitionFor(user.loyaltyTier);
-    const nextTier = TIER_DEFINITIONS.find((t) => t.minPoints > user.loyaltyPoints);
+    const nextTier = TIER_DEFINITIONS[tierRank(user.loyaltyTier) + 1];
+    const kept =
+      tierRank(tierForPoints(user.loyaltyPoints).tier) < tierRank(user.loyaltyTier) &&
+      user.loyaltyTierReachedAt
+        ? {
+            tierKeptUntil: tierKeptUntil(user.loyaltyTierReachedAt).toISOString().slice(0, 10),
+            pointsToKeepTier: Math.max(minPointsOf(user.loyaltyTier) - user.loyaltyPoints, 0),
+          }
+        : {};
     return {
       userId,
       points: user.loyaltyPoints,
       tier: currentTier,
       nextTier,
       pointsToNextTier: nextTier ? Math.max(nextTier.minPoints - user.loyaltyPoints, 0) : undefined,
-      ticketPointsPerTicket: this.config.ticketPointsPerTicket,
+      ...kept,
       earning: {
         registrationPoints: this.config.registrationPoints,
         profileCompletionPoints: this.config.profileCompletionPoints,
-        ticketPointsPerTicket: this.config.ticketPointsPerTicket,
+        attendancePoints: this.config.attendancePoints,
         seasonPassPoints: this.config.seasonPassPoints,
         passLoanPoints: this.config.passLoanPoints,
         carryoverPercent: this.config.carryoverPercent,
@@ -163,6 +189,66 @@ export class LoyaltyService {
     });
   }
 
+  /**
+   * The match each ledger row belongs to, for showing the row in plain words (the internal source
+   * and reference are never shown): attendance rows carry it in their reference, an old ticket
+   * purchase or pass entry points at a ticket, a loan at the loan.
+   */
+  async matchesFor(rows: readonly LoyaltyTransaction[]): Promise<Map<string, TransactionMatch>> {
+    const matchOfRow = new Map<string, string>();
+    const ticketRefs = new Map<string, string[]>();
+    const loanRefs = new Map<string, string[]>();
+    const push = (map: Map<string, string[]>, id: string, rowId: string): void => {
+      map.set(id, [...(map.get(id) ?? []), rowId]);
+    };
+    for (const row of rows) {
+      const ref = row.referenceId ?? '';
+      if (row.source === LoyaltyTransactionSource.ATTENDANCE && ref.startsWith('match:')) {
+        matchOfRow.set(row.id, ref.split(':')[1]);
+      } else if (ref.startsWith('ticket:')) {
+        push(ticketRefs, ref.slice('ticket:'.length), row.id);
+      } else if (row.source === LoyaltyTransactionSource.PASS_LOAN && ref.startsWith('loan:')) {
+        push(loanRefs, ref.slice('loan:'.length), row.id);
+      }
+    }
+    if (ticketRefs.size > 0) {
+      const tickets = await this.dataSource.getRepository(Ticket).find({
+        where: { id: In([...ticketRefs.keys()]) },
+        select: ['id', 'matchId'],
+      });
+      for (const t of tickets)
+        for (const rowId of ticketRefs.get(t.id) ?? []) matchOfRow.set(rowId, t.matchId);
+    }
+    if (loanRefs.size > 0) {
+      const loans = await this.dataSource.getRepository(PassLoan).find({
+        where: { id: In([...loanRefs.keys()]) },
+        select: ['id', 'matchId'],
+      });
+      for (const l of loans)
+        for (const rowId of loanRefs.get(l.id) ?? []) matchOfRow.set(rowId, l.matchId);
+    }
+    const ids = [...new Set(matchOfRow.values())];
+    const out = new Map<string, TransactionMatch>();
+    if (ids.length === 0) return out;
+    const matches = await this.dataSource.getRepository(Match).find({
+      where: { id: In(ids) },
+      select: ['id', 'homeTeam', 'awayTeam', 'kickoffAt'],
+    });
+    const byId = new Map(matches.map((m) => [m.id, m]));
+    for (const [rowId, matchId] of matchOfRow) {
+      const m = byId.get(matchId);
+      if (m) {
+        out.set(rowId, {
+          id: m.id,
+          homeTeam: m.homeTeam,
+          awayTeam: m.awayTeam,
+          kickoffAt: m.kickoffAt.toISOString(),
+        });
+      }
+    }
+    return out;
+  }
+
   /** Distinct matches for which one of the user's tickets was scanned at the gate. */
   private async countMatchesAttended(userId: string): Promise<number> {
     const row = await this.dataSource
@@ -173,25 +259,6 @@ export class LoyaltyService {
       .andWhere('t.scanned_at IS NOT NULL')
       .getRawOne<{ count: string }>();
     return Number(row?.count ?? 0);
-  }
-
-  /**
-   * Points actually credited to the user for the given ticket-purchase
-   * references (`ticket:<id>`). Reads the ledger, so it reflects what was
-   * really awarded - not what the rules say should have been.
-   */
-  async pointsCreditedFor(userId: string, referenceIds: readonly string[]): Promise<number> {
-    if (referenceIds.length === 0) {
-      return 0;
-    }
-    const rows = await this.loyaltyRepository.find({
-      where: {
-        userId,
-        source: LoyaltyTransactionSource.TICKET_PURCHASE,
-        referenceId: In([...referenceIds]),
-      },
-    });
-    return rows.reduce((sum, row) => sum + row.points, 0);
   }
 
   getTierDefinitions(): readonly TierDefinition[] {
@@ -251,17 +318,23 @@ export class LoyaltyService {
       throw error;
     }
 
-    const newTierDefinition = tierForPoints(newBalance);
+    // An award raises the tier when the points reach a higher one, and never lowers it: only the
+    // season-end conversion can, and a tier reached in a season is kept (loyalty-tier-keeping.ts).
+    const after = tierAfterAward(
+      { tier: user.loyaltyTier, reachedAt: user.loyaltyTierReachedAt ?? null },
+      newBalance,
+      new Date(),
+    );
+    const newTierDefinition = definitionFor(after.tier);
     user.loyaltyPoints = newBalance;
-    user.loyaltyTier = newTierDefinition.tier;
+    user.loyaltyTier = after.tier;
+    user.loyaltyTierReachedAt = after.reachedAt;
     await userRepo.save(user);
 
-    const tierUpgraded =
-      TIER_DEFINITIONS.findIndex((t) => t.tier === newTierDefinition.tier) >
-      TIER_DEFINITIONS.findIndex((t) => t.tier === previousTier);
+    const tierUpgraded = after.upgraded;
 
     if (tierUpgraded) {
-      const nextTierDefinition = TIER_DEFINITIONS.find((t) => t.minPoints > newBalance);
+      const nextTierDefinition = TIER_DEFINITIONS[tierRank(after.tier) + 1];
       // Fire-and-forget tier upgrade email. Never block the caller on SMTP.
       void this.emailService
         .send({
@@ -277,6 +350,8 @@ export class LoyaltyService {
             pointsToNextTier: nextTierDefinition
               ? Math.max(nextTierDefinition.minPoints - newBalance, 0)
               : undefined,
+            attendancePoints: this.config.attendancePoints,
+            carryoverPercent: this.config.carryoverPercent,
             loyaltyDashboardUrl: `${this.mailConfig.baseUrl}/loyalty`,
           },
           correlationId: `tier-upgrade:${user.id}:${newTierDefinition.tier}`,

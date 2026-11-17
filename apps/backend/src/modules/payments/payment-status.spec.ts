@@ -3,19 +3,14 @@ import { PaymentsService } from './payments.service';
 
 /**
  * getPaymentStatus feeds the confirmation page: it must only answer the owner,
- * read the amount and points from real records, and tell "processing" from
+ * read the amount from real records, and tell "processing" from
  * "failed" without ever suggesting a second payment.
  */
 describe('PaymentsService.getPaymentStatus', () => {
   const PI = 'pi_3abcDEF123';
   const USER = 'user-1';
 
-  function build(opts: {
-    tickets?: unknown[];
-    intent?: unknown;
-    retrieveFails?: boolean;
-    points?: number;
-  }) {
+  function build(opts: { tickets?: unknown[]; intent?: unknown; retrieveFails?: boolean }) {
     const ticketRepository = { find: jest.fn().mockResolvedValue(opts.tickets ?? []) };
     const stripe = {
       paymentIntents: {
@@ -24,13 +19,11 @@ describe('PaymentsService.getPaymentStatus', () => {
           : jest.fn().mockResolvedValue(opts.intent),
       },
     };
-    const loyaltyService = { pointsCreditedFor: jest.fn().mockResolvedValue(opts.points ?? 0) };
     const service = Object.assign(Object.create(PaymentsService.prototype), {
       ticketRepository,
       stripe,
-      loyaltyService,
     }) as PaymentsService;
-    return { service, ticketRepository, stripe, loyaltyService };
+    return { service, ticketRepository, stripe };
   }
 
   const ticket = (id: string, price: string, seatNumber: number) => ({
@@ -76,18 +69,15 @@ describe('PaymentsService.getPaymentStatus', () => {
     expect(all.confirmationEmailSentAt).toBe('2026-11-08T19:00:05.000Z');
   });
 
-  it('reports issued tickets with the amount paid and the points really credited', async () => {
-    const { service, loyaltyService } = build({
+  it('reports issued tickets with the amount paid', async () => {
+    const { service } = build({
       tickets: [ticket('t1', '3325.00', 1), ticket('t2', '4987.00', 2)],
-      points: 100,
     });
     const status = await service.getPaymentStatus(PI, USER);
     expect(status.status).toBe('issued');
     expect(status.amountPaid).toBe(8312);
-    expect(status.pointsCredited).toBe(100);
     expect(status.seats).toHaveLength(2);
     expect(status.match?.awayTeam).toBe('Újpest FC');
-    expect(loyaltyService.pointsCreditedFor).toHaveBeenCalledWith(USER, ['ticket:t1', 'ticket:t2']);
   });
 
   it("only looks at the caller's own tickets", async () => {

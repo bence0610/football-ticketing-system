@@ -14,7 +14,7 @@ import { seatDescription } from '../../cart/logic/cart-logic';
 /**
  * Sticky order summary: the fixture and kickoff, one line per seat, subtotal,
  * the loyalty discount row, the amount to pay, the pay button and two short
- * notes (when the ticket is issued, and the points earned).
+ * notes (when the ticket is issued, and how loyalty points are earned).
  */
 @Component({
   selector: 'kte-checkout-summary',
@@ -81,7 +81,7 @@ import { seatDescription } from '../../cart/logic/cart-logic';
 
       <p class="summary__points" *ngIf="points !== null && points > 0" data-testid="summary-points">
         <mat-icon inline aria-hidden="true">check_circle</mat-icon>
-        <span>Ezzel a vásárlással <strong>{{ points }} hűségpontot</strong> gyűjtesz.</span>
+        <span>Hűségpontot a részvételért kapsz: meccsenként egyszer <strong>{{ points }} pont</strong>, miután beolvasták a jegyed. A vásárlásért nem jár pont.</span>
       </p>
     </aside>
   `,
@@ -218,7 +218,7 @@ export class CheckoutSummaryComponent {
   @Input() subtotal: number | null = null;
   @Input() discount: TierDiscount | null = null;
   @Input() total: number | null = null;
-  /** Loyalty points this purchase earns; null when unknown. */
+  /** Points for attending a match (once per match); null when unknown. */
   @Input() points: number | null = null;
   @Input() processing = false;
   /** False while the payment cannot start (element loading, a hold expired, ...). */

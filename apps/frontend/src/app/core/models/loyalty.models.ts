@@ -11,7 +11,9 @@ export type LoyaltyTransactionSource =
   | 'profile_completion'
   | 'pass_loan'
   | 'season_carryover'
-  | 'registration';
+  | 'registration'
+  | 'pass_attendance'
+  | 'attendance';
 
 export interface LoyaltyTierResponse {
   tier: LoyaltyTier;
@@ -28,8 +30,10 @@ export interface LoyaltyTransactionResponse {
   points: number;
   balanceAfter: number;
   description?: string;
-  /** What earned the points; (source, referenceId) is unique. Absent on older rows. */
+  /** Internal key of the event (unique with the source); the UI never shows it. */
   referenceId?: string;
+  /** The match the row belongs to (attendance, an old ticket purchase, a loan), when there is one. */
+  match?: { id: string; homeTeam: string; awayTeam: string; kickoffAt: string };
   createdAt: string;
 }
 
@@ -37,8 +41,8 @@ export interface LoyaltyTransactionResponse {
 export interface LoyaltyEarningRules {
   registrationPoints: number;
   profileCompletionPoints: number;
-  /** Flat points per purchased ticket - not a rate per forint. */
-  ticketPointsPerTicket: number;
+  /** Points for entering a match: once per person per match, with a ticket, a pass entry or a borrowed entry. */
+  attendancePoints: number;
   seasonPassPoints: number;
   passLoanPoints: number;
   /** Share of the balance kept at the season-end conversion (0-100). */
@@ -50,8 +54,10 @@ export interface LoyaltySnapshotResponse {
   tier: LoyaltyTierResponse;
   nextTier?: LoyaltyTierResponse;
   pointsToNextTier?: number;
-  /** Points earned per ticket bought (server config). Absent on older servers. */
-  ticketPointsPerTicket?: number;
+  /** Present while the tier is kept without the points to match it: the last day it is kept (yyyy-mm-dd). */
+  tierKeptUntil?: string;
+  /** With `tierKeptUntil`: how many points the balance is short of the kept tier. */
+  pointsToKeepTier?: number;
   /** Absent on older servers; the page then says nothing about the rules. */
   earning?: LoyaltyEarningRules;
   /** Distinct matches entered (a ticket with a gate scan). */
@@ -98,7 +104,7 @@ export const TIER_TEXT_COLORS: Record<LoyaltyTier, string> = {
 };
 
 export const TRANSACTION_SOURCE_LABELS: Record<LoyaltyTransactionSource, string> = {
-  ticket_purchase: 'Jegyvásárlás',
+  ticket_purchase: 'Jegyvásárlás (régi pontozás)',
   season_pass_purchase: 'Bérletvásárlás',
   promotion: 'Promóció',
   reward_redeem: 'Pontbeváltás',
@@ -107,4 +113,6 @@ export const TRANSACTION_SOURCE_LABELS: Record<LoyaltyTransactionSource, string>
   pass_loan: 'Bérletkölcsön',
   season_carryover: 'Szezonzáró pontkonverzió',
   registration: 'Regisztráció',
+  pass_attendance: 'Belépés bérlettel (régi pontozás)',
+  attendance: 'Részvétel',
 };

@@ -20,7 +20,7 @@
  * stores a PaymentIntent id (one per order, shared by the tickets of that order). Everything
  * else is written the way the application writes it: the same statuses and QR code formats,
  * the same loyalty ledger (reference ids, tiers, the discount the buyer's tier gave at that
- * moment, the season-end halving), the same seat rules. Redis is not touched.
+ * moment, the season-end conversion, the kept tier and the points a scanned pass entry earns), the same seat rules. Redis is not touched.
  */
 import 'reflect-metadata';
 import * as bcrypt from 'bcrypt';

@@ -22,6 +22,20 @@ export class LoyaltyTierResponseDto {
   color!: string;
 }
 
+export class LoyaltyTransactionMatchDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ example: 'Kecskeméti TE' })
+  homeTeam!: string;
+
+  @ApiProperty({ example: 'Diósgyőri VTK' })
+  awayTeam!: string;
+
+  @ApiProperty({ format: 'date-time' })
+  kickoffAt!: string;
+}
+
 export class LoyaltyTransactionResponseDto {
   @ApiProperty()
   id!: string;
@@ -43,11 +57,19 @@ export class LoyaltyTransactionResponseDto {
 
   @ApiProperty({
     required: false,
-    example: 'ticket:7c1e…',
+    example: 'match:7c1e…:9a2f…',
     description:
-      'Reference of the event that earned the points. (source, referenceId) is unique, so one event can never be credited twice.',
+      'Reference of the event that earned the points (internal; the UI never shows it). (source, referenceId) is unique, so one event can never be credited twice.',
   })
   referenceId?: string;
+
+  @ApiProperty({
+    required: false,
+    type: () => LoyaltyTransactionMatchDto,
+    description:
+      'The match the row belongs to (attendance, an old ticket purchase, a loan), when there is one.',
+  })
+  match?: LoyaltyTransactionMatchDto;
 
   @ApiProperty({ type: String })
   createdAt!: string;
@@ -60,8 +82,12 @@ export class LoyaltyEarningRulesDto {
   @ApiProperty({ example: 50 })
   profileCompletionPoints!: number;
 
-  @ApiProperty({ example: 50, description: 'Flat points per purchased ticket (not per forint).' })
-  ticketPointsPerTicket!: number;
+  @ApiProperty({
+    example: 50,
+    description:
+      'Points for entering a match (LOYALTY_ATTENDANCE_POINTS): once per person per match, with a ticket, a pass entry or a borrowed entry.',
+  })
+  attendancePoints!: number;
 
   @ApiProperty({ example: 500 })
   seasonPassPoints!: number;
@@ -90,10 +116,19 @@ export class LoyaltySnapshotResponseDto {
   pointsToNextTier?: number;
 
   @ApiProperty({
-    example: 50,
-    description: 'Points earned for each ticket bought (LOYALTY_TICKET_POINTS_PER_TICKET).',
+    example: '2028-06-30',
+    required: false,
+    description:
+      'Present while the tier is kept without the points to match it: the last day it is kept.',
   })
-  ticketPointsPerTicket!: number;
+  tierKeptUntil?: string;
+
+  @ApiProperty({
+    example: 835,
+    required: false,
+    description: 'With tierKeptUntil: how many points the balance is short of the kept tier.',
+  })
+  pointsToKeepTier?: number;
 
   @ApiProperty({ type: () => LoyaltyEarningRulesDto })
   earning!: LoyaltyEarningRulesDto;

@@ -227,14 +227,17 @@ describe('shared e-mail frame', () => {
       expect(html).toContain('A meghívó már nem érvényes');
     });
 
-    it('ticket confirmation: fixture, seat, amount paid, flat points; no invoice promise', () => {
+    it('ticket confirmation: fixture, seat, amount paid; points are promised for attending, never for buying; no invoice promise', () => {
       const { html, text } = render(find('ticket-confirmation'));
-      const points = 2 * loyaltyConfig().ticketPointsPerTicket;
+      const points = loyaltyConfig().attendancePoints;
       for (const body of [html, text]) {
         expect(body).toContain('Kecskeméti TE - Újpest FC');
         expect(body).toContain('D/1 szektor / 7. sor / 12. szék');
         expect(body).toContain('9 000 HUF');
-        expect(body).toContain(`+${points} pont`);
+        // loyalty measures attendance: once per match, after the entry is scanned; buying earns nothing
+        expect(body).toContain(`meccsenként egyszer ${points} pont jár`);
+        expect(body).toContain('A jegyvásárlásért nem jár pont');
+        expect(body).not.toContain('Gyűjtött hűségpont');
         expect(body).not.toMatch(/számla|invoice/i);
       }
     });

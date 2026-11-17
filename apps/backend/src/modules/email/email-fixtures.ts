@@ -40,7 +40,7 @@ export function buildFixtures(qrDataUrl: string): EmailFixture[] {
     matchKickoffLabel: summary.kickoffLabel,
   };
   const seatLabel = 'D/1 szektor / 7. sor / 12. szék';
-  const perTicket = loyaltyConfig().ticketPointsPerTicket;
+  const attendancePoints = loyaltyConfig().attendancePoints;
   const tier = TIER_DEFINITIONS[1]; // Ezüst
   const nextTier = TIER_DEFINITIONS[2];
   const tickets = [
@@ -118,7 +118,7 @@ export function buildFixtures(qrDataUrl: string): EmailFixture[] {
         ...matchInfo,
         tickets,
         totalLabel: '9 000 HUF',
-        pointsEarned: tickets.length * perTicket,
+        attendancePoints,
         ticketsUrl: `${BASE_URL}/profile`,
         qrImageDataUrls: tickets.map((t, i) => ({
           ticketId: `T${i}`,
@@ -138,6 +138,8 @@ export function buildFixtures(qrDataUrl: string): EmailFixture[] {
         pointsBalance: 550,
         nextTierLabel: nextTier.label,
         pointsToNextTier: nextTier.minPoints - 550,
+        attendancePoints,
+        carryoverPercent: loyaltyConfig().carryoverPercent,
         loyaltyDashboardUrl: `${BASE_URL}/loyalty`,
       },
     },

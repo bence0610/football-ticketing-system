@@ -134,10 +134,6 @@ type View = 'checking' | 'issued' | 'processing' | 'failed' | 'missing';
               <span class="foot__label">Fizetett összeg</span>
               <strong data-testid="confirm-amount">{{ s.amountPaid | hufCurrency }}</strong>
             </div>
-            <div class="foot__item">
-              <span class="foot__label">Jóváírt pont</span>
-              <strong data-testid="confirm-points">+{{ s.pointsCredited }} pont</strong>
-            </div>
           </ng-container>
         </footer>
       </div>

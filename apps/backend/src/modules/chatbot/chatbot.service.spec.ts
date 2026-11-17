@@ -44,7 +44,7 @@ const SNAPSHOT: ChatbotContextSnapshot = {
     earning: {
       registration: 100,
       profileCompletion: 50,
-      perTicket: 50,
+      attendance: 50,
       seasonPass: 500,
       passLoan: 25,
     },

@@ -1,5 +1,4 @@
 import { EntityManager, EntityTarget } from 'typeorm';
-import { tierForPoints } from '../../modules/loyalty/loyalty.constants';
 import { LoyaltyTransaction } from '../entities/loyalty-transaction.entity';
 import { Match } from '../entities/match.entity';
 import { PassLoan } from '../entities/pass-loan.entity';
@@ -59,11 +58,8 @@ export async function wipeDemoData(manager: EntityManager): Promise<Counts> {
         [e.userId],
       )) as Array<{ points: number }>;
       const points = Math.max(0, Number(user?.points ?? 0) - Number(e.points));
-      await manager.query('UPDATE users SET loyalty_points = ?, loyalty_tier = ? WHERE id = ?', [
-        points,
-        tierForPoints(points).tier,
-        e.userId,
-      ]);
+      // The tier is left as it is: it may be a kept tier above what the points give.
+      await manager.query('UPDATE users SET loyalty_points = ? WHERE id = ?', [points, e.userId]);
     }
   }
 

@@ -952,12 +952,12 @@
 
 ### KTE-048 – Season-End Points Carryover Job ✅ DONE
 
-**User Story:** As a developer, I want a scheduled job that carries over 50% of loyalty points at the end of each season, so that the loyalty program resets partially for the next season.
+**User Story:** As a developer, I want a scheduled job that carries over 70% of loyalty points (originally 50%) at the end of each season, so that the loyalty program resets partially for the next season.
 
 **Acceptance Criteria:**
 - [x] Cron job runs on a configurable date (default: end of football season, ~June 30)
-- [x] Each user's points are reduced to 50% and a `LoyaltyTransaction` is recorded (reason: "Season carryover")
-- [x] Tier is recalculated after carryover
+- [x] Each user's points are reduced to 70% (LOYALTY_CARRYOVER_PERCENT; originally 50%) and a `LoyaltyTransaction` is recorded (reason: "Season carryover")
+- [x] Tier is decided after carryover: a tier reached during a season is kept until the end of the next season (stored with `loyalty_tier_reached_at`)
 - [x] Job is idempotent (safe to re-run)
 - [x] Job execution is logged
 

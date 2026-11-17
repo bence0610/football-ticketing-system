@@ -10,6 +10,8 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import {
+  LoyaltyTransactionSource,
+  LoyaltyTransactionType,
   MatchStatus,
   PassLoan,
   PassLoanStatus,
@@ -22,6 +24,7 @@ import {
   User,
 } from '../../database/entities';
 import { formatFullName } from '../../common/format-name';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { QrService } from '../qr/qr.service';
 import { loadSectorMap } from '../seats/sector-lookup';
 import { TicketScanResponseDto } from './dto/scan-ticket.dto';
@@ -39,6 +42,7 @@ export class TicketsService {
     @Optional()
     @Inject(forwardRef(() => WaitlistNotificationService))
     private readonly waitlistNotifier?: WaitlistNotificationService,
+    @Optional() private readonly loyaltyService?: LoyaltyService,
   ) {}
 
   async count(): Promise<number> {
@@ -124,7 +128,9 @@ export class TicketsService {
       }
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    // Set when this call is the one that admitted an entry: it can earn attendance points.
+    let admittedEntry: Ticket | null = null;
+    const response = await this.dataSource.transaction<TicketScanResponseDto>(async (manager) => {
       const ticketRepo = manager.getRepository(Ticket);
       const ticket = await ticketRepo.findOne({
         where: { id: ticketId },
@@ -184,6 +190,7 @@ export class TicketsService {
         await this.qrService.revoke(ticket.qrJti);
       }
       await this.markLoanUsed(manager, ticket);
+      admittedEntry = ticket;
       const holderName = await this.resolveEnteringName(manager, ticket);
       return {
         success: true,
@@ -195,6 +202,53 @@ export class TicketsService {
         ...(await this.scanDetails(ticket)),
       };
     });
+    if (admittedEntry) {
+      await this.awardAttendance(admittedEntry);
+    }
+    return response;
+  }
+
+  /**
+   * Loyalty measures attendance, not spending: the first time a person enters a match they earn
+   * LOYALTY_ATTENDANCE_POINTS, once per person per match however many of their tickets are scanned.
+   * Whose entry it is:
+   *  - a single ticket: the buyer (their ticket got in);
+   *  - a season-pass entry: the pass HOLDER's account (a holder without one has nobody to credit);
+   *  - a loan entry: the borrower, who was there (the lender is paid the loan points elsewhere).
+   * The ledger row's reference is built from the match and the person, so the database's unique
+   * (source, reference) key is what enforces the "once": a second ticket for the same match, a pass
+   * entry plus a ticket, or a repeated award all land on the same key and are refused.
+   * Best effort and after the admission has committed: the gate never waits on, or fails because
+   * of, the loyalty ledger.
+   */
+  private async awardAttendance(entry: Ticket): Promise<void> {
+    if (!this.loyaltyService) return;
+    try {
+      const points = this.loyaltyService.getConfig().attendancePoints;
+      if (points <= 0) return;
+      let userId: string | null | undefined = entry.userId;
+      if (entry.source === TicketSource.SEASON_PASS) {
+        const pass = entry.seasonPassId
+          ? await this.dataSource
+              .getRepository(SeasonPass)
+              .findOne({ where: { id: entry.seasonPassId } })
+          : null;
+        userId = pass?.holderUserId;
+      }
+      if (!userId) return;
+      await this.loyaltyService.award({
+        userId,
+        type: LoyaltyTransactionType.EARN,
+        source: LoyaltyTransactionSource.ATTENDANCE,
+        points,
+        referenceId: `match:${entry.matchId}:${userId}`,
+        description: 'Részvétel',
+      });
+    } catch (error) {
+      this.logger.error(
+        `Attendance points failed for ticket ${entry.id}: ${(error as Error).message}`,
+      );
+    }
   }
 
   /**

@@ -92,10 +92,14 @@ export const envValidationSchema = Joi.object({
   // Loyalty
   LOYALTY_REGISTRATION_POINTS: Joi.number().integer().min(0).default(100),
   LOYALTY_PROFILE_COMPLETION_POINTS: Joi.number().integer().min(0).default(50),
+  // Points for entering a match, once per person per match. No default here: when it is not set the
+  // old name below is used, and then 50.
+  LOYALTY_ATTENDANCE_POINTS: Joi.number().integer().min(0),
+  // Deprecated name of LOYALTY_ATTENDANCE_POINTS.
   LOYALTY_TICKET_POINTS_PER_TICKET: Joi.number().integer().min(0).default(50),
   LOYALTY_SEASON_PASS_POINTS: Joi.number().integer().min(0).default(500),
   LOYALTY_PASS_LOAN_POINTS: Joi.number().integer().min(0).default(25),
-  LOYALTY_CARRYOVER_PERCENT: Joi.number().integer().min(0).max(100).default(50),
+  LOYALTY_CARRYOVER_PERCENT: Joi.number().integer().min(0).max(100).default(70),
 
   // Cron
   LOAN_RELEASE_CRON: Joi.string().default('0 * * * *'),

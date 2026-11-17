@@ -17,7 +17,11 @@ export type Slot = 'sat' | 'sun' | 'fri' | 'midweek';
 export interface MatchPlan {
   /** Stable name of the fixture: `cur:r07`, `cur:cup2`, `prev:l03`. */
   key: string;
-  season: 'current' | 'previous';
+  /**
+   * `older`: the seasons before the previous one. They exist only as a long history for the one
+   * account that has been to every match for years (see olderSeasons).
+   */
+  season: 'current' | 'previous' | 'older';
   seasonLabel: string;
   /** League round 1..30; null for a cup tie. */
   round: number | null;
@@ -348,6 +352,34 @@ export function buildSchedule(
   previous.sort((a, b) => a.kickoffAt.getTime() - b.kickoffAt.getTime());
 
   return { current, previous, roundSpacingDays: spacing };
+}
+
+/**
+ * The home matches of the seasons before last season, `count` of them, as copies of last season's
+ * shifted back 52 weeks at a time. Loyalty measures attendance and a person can earn at most
+ * about 1,300 points a season (a pass and every home match), so reaching KTE Legenda by attending
+ * takes four or five seasons: this is the history of the one account that has done that.
+ */
+export function olderSeasons(
+  previous: readonly MatchPlan[],
+  labelBefore: (label: string) => string,
+  count: number,
+): MatchPlan[] {
+  const out: MatchPlan[] = [];
+  let label = previous[0].seasonLabel;
+  for (let k = 1; k <= count; k += 1) {
+    label = labelBefore(label);
+    for (const p of previous) {
+      out.push({
+        ...p,
+        key: `old${k}:${p.key.slice('prev:'.length)}`,
+        season: 'older',
+        seasonLabel: label,
+        kickoffAt: new Date(p.kickoffAt.getTime() - 364 * k * DAY_MS),
+      });
+    }
+  }
+  return out;
 }
 
 export function venueFor(m: Pick<MatchPlan, 'home' | 'opponent'>): string {

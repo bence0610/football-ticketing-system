@@ -107,7 +107,8 @@ export interface ChatbotLoyaltySnapshot {
   earning: {
     registration: number;
     profileCompletion: number;
-    perTicket: number;
+    /** Entering a match, once per person per match (ticket, pass entry or borrowed entry). */
+    attendance: number;
     seasonPass: number;
     passLoan: number;
   };
@@ -285,7 +286,7 @@ export class ChatbotContextService {
       earning: {
         registration: c.registrationPoints,
         profileCompletion: c.profileCompletionPoints,
-        perTicket: c.ticketPointsPerTicket,
+        attendance: c.attendancePoints,
         seasonPass: c.seasonPassPoints,
         passLoan: c.passLoanPoints,
       },

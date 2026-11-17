@@ -35,7 +35,14 @@ import type {
 } from './model';
 import { PASS_TIERS, buildPasses } from './passes';
 import { Rng } from './rng';
-import { MatchPlan, awayTeamOf, buildSchedule, homeTeamOf, venueFor } from './schedule';
+import {
+  MatchPlan,
+  awayTeamOf,
+  buildSchedule,
+  homeTeamOf,
+  olderSeasons,
+  venueFor,
+} from './schedule';
 import {
   DAY_MS,
   HOUR_MS,
@@ -58,6 +65,8 @@ export const LIFETIME_TICKET_CAP = 85;
  * previous season sells this share of what a current-season match of the same pull would.
  */
 export const PREVIOUS_SEASON_SHARE = 0.8;
+/** Seasons before last season that the one lifelong supporter has a history in. */
+export const OLDER_SEASONS = 3;
 /** The invitation lifetime the application uses (LOAN_INVITATION_TTL_HOURS). */
 const LOAN_TTL_HOURS = 72;
 
@@ -131,6 +140,15 @@ function nextSweepAfter(after: Date): Date {
   return sameDay.getTime() >= after.getTime() ? sameDay : wallClockToUtc(day + 1, 4, 0);
 }
 
+/** When seat `i` of an order was scanned at the gate (a little before kickoff). */
+function scanTimeOf(o: Order, i: number): Date {
+  return floorSecond(
+    o.plan.kickoffAt.getTime() -
+      (8 + ((o.at.getTime() / 1000) % 60) + (i % 3)) * MINUTE_MS -
+      i * 11_000,
+  );
+}
+
 function scanFlags(
   plan: MatchPlan,
   size: number,
@@ -174,8 +192,10 @@ interface OrderContext {
 function generateOrders(ctx: OrderContext): Order[] {
   const { now, stadium, users, rng } = ctx;
   const crowd = users.filter((u) => CLASS_WEIGHT[u.fanClass] > 0);
+  // The older seasons have no crowd: only the history of the one account that attended them (a
+  // pass, entered at the gate), so no single tickets are generated for them.
   const homePlans = ctx.plans
-    .filter((p) => p.home)
+    .filter((p) => p.home && p.season !== 'older')
     .sort((a, b) => a.kickoffAt.getTime() - b.kickoffAt.getTime());
   const planKeys = new Set(homePlans.map((p) => p.key));
 
@@ -440,7 +460,7 @@ function passTickets(
   const leaguePlans = plans.filter((p) => p.home && p.passEligible);
   for (const pass of passes) {
     for (const plan of leaguePlans) {
-      if (plan.season !== pass.season) continue;
+      if (plan.seasonLabel !== pass.seasonLabel) continue;
       const kickoff = plan.kickoffAt.getTime();
       if (kickoff < pass.createdAt.getTime() + HOUR_MS) continue;
       if (lent.has(`${pass.id}|${plan.key}`)) continue;
@@ -502,8 +522,24 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
     validUntil: shiftYear(input.season.validUntil, -1),
     prices: PREVIOUS_PRICES,
   };
+  // One window per older season, nearest first, shifted back a year at a time.
+  const olderWindows: Array<{ label: string; validFrom: Date; validUntil: Date }> = [];
+  {
+    let label = previousLabel;
+    for (let k = 1; k <= OLDER_SEASONS; k += 1) {
+      label = previousSeasonLabel(label);
+      olderWindows.push({
+        label,
+        validFrom: shiftYear(input.season.validFrom, -1 - k),
+        validUntil: shiftYear(input.season.validUntil, -1 - k),
+      });
+    }
+  }
   const schedule = buildSchedule(now, input.season, previousLabel);
-  const plans = [...schedule.current, ...schedule.previous];
+  // Seasons before last season, for the account that has held a pass and been to every match for
+  // years (see olderSeasons): four seasons are what reaching KTE Legenda by attending takes.
+  const olderPlans = olderSeasons(schedule.previous, previousSeasonLabel, OLDER_SEASONS);
+  const plans = [...schedule.current, ...schedule.previous, ...olderPlans];
   const planByKey = new Map(plans.map((p) => [p.key, p]));
   const stadium = new Stadium(input.seats, input.sectors);
   const sellable = stadium.sellableSeats().length;
@@ -555,6 +591,7 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
       now,
       season: input.season,
       previous: previousWindow,
+      older: olderWindows,
       foreignPassSeatIds: foreign,
     },
     rPasses,
@@ -623,9 +660,45 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
   }
   for (const p of passes)
     events.push({ kind: 'pass', userId: p.buyerId, at: p.createdAt, passId: p.id });
+  // Attendance: the first time a person enters a match they earn the attendance points, once per
+  // person per match. Whose entry it is: a single ticket, its buyer; a pass entry, the pass HOLDER's
+  // account (a holder without one has nobody to credit); a borrowed entry, the borrower.
+  const firstEntry = new Map<string, { userId: string; matchId: string; at: Date }>();
+  const entered = (userId: string, matchId: string, at: Date): void => {
+    const key = `${userId}|${matchId}`;
+    const seen = firstEntry.get(key);
+    if (!seen || at.getTime() < seen.at.getTime()) firstEntry.set(key, { userId, matchId, at });
+  };
+  for (const o of orders) {
+    o.seats.forEach((_seat, i) => {
+      if (o.scanned[i])
+        entered(o.user.id, matchIdByKey.get(o.plan.key) as string, scanTimeOf(o, i));
+    });
+  }
+  const holderByPass = new Map(passes.map((p) => [p.id, p.holderId]));
+  for (const t of entryTickets) {
+    const holder = t.seasonPassId ? holderByPass.get(t.seasonPassId) : null;
+    if (t.source === 'season_pass' && t.status === 'used' && holder && t.scannedAt) {
+      entered(holder, t.matchId, t.scannedAt);
+    }
+  }
+  for (const t of loanOut.tickets) {
+    if (t.source === 'loan' && t.status === 'used' && t.scannedAt)
+      entered(t.userId, t.matchId, t.scannedAt);
+  }
+  for (const e of firstEntry.values()) {
+    events.push({ kind: 'attend', userId: e.userId, at: e.at, matchId: e.matchId });
+  }
   events.push(...loanOut.events);
-  const carryoverAt = wallClockToUtc(dayNumberOfDateColumn(input.season.validFrom) - 1, 3, 0);
-  const outcome = simulateLoyalty(events, input.rules, carryoverAt, rLedger, now);
+  // The season-end conversion of every season boundary, oldest first (30 June 03:00 each year).
+  const carryoverAts = [
+    input.season.validFrom,
+    previousWindow.validFrom,
+    ...olderWindows.map((w) => w.validFrom),
+  ]
+    .map((from) => wallClockToUtc(dayNumberOfDateColumn(from) - 1, 3, 0))
+    .sort((a, b) => a.getTime() - b.getTime());
+  const outcome = simulateLoyalty(events, input.rules, carryoverAts, rLedger, now);
 
   for (const u of users) {
     if (!u.expectedTier) continue;
@@ -643,13 +716,7 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
     const prices = outcome.orderPrices.get(o.id) as number[];
     const kickoff = o.plan.kickoffAt;
     o.seats.forEach((seat, i) => {
-      const scannedAt = o.scanned[i]
-        ? floorSecond(
-            kickoff.getTime() -
-              (8 + ((o.at.getTime() / 1000) % 60) + (i % 3)) * MINUTE_MS -
-              i * 11_000,
-          )
-        : null;
+      const scannedAt = o.scanned[i] ? scanTimeOf(o, i) : null;
       const expired = !scannedAt && o.plan.season === 'previous';
       const expiredAt = expired ? nextSweepAfter(new Date(kickoff.getTime() + DAY_MS)) : null;
       singleTickets.push({
@@ -689,6 +756,7 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
       dateOfBirth: u.dateOfBirth,
       role: u.role,
       loyaltyTier: balance?.tier ?? LoyaltyTier.BRONZE,
+      loyaltyTierReachedAt: balance?.reachedAt ?? null,
       loyaltyPoints: balance?.points ?? 0,
       emailVerified: true,
       twoFactorEnabled: false,
@@ -721,20 +789,22 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
     version: 1,
   }));
 
-  const priceRows: PriceRow[] = PASS_TIERS.map((tier) => ({
-    id: rExtra.uuid(),
-    section: tier,
-    sectionLabel: TIER_LABEL[tier],
-    seasonLabel: previousLabel,
-    price: PREVIOUS_PRICES[tier],
-    currency: 'HUF',
-    validFrom: previousWindow.validFrom,
-    validUntil: previousWindow.validUntil,
-    isActive: false,
-    createdAt: floorSecond(previousWindow.validFrom.getTime() - 20 * DAY_MS),
-    updatedAt: floorSecond(previousWindow.validFrom.getTime() - 20 * DAY_MS),
-    version: 1,
-  }));
+  const priceRows: PriceRow[] = [previousWindow, ...olderWindows].flatMap((w) =>
+    PASS_TIERS.map((tier) => ({
+      id: rExtra.uuid(),
+      section: tier,
+      sectionLabel: TIER_LABEL[tier],
+      seasonLabel: w.label,
+      price: PREVIOUS_PRICES[tier],
+      currency: 'HUF',
+      validFrom: w.validFrom,
+      validUntil: w.validUntil,
+      isActive: false,
+      createdAt: floorSecond(w.validFrom.getTime() - 20 * DAY_MS),
+      updatedAt: floorSecond(w.validFrom.getTime() - 20 * DAY_MS),
+      version: 1,
+    })),
+  );
 
   const accounts: NamedAccount[] = users
     .filter((u) => u.key)

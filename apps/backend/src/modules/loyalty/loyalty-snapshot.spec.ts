@@ -9,14 +9,22 @@ import { LoyaltyService } from './loyalty.service';
  */
 describe('LoyaltyService.getSnapshot', () => {
   interface Options {
-    ticketPointsPerTicket?: number;
+    attendancePoints?: number;
     attended?: number;
     ledgerSize?: number;
+    points?: number;
+    tier?: LoyaltyTier;
+    reachedAt?: Date | null;
   }
 
   function build(options: Options = {}) {
-    const { ticketPointsPerTicket = 50, attended = 0, ledgerSize = 0 } = options;
-    const user = { id: 'u1', loyaltyPoints: 1000, loyaltyTier: LoyaltyTier.SILVER };
+    const { attendancePoints = 50, attended = 0, ledgerSize = 0 } = options;
+    const user = {
+      id: 'u1',
+      loyaltyPoints: options.points ?? 1000,
+      loyaltyTier: options.tier ?? LoyaltyTier.SILVER,
+      loyaltyTierReachedAt: options.reachedAt ?? null,
+    };
     const queryBuilder = {
       select: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
@@ -39,7 +47,7 @@ describe('LoyaltyService.getSnapshot', () => {
           ? {
               registrationPoints: 100,
               profileCompletionPoints: 50,
-              ticketPointsPerTicket,
+              attendancePoints,
               seasonPassPoints: 500,
               passLoanPoints: 25,
               carryoverPercent: 50,
@@ -55,19 +63,18 @@ describe('LoyaltyService.getSnapshot', () => {
     return { service, repo, queryBuilder };
   }
 
-  it('exposes the configured points per ticket', async () => {
-    const { service } = build({ ticketPointsPerTicket: 50 });
+  it('exposes the configured attendance points', async () => {
+    const { service } = build({ attendancePoints: 50 });
     const snapshot = await service.getSnapshot('u1');
-    expect(snapshot.ticketPointsPerTicket).toBe(50);
+    expect(snapshot.earning.attendancePoints).toBe(50);
     expect(snapshot.tier.tier).toBe(LoyaltyTier.SILVER);
     expect(snapshot.pointsToNextTier).toBe(500);
   });
 
   it('follows the configuration rather than a constant', async () => {
-    const { service } = build({ ticketPointsPerTicket: 120 });
+    const { service } = build({ attendancePoints: 120 });
     const snapshot = await service.getSnapshot('u1');
-    expect(snapshot.ticketPointsPerTicket).toBe(120);
-    expect(snapshot.earning.ticketPointsPerTicket).toBe(120);
+    expect(snapshot.earning.attendancePoints).toBe(120);
   });
 
   it('carries every earning rule from the configuration', async () => {
@@ -75,11 +82,44 @@ describe('LoyaltyService.getSnapshot', () => {
     expect((await service.getSnapshot('u1')).earning).toEqual({
       registrationPoints: 100,
       profileCompletionPoints: 50,
-      ticketPointsPerTicket: 50,
+      attendancePoints: 50,
       seasonPassPoints: 500,
       passLoanPoints: 25,
       carryoverPercent: 50,
     });
+  });
+
+  it('a tier kept past the points: next tier is the one above it, and the keep date and shortfall are given', async () => {
+    // Legenda reached in the 2026/27 season, balance down to 2,165 after the 30 June conversion.
+    const { service } = build({
+      points: 2165,
+      tier: LoyaltyTier.PLATINUM,
+      reachedAt: new Date('2026-11-20T12:00:00Z'),
+    });
+    const snapshot = await service.getSnapshot('u1');
+    expect(snapshot.tier.tier).toBe(LoyaltyTier.PLATINUM);
+    expect(snapshot.nextTier).toBeUndefined(); // top tier: nothing above it
+    expect(snapshot.tierKeptUntil).toBe('2028-06-30'); // end of the season AFTER the one it was reached in
+    expect(snapshot.pointsToKeepTier).toBe(3000 - 2165);
+  });
+
+  it('a kept tier below the top still points at the tier above it, not at a threshold above the points', async () => {
+    const { service } = build({
+      points: 1400,
+      tier: LoyaltyTier.GOLD,
+      reachedAt: new Date('2026-11-20T12:00:00Z'),
+    });
+    const snapshot = await service.getSnapshot('u1');
+    expect(snapshot.nextTier?.tier).toBe(LoyaltyTier.PLATINUM);
+    expect(snapshot.pointsToNextTier).toBe(3000 - 1400);
+    expect(snapshot.tierKeptUntil).toBe('2028-06-30');
+  });
+
+  it('says nothing about keeping when the points hold the tier', async () => {
+    const { service } = build({ points: 1000, tier: LoyaltyTier.SILVER, reachedAt: new Date() });
+    const snapshot = await service.getSnapshot('u1');
+    expect(snapshot.tierKeptUntil).toBeUndefined();
+    expect(snapshot.pointsToKeepTier).toBeUndefined();
   });
 
   it('counts only distinct matches with a scanned ticket', async () => {

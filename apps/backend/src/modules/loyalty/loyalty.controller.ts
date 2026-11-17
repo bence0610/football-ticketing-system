@@ -64,16 +64,21 @@ export class LoyaltyController {
       throw new Error('Authenticated user id missing from request');
     }
     const snapshot = await this.loyaltyService.getSnapshot(userId);
+    const matches = await this.loyaltyService.matchesFor(snapshot.recentTransactions);
     return {
       points: snapshot.points,
       tier: { ...snapshot.tier },
       nextTier: snapshot.nextTier ? { ...snapshot.nextTier } : undefined,
       pointsToNextTier: snapshot.pointsToNextTier,
-      ticketPointsPerTicket: snapshot.ticketPointsPerTicket,
+      ...(snapshot.tierKeptUntil
+        ? { tierKeptUntil: snapshot.tierKeptUntil, pointsToKeepTier: snapshot.pointsToKeepTier }
+        : {}),
       earning: { ...snapshot.earning },
       matchesAttended: snapshot.matchesAttended,
       totalTransactions: snapshot.totalTransactions,
-      recentTransactions: snapshot.recentTransactions.map(toTransactionDto),
+      recentTransactions: snapshot.recentTransactions.map((tx) =>
+        toTransactionDto(tx, matches.get(tx.id)),
+      ),
     };
   }
 
@@ -95,11 +100,15 @@ export class LoyaltyController {
       Math.max(offset, 0),
       Math.min(Math.max(limit, 1), MAX_PAGE),
     );
-    return rows.map(toTransactionDto);
+    const matches = await this.loyaltyService.matchesFor(rows);
+    return rows.map((tx) => toTransactionDto(tx, matches.get(tx.id)));
   }
 }
 
-function toTransactionDto(tx: LoyaltyTransaction): LoyaltyTransactionResponseDto {
+function toTransactionDto(
+  tx: LoyaltyTransaction,
+  match?: LoyaltyTransactionResponseDto['match'],
+): LoyaltyTransactionResponseDto {
   return {
     id: tx.id,
     type: tx.type,
@@ -108,6 +117,7 @@ function toTransactionDto(tx: LoyaltyTransaction): LoyaltyTransactionResponseDto
     balanceAfter: tx.balanceAfter,
     description: tx.description,
     referenceId: tx.referenceId,
+    match,
     createdAt: tx.createdAt.toISOString(),
   };
 }

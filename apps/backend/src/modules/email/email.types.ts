@@ -29,8 +29,8 @@ export interface TicketConfirmationContext {
     gateLabel?: string;
   }>;
   totalLabel: string;
-  /** Loyalty points earned by this purchase: tickets x the flat per-ticket rule (never a share of the price). */
-  pointsEarned: number;
+  /** Points for entering the match (once per person per match). Buying earns none. */
+  attendancePoints: number;
   ticketsUrl: string;
   qrImageDataUrls: Array<{ ticketId: string; seatLabel: string; dataUrl: string }>;
 }
@@ -79,6 +79,10 @@ export interface TierUpgradedContext {
   /** The tier after this one, when there is one. */
   nextTierLabel?: string;
   pointsToNextTier?: number;
+  /** Points for entering a match, once per person per match. */
+  attendancePoints: number;
+  /** Share of the balance kept at the 30 June conversion (0-100). */
+  carryoverPercent: number;
   loyaltyDashboardUrl: string;
 }
 
