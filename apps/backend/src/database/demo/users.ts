@@ -204,7 +204,7 @@ const NAMED: readonly NamedSpec[] = [
     purpose: 'Lila szint: a belépő szint, 0% kedvezmény, a következő szintig hátralévő pontok.',
   },
   {
-    // Attends 5 matches last season (150 + 250 = 400, 70% kept = 280) and 6 this season (+300): 580, Ezüst (500-1499).
+    // Attends 5 matches last season (150 + 250 = 400, 70% kept = 280) and 6 this season (+300): 580, Ezüst (300-999).
     key: 'ezust',
     firstName: 'Tamás',
     lastName: 'Balogh',
@@ -221,7 +221,7 @@ const NAMED: readonly NamedSpec[] = [
       'Ezüst szint: 5% kedvezmény látható az árakban, szezonváltáskori pontkonverzió (70% marad) a főkönyvben.',
   },
   {
-    // A pass holder who attends most home matches, with a few tickets for friends besides: about 1,700 points, Arany (1500-2999).
+    // A pass holder who attends most home matches, with a few tickets for friends besides: about 1,700 points, Arany (1000-2499).
     key: 'arany',
     firstName: 'Zoltán',
     lastName: 'Takács',
@@ -234,15 +234,15 @@ const NAMED: readonly NamedSpec[] = [
     purpose: 'Arany szint: 10% kedvezmény, kedvezményes jegyárak a kosárban és a jegyeken.',
   },
   {
-    // A supporter since 2022 with a pass of their own in every season, who has been to every home match (a scanned
-    // pass entry; the cup ties with a ticket): 50 points per match, once, and 500 per pass. Five seasons of that is
+    // A supporter since 2023 with a pass of their own in every season, who has been to every home match (a scanned
+    // pass entry; the cup ties with a ticket): 50 points per match, once, and 500 per pass. Three seasons of that (with the pass bought for a guest this season) is
     // what reaching KTE Legenda by attending takes.
     key: 'legenda',
     firstName: 'Sándor',
     lastName: 'Lakatos',
     role: UserRole.FAN,
     fanClass: 'scripted',
-    createdDaysAgo: 1700,
+    createdDaysAgo: 1100,
     profileDone: true,
     forced: [scanned('cur:cup1', 1), scanned('prev:cup1', 1)],
     expectedTier: LoyaltyTier.PLATINUM,

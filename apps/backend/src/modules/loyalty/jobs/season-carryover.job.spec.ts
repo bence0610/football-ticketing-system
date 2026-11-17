@@ -75,12 +75,12 @@ describe('SeasonCarryoverJob', () => {
   it('the next year, with the tier neither earned again nor reached that season, it falls to what the points give', async () => {
     const { job, row } = setup({
       tier: LoyaltyTier.PLATINUM,
-      points: 2565, // 2,165 plus a quiet season
+      points: 2300, // 1,820 plus a quiet season: under the 2,500 of Legenda
       reachedAt: new Date('2027-06-30T01:00:00Z'), // stamped at the previous conversion
     });
     jest.setSystemTime(new Date('2028-06-30T01:00:00Z'));
     await job.run();
-    expect(row.loyaltyPoints).toBe(1796);
+    expect(row.loyaltyPoints).toBe(1610);
     expect(row.loyaltyTier).toBe(LoyaltyTier.GOLD);
     expect(row.loyaltyTierReachedAt).toBeNull();
   });

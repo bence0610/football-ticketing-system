@@ -4,22 +4,27 @@ import { definitionFor, tierForPoints, TIER_DEFINITIONS } from './loyalty.consta
 describe('LoyaltyConstants', () => {
   it('returns BRONZE for any points below the silver threshold', () => {
     expect(tierForPoints(0).tier).toBe(LoyaltyTier.BRONZE);
-    expect(tierForPoints(499).tier).toBe(LoyaltyTier.BRONZE);
+    expect(tierForPoints(299).tier).toBe(LoyaltyTier.BRONZE);
   });
 
-  it('returns SILVER between 500 and 1499 points', () => {
-    expect(tierForPoints(500).tier).toBe(LoyaltyTier.SILVER);
-    expect(tierForPoints(1499).tier).toBe(LoyaltyTier.SILVER);
+  it('returns SILVER between 300 and 999 points', () => {
+    expect(tierForPoints(300).tier).toBe(LoyaltyTier.SILVER);
+    expect(tierForPoints(999).tier).toBe(LoyaltyTier.SILVER);
   });
 
-  it('returns GOLD between 1500 and 2999 points', () => {
-    expect(tierForPoints(1500).tier).toBe(LoyaltyTier.GOLD);
-    expect(tierForPoints(2999).tier).toBe(LoyaltyTier.GOLD);
+  it('returns GOLD between 1000 and 2499 points', () => {
+    expect(tierForPoints(1000).tier).toBe(LoyaltyTier.GOLD);
+    expect(tierForPoints(2499).tier).toBe(LoyaltyTier.GOLD);
   });
 
-  it('returns PLATINUM at 3000+ points', () => {
-    expect(tierForPoints(3000).tier).toBe(LoyaltyTier.PLATINUM);
+  it('returns PLATINUM at 2500+ points', () => {
+    expect(tierForPoints(2500).tier).toBe(LoyaltyTier.PLATINUM);
     expect(tierForPoints(50_000).tier).toBe(LoyaltyTier.PLATINUM);
+  });
+
+  it('has the thresholds 300 / 1000 / 2500 and the discounts 0 / 5 / 10 / 15', () => {
+    expect(TIER_DEFINITIONS.map((t) => t.minPoints)).toEqual([0, 300, 1000, 2500]);
+    expect(TIER_DEFINITIONS.map((t) => t.discountPercent)).toEqual([0, 5, 10, 15]);
   });
 
   it('exposes a definition for every tier value', () => {

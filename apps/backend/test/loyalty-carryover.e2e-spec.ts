@@ -82,13 +82,13 @@ describe('Season-end carryover and the kept tier (E2E)', () => {
   it('a tier whose protection is used up falls to what the points give', async () => {
     // Stamped at the previous conversion, and not earned in the season that is now ending.
     const spent = await fan(
-      2565,
+      2300,
       LoyaltyTier.PLATINUM,
       new Date(Date.UTC(new Date().getUTCFullYear() - 1, 5, 30)),
     );
     await ctx.app.get(SeasonCarryoverJob).run();
     const after = await reload(spent);
-    expect(after.loyaltyPoints).toBe(1796);
+    expect(after.loyaltyPoints).toBe(1610);
     expect(after.loyaltyTier).toBe(LoyaltyTier.GOLD);
     expect(after.loyaltyTierReachedAt).toBeNull();
   });

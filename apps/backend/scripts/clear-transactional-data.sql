@@ -49,7 +49,7 @@ SET t.balance_after = GREATEST(r.running, 0);
 
 -- 4. The user's own balance and tier are stored columns too: without this they
 --    keep the points the deleted purchases earned. Tier thresholds are the
---    application's: Ezüst 500, Arany 1500, KTE Legenda 3000, otherwise Lila.
+--    application's: Ezüst 300, Arany 1000, KTE Legenda 2500, otherwise Lila.
 UPDATE users u
 JOIN tmp_affected_users a ON a.user_id = u.id
 LEFT JOIN (
@@ -60,9 +60,9 @@ SET u.loyalty_points = GREATEST(COALESCE(s.total, 0), 0);
 UPDATE users u
 JOIN tmp_affected_users a ON a.user_id = u.id
 SET u.loyalty_tier = CASE
-  WHEN u.loyalty_points >= 3000 THEN 'platinum'
-  WHEN u.loyalty_points >= 1500 THEN 'gold'
-  WHEN u.loyalty_points >= 500 THEN 'silver'
+  WHEN u.loyalty_points >= 2500 THEN 'platinum'
+  WHEN u.loyalty_points >= 1000 THEN 'gold'
+  WHEN u.loyalty_points >= 300 THEN 'silver'
   ELSE 'bronze'
 END;
 

@@ -43,7 +43,7 @@ describe('tierKeptText', () => {
   const snapshot = (over: Partial<LoyaltySnapshotResponse>): LoyaltySnapshotResponse =>
     ({
       points: 2165,
-      tier: { tier: 'platinum', label: 'KTE Legenda', minPoints: 3000, discountPercent: 15, color: '#C94B1E' },
+      tier: { tier: 'platinum', label: 'KTE Legenda', minPoints: 2500, discountPercent: 15, color: '#C94B1E' },
       recentTransactions: [],
       ...over,
     }) as LoyaltySnapshotResponse;

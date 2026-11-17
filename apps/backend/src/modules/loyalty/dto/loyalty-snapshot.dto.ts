@@ -12,7 +12,7 @@ export class LoyaltyTierResponseDto {
   @ApiProperty({ example: 'Arany' })
   label!: string;
 
-  @ApiProperty({ example: 1500 })
+  @ApiProperty({ example: 1000 })
   minPoints!: number;
 
   @ApiProperty({ example: 10 })

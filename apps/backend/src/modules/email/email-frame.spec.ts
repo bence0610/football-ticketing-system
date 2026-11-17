@@ -1,3 +1,4 @@
+import { TIER_DEFINITIONS } from '../loyalty/loyalty.constants';
 import loyaltyConfig from '../../config/loyalty.config';
 import { EmailFixture, buildFixtures } from './email-fixtures';
 import { EmailTemplateService } from './email-template.service';
@@ -246,7 +247,8 @@ describe('shared e-mail frame', () => {
       const { html } = render(find('tier-upgraded'));
       expect(html).toContain('Ezüst');
       expect(html).toContain('5% kedvezmény minden új jegyvásárlásból');
-      expect(html).toContain('Arany, még 950 pont');
+      // 550 points in the fixture: what is missing to Arany comes from the real tier table
+      expect(html).toContain(`Arany, még ${TIER_DEFINITIONS[2].minPoints - 550} pont`);
     });
 
     it('waitlist: which sector, plainly not reserved, no settings/unsubscribe link', () => {

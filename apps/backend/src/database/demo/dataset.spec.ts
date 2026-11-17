@@ -532,16 +532,16 @@ describe('the demo dataset', () => {
       expect(new Set(conversions.map((c) => c.referenceId)).size).toBe(conversions.length);
     });
 
-    it('gets KTE Legenda by attending, not by buying: a pass in five seasons, every home match, five conversions', () => {
+    it('gets KTE Legenda by attending, not by buying: a pass in every season, every home match, two conversions', () => {
       const legenda = user('legenda');
       const rows = rowsOf(legenda.id);
       expect(legenda.loyaltyTier).toBe(LoyaltyTier.PLATINUM);
-      // no purchase points at all, and the points are registration, profile, passes and attendance
+      // no purchase points at all: the points are registration, profile, passes and attendance
       expect(rows.filter((r) => r.source === 'ticket_purchase')).toHaveLength(0);
       const bySource = (src: string) => rows.filter((r) => r.source === src).length;
-      expect(bySource('season_pass_purchase')).toBeGreaterThanOrEqual(5);
-      expect(bySource('attendance')).toBeGreaterThan(60);
-      expect(bySource('season_carryover')).toBeGreaterThanOrEqual(4);
+      expect(bySource('season_pass_purchase')).toBeGreaterThanOrEqual(3);
+      expect(bySource('attendance')).toBeGreaterThan(30);
+      expect(bySource('season_carryover')).toBeGreaterThanOrEqual(2);
       // single tickets of this account: only the two cup ties (the pass covers the league matches)
       const bought = d.tickets.filter((t) => t.userId === legenda.id && t.source === 'single');
       expect(bought.length).toBeLessThanOrEqual(2);

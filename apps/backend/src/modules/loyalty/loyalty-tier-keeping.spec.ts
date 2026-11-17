@@ -87,8 +87,8 @@ describe('tierAtSeasonEnd: the 30 June decision', () => {
   it('a tier reached this season is kept even if the balance before did not reach it (stamped, not re-earned)', () => {
     const out = tierAtSeasonEnd({
       ...legenda(D('2027-03-01T00:00:00Z')),
-      pointsBefore: 2500,
-      pointsAfter: 1750,
+      pointsBefore: 2400, // did not reach the 2,500 of Legenda this season
+      pointsAfter: 1680,
       year: 2027,
       at,
     });
@@ -108,19 +108,19 @@ describe('tierAtSeasonEnd: the 30 June decision', () => {
     const at2 = D('2028-06-30T01:00:00Z');
     const out = tierAtSeasonEnd({
       ...kept,
-      pointsBefore: 2165 + 400, // a quiet season
-      pointsAfter: keep(2565),
+      pointsBefore: 2165 + 135, // a quiet season: 2,300, still under 2,500
+      pointsAfter: keep(2300),
       year: 2028,
       at: at2,
     });
-    expect(keep(2565)).toBe(1796);
+    expect(keep(2300)).toBe(1610);
     expect(out).toEqual({ tier: LoyaltyTier.GOLD, reachedAt: null });
   });
 
   it('a tier earned again in the later season is kept for another year', () => {
     const out = tierAtSeasonEnd({
       ...legenda(D('2026-11-20T12:00:00Z')),
-      pointsBefore: 3300, // back over 3,000 during 2027/28
+      pointsBefore: 3300, // back over 2,500 during 2027/28
       pointsAfter: keep(3300),
       year: 2028,
       at: D('2028-06-30T01:00:00Z'),
@@ -140,8 +140,8 @@ describe('tierAtSeasonEnd: the 30 June decision', () => {
     const out = tierAtSeasonEnd({
       tier: LoyaltyTier.GOLD,
       reachedAt: null,
-      pointsBefore: 1400, // did not support Arany before either
-      pointsAfter: 980,
+      pointsBefore: 900, // did not support Arany (1,000) before either
+      pointsAfter: 630,
       year: 2027,
       at,
     });
@@ -198,16 +198,21 @@ describe('simulation: how long it takes to reach a tier by attending', () => {
   describe('a pass holder with one extra cup ticket who attends 13 of 15 home matches', () => {
     // 13 league matches and the cup tie: 14 entries a season, 500 for the pass.
     const run = (seasons: number) => simulate({ pass: true, matchesPerSeason: 14, seasons });
+    const seasonOf = (seasons: number, tier: LoyaltyTier) =>
+      run(seasons).reached.find((r) => r.tier === tier)?.season;
 
-    it('reaches KTE Legenda during the fourth season', () => {
-      const legenda = run(4).reached.find((r) => r.tier === LoyaltyTier.PLATINUM);
-      expect(legenda?.season).toBe(4);
+    it('reaches Ezüst in the first season, Arany in the first season, KTE Legenda in the third', () => {
+      expect(seasonOf(4, LoyaltyTier.SILVER)).toBe(1); // at the pass purchase: 150 + 500
+      expect(seasonOf(4, LoyaltyTier.GOLD)).toBe(1); // 1,000 points at the 7th match
+      expect(seasonOf(4, LoyaltyTier.PLATINUM)).toBe(3); // 2,502 points at the 10th match
     });
 
-    it('is not Legenda before that: 1,350, 2,145 and 2,702 before the first three conversions', () => {
-      const { reached, peaks } = run(3);
-      expect(peaks).toEqual([1350, 2145, 2702]);
-      expect(reached.some((r) => r.tier === LoyaltyTier.PLATINUM)).toBe(false);
+    it('balances before the conversions: 1,350, 2,145, 2,702, 3,092', () => {
+      expect(run(4).peaks).toEqual([1350, 2145, 2702, 3092]);
+    });
+
+    it('is not Legenda in the first two seasons', () => {
+      const { reached } = run(2);
       expect(reached.map((r) => r.tier)).toEqual([LoyaltyTier.SILVER, LoyaltyTier.GOLD]);
     });
 
@@ -219,17 +224,20 @@ describe('simulation: how long it takes to reach a tier by attending', () => {
   describe('a fan without a pass who attends all 15 home matches with tickets', () => {
     const run = (seasons: number) => simulate({ pass: false, matchesPerSeason: 15, seasons });
 
-    it('reaches Arany in the third season and never gets to Legenda', () => {
+    it('reaches Ezüst in the first season (3rd match) and Arany in the second (8th match)', () => {
       const { reached } = run(30);
-      expect(reached.find((r) => r.tier === LoyaltyTier.GOLD)?.season).toBe(3);
-      expect(reached.some((r) => r.tier === LoyaltyTier.PLATINUM)).toBe(false);
+      expect(reached.find((r) => r.tier === LoyaltyTier.SILVER)?.season).toBe(1);
+      expect(reached.find((r) => r.tier === LoyaltyTier.GOLD)?.season).toBe(2);
     });
 
-    it('settles at Arany: the balance peaks near 2,500 and never reaches 3,000', () => {
-      const { state, peaks } = run(30);
-      expect(state.tier).toBe(LoyaltyTier.GOLD);
-      expect(Math.max(...peaks)).toBeLessThan(3000);
+    it('settles at Arany: the yearly peak creeps towards 2,500 and gets there only in season 20', () => {
+      // 750 a season against 30% lost each year converges on exactly 2,500 (the rounding of the
+      // conversion decides the last point): for twenty years the fan is Arany.
+      const { reached, peaks } = run(19);
+      expect(reached.some((r) => r.tier === LoyaltyTier.PLATINUM)).toBe(false);
+      expect(Math.max(...peaks)).toBeLessThan(2500);
       expect(peaks[peaks.length - 1]).toBeGreaterThan(2400);
+      expect(run(20).reached.find((r) => r.tier === LoyaltyTier.PLATINUM)?.season).toBe(20);
     });
   });
 

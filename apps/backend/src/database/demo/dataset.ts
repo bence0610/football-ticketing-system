@@ -65,8 +65,8 @@ export const LIFETIME_TICKET_CAP = 85;
  * previous season sells this share of what a current-season match of the same pull would.
  */
 export const PREVIOUS_SEASON_SHARE = 0.8;
-/** Seasons before last season that the one lifelong supporter has a history in. */
-export const OLDER_SEASONS = 3;
+/** One season before last season: the lifelong supporter's history (two seasons cannot reach KTE Legenda by attending). */
+export const OLDER_SEASONS = 1;
 /** The invitation lifetime the application uses (LOAN_INVITATION_TTL_HOURS). */
 const LOAN_TTL_HOURS = 72;
 

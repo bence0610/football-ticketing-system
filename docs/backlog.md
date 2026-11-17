@@ -869,7 +869,7 @@
 **Acceptance Criteria:**
 - [x] Points awarded: registration +100, profile completion +50, ticket purchase +50/ticket, season pass +500, pass loan +25
 - [x] Each award creates a `LoyaltyTransaction` record (userId, points, reason, createdAt)
-- [x] Current tier calculated from total points: Lila (0–499), Ezüst (500–1499), Arany (1500–2999), KTE Legenda (3000+)
+- [x] Current tier calculated from total points: Lila (0–299), Ezüst (300–999), Arany (1000–2499), KTE Legenda (2500+; originally 0–499 / 500–1499 / 1500–2999 / 3000+)
 - [x] Tier is stored on the `User` entity and updated after each transaction
 - [x] Unit tests cover each point-awarding event
 

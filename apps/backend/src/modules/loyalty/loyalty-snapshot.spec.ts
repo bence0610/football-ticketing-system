@@ -64,11 +64,11 @@ describe('LoyaltyService.getSnapshot', () => {
   }
 
   it('exposes the configured attendance points', async () => {
-    const { service } = build({ attendancePoints: 50 });
+    const { service } = build({ attendancePoints: 50, points: 700 });
     const snapshot = await service.getSnapshot('u1');
     expect(snapshot.earning.attendancePoints).toBe(50);
     expect(snapshot.tier.tier).toBe(LoyaltyTier.SILVER);
-    expect(snapshot.pointsToNextTier).toBe(500);
+    expect(snapshot.pointsToNextTier).toBe(300);
   });
 
   it('follows the configuration rather than a constant', async () => {
@@ -90,9 +90,9 @@ describe('LoyaltyService.getSnapshot', () => {
   });
 
   it('a tier kept past the points: next tier is the one above it, and the keep date and shortfall are given', async () => {
-    // Legenda reached in the 2026/27 season, balance down to 2,165 after the 30 June conversion.
+    // Legenda reached in the 2026/27 season, balance down to 1,751 after the 30 June conversion.
     const { service } = build({
-      points: 2165,
+      points: 1751,
       tier: LoyaltyTier.PLATINUM,
       reachedAt: new Date('2026-11-20T12:00:00Z'),
     });
@@ -100,18 +100,18 @@ describe('LoyaltyService.getSnapshot', () => {
     expect(snapshot.tier.tier).toBe(LoyaltyTier.PLATINUM);
     expect(snapshot.nextTier).toBeUndefined(); // top tier: nothing above it
     expect(snapshot.tierKeptUntil).toBe('2028-06-30'); // end of the season AFTER the one it was reached in
-    expect(snapshot.pointsToKeepTier).toBe(3000 - 2165);
+    expect(snapshot.pointsToKeepTier).toBe(2500 - 1751);
   });
 
   it('a kept tier below the top still points at the tier above it, not at a threshold above the points', async () => {
     const { service } = build({
-      points: 1400,
+      points: 700,
       tier: LoyaltyTier.GOLD,
       reachedAt: new Date('2026-11-20T12:00:00Z'),
     });
     const snapshot = await service.getSnapshot('u1');
     expect(snapshot.nextTier?.tier).toBe(LoyaltyTier.PLATINUM);
-    expect(snapshot.pointsToNextTier).toBe(3000 - 1400);
+    expect(snapshot.pointsToNextTier).toBe(2500 - 700);
     expect(snapshot.tierKeptUntil).toBe('2028-06-30');
   });
 

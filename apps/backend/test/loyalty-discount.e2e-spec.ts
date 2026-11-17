@@ -60,11 +60,11 @@ interface TierCase {
 
 const TIER_CASES: TierCase[] = [
   { name: 'Ezüst', tier: LoyaltyTier.SILVER, points: 500, percent: 5, discount: 417, total: 7916 },
-  { name: 'Arany', tier: LoyaltyTier.GOLD, points: 1500, percent: 10, discount: 833, total: 7500 },
+  { name: 'Arany', tier: LoyaltyTier.GOLD, points: 1000, percent: 10, discount: 833, total: 7500 },
   {
     name: 'KTE Legenda',
     tier: LoyaltyTier.PLATINUM,
-    points: 3000,
+    points: 2500,
     percent: 15,
     discount: 1250,
     total: 7083,

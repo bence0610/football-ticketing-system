@@ -47,7 +47,7 @@ A hűségprogram célja, hogy jutalmazzon minden interakciót, és erősítse a 
 Pontszerzési lehetőségek
 EseményPontRészvétel (az első beolvasott belépő egy meccsen: jegy, bérletes belépő vagy kölcsönkapott belépő)+50 pont, meccsenként és személyenként egyszer, akárhány jegy van arra a meccsreBérletvásárlás+500 pontJegyvásárlás0 pont (a hűségpont a részvételt jutalmazza, nem a költést)Bérlet kölcsönadása+25 pontRegisztráció+100 pont (egyszeri)Profil kitöltése+50 pont (egyszeri)
 Szintek és jutalmak
-SzintPonthatárJutalom🟣 Lila Szurkoló0–499 pontAlap hozzáférés⚪ Ezüst Szurkoló500–1499 pont5% kedvezmény jegyekre🟡 Arany Szurkoló1500–2999 pont10% kedvezmény, korai jegyelővétel🔴 KTE Legenda3000+ pont15% kedvezmény, VIP előtérhozzáférés, dedikált support
+SzintPonthatárJutalom🟣 Lila Szurkoló0–299 pontAlap hozzáférés⚪ Ezüst Szurkoló300–999 pont5% kedvezmény jegyekre🟡 Arany Szurkoló1000–2499 pont10% kedvezmény, korai jegyelővétel🔴 KTE Legenda2500+ pont15% kedvezmény, VIP előtérhozzáférés, dedikált support
 A pontok és szintek a felhasználó profiljában valós időben frissülnek (a részvételi pont a kapunál a beolvasáskor kerül jóváírásra, a belépést sosem akadályozza), és az évad végén (június 30.) részlegesen (70%) átvihetők a következő szezonba. A szezon közben elért szintet a rendszer a következő szezon végéig megtartja akkor is, ha a pontkonverzió után a pontok a szint határa alá esnek (a szint és az elérésének ideje tárolt adat, nem csak a pontokból számolt).
 
 5. AI Chatbot Asszisztens

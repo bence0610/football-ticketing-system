@@ -234,7 +234,7 @@ test.describe('Checkout Page – /checkout', () => {
     await page.unroute('**/loyalty/me');
     await mockLoyalty(page, {
       points: 1000,
-      tier: { tier: 'silver', label: 'Ezüst', minPoints: 500, discountPercent: 10, color: '#aaa' },
+      tier: { tier: 'silver', label: 'Ezüst', minPoints: 300, discountPercent: 10, color: '#aaa' },
       ticketPointsPerTicket: 50,
       recentTransactions: [],
     });

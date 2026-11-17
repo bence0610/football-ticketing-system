@@ -29,7 +29,7 @@ const LABELS: Record<LoyaltyTier, string> = {
   platinum: 'KTE Legenda',
 };
 const ORDER: LoyaltyTier[] = ['bronze', 'silver', 'gold', 'platinum'];
-const FLOORS = [0, 500, 1500, 5000];
+const FLOORS = [0, 300, 1000, 2500];
 
 function snapshot(tier: LoyaltyTier, points: number): LoyaltySnapshotResponse {
   const i = ORDER.indexOf(tier);
@@ -67,11 +67,11 @@ describe('LoyaltyStripComponent', () => {
   it('never prints a placeholder article, and uses the right one for every next tier', () => {
     const expected: [LoyaltyTier, string][] = [
       ['bronze', 'Még 100 pont az Ezüst szintig'],
-      ['silver', 'Még 500 pont az Arany szintig'],
+      ['silver', 'Még 350 pont az Arany szintig'],
       ['gold', 'Még 1000 pont a KTE Legenda szintig'],
     ];
     expected.forEach(([tier, text]) => {
-      const points = tier === 'bronze' ? 400 : tier === 'silver' ? 1000 : 4000;
+      const points = tier === 'bronze' ? 200 : tier === 'silver' ? 650 : 1500;
       const el = render(snapshot(tier, points));
       expect(el.textContent).toContain(text);
       expect(el.textContent).not.toContain('(z)');
@@ -79,8 +79,8 @@ describe('LoyaltyStripComponent', () => {
     // and "a Lila" for a tier that sits below nothing is covered by the helper spec
   });
 
-  it('shows halfway between Ezüst (500) and Arany (1500) at 1000 points', () => {
-    const el = render(snapshot('silver', 1000));
+  it('shows halfway between Ezüst (300) and Arany (1000) at 650 points', () => {
+    const el = render(snapshot('silver', 650));
     const bar = el.querySelector('[role="progressbar"]') as HTMLElement;
     expect(bar.getAttribute('aria-valuenow')).toBe('50');
     expect((el.querySelector('.strip__fill') as HTMLElement).style.width).toBe('50%');
@@ -88,7 +88,7 @@ describe('LoyaltyStripComponent', () => {
 
   ORDER.forEach((tier) => {
     it(`${LABELS[tier]}: pill text and progress fill are readable`, () => {
-      const el = render(snapshot(tier, tier === 'platinum' ? 6000 : FLOORS[ORDER.indexOf(tier)] + 100));
+      const el = render(snapshot(tier, tier === 'platinum' ? 4000 : FLOORS[ORDER.indexOf(tier)] + 100));
       const css = (node: Element) => getComputedStyle(node);
 
       const pill = el.querySelector('.strip__pill') as HTMLElement;
