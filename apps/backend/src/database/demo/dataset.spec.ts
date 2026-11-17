@@ -4,6 +4,7 @@ import { LoyaltyTier } from '../entities/user.entity';
 import { SEASON_PASS_TIER_PRICE, STADIUM_LAYOUT, priceModifierFor } from '../stadium-layout';
 import { DemoDataset, DemoInput, LIFETIME_TICKET_CAP, buildDemoDataset } from './dataset';
 import type { SeatRef, SectorRef } from './demand';
+import { MIN_FREE_PASS_SEATS, MIN_FREE_PASS_SHARE } from './report';
 import { DEMO_ID_PREFIX } from './rng';
 
 const NOW = new Date('2026-11-16T19:24:00Z');
@@ -79,7 +80,7 @@ describe('the demo dataset', () => {
   const singles = () => d.tickets.filter((t) => t.source === 'single');
 
   it('has about 3,000 fans, the named accounts, and one shared password hash', () => {
-    expect(d.users).toHaveLength(3016);
+    expect(d.users).toHaveLength(3015);
     expect(new Set(d.users.map((u) => u.passwordHash)).size).toBe(1);
     expect(new Set(d.users.map((u) => u.email)).size).toBe(d.users.length);
     expect(d.accounts.map((a) => a.email)).toEqual(
@@ -91,7 +92,7 @@ describe('the demo dataset', () => {
         'demo-legenda@kte-demo.test',
       ]),
     );
-    expect(d.accounts).toHaveLength(16);
+    expect(d.accounts).toHaveLength(15);
     expect(user('admin').role).toBe('admin');
     expect(user('kapus').role).toBe('gate');
   });
@@ -132,7 +133,7 @@ describe('the demo dataset', () => {
       expect(new Set(holders).size).toBe(holders.length);
     });
 
-    it("never sells a single ticket on a pass seat in that pass's season", () => {
+    it('never sells a single ticket on a pass seat for a match that pass covers (league home matches)', () => {
       for (const label of ['2026/2027', '2025/2026']) {
         const passSeats = new Set(
           d.passes.filter((p) => p.seasonLabel === label).map((p) => p.seatId),
@@ -145,7 +146,7 @@ describe('the demo dataset', () => {
               k >= p.validFrom.getTime() &&
               k < p.validUntil.getTime() + 86_400_000,
           );
-          return inSeason && passSeats.has(t.seatId);
+          return inSeason && matchById(t.matchId).isSeasonPassEligible && passSeats.has(t.seatId);
         });
         expect(bad).toHaveLength(0);
       }
@@ -282,41 +283,80 @@ describe('the demo dataset', () => {
     });
   });
 
-  describe('the sold-out match and its waitlist', () => {
-    const soldOut = () => matchById(d.soldOutMatchId);
+  describe('no sold-out match, and a season pass can be bought in every tier', () => {
+    const ticketed = (matchId: string): number =>
+      d.tickets.filter(
+        (t) => t.matchId === matchId && ['paid', 'used', 'pending_payment'].includes(t.status),
+      ).length;
 
-    it('has every sellable seat taken, so the waitlist rule can hold', () => {
-      const taken = d.tickets.filter(
-        (t) =>
-          t.matchId === d.soldOutMatchId && ['paid', 'used', 'pending_payment'].includes(t.status),
-      );
-      expect(soldOut().status).toBe(MatchStatus.SOLD_OUT);
-      expect(soldOut().capacity).toBe(sellable);
-      expect(taken).toHaveLength(sellable);
+    it('has no sold-out match, no waitlist and no waitlist account', () => {
+      expect(d.matches.some((m) => m.status === MatchStatus.SOLD_OUT)).toBe(false);
+      for (const m of d.matches.filter((x) => x.capacity > 0))
+        expect(ticketed(m.id)).toBeLessThan(m.capacity);
+      expect(d.waitlist).toHaveLength(0);
+      expect(d.accounts.some((a) => a.email.includes('varolistas'))).toBe(false);
     });
 
-    it('has 50 to 100 fans waiting, none of whom holds a place, the named one first', () => {
-      expect(d.waitlist.length).toBeGreaterThanOrEqual(50);
-      expect(d.waitlist.length).toBeLessThanOrEqual(100);
-      expect(new Set(d.waitlist.map((w) => w.userId)).size).toBe(d.waitlist.length);
-      const holders = new Set(
-        d.tickets.filter((t) => t.matchId === d.soldOutMatchId).map((t) => t.userId),
+    it('makes the biggest upcoming league match clearly the fullest, about 85%, halfway sectors nearly full', () => {
+      const m = matchById(d.fullestMatchId);
+      expect(m.status).toBe(MatchStatus.ON_SALE);
+      const upcoming = d.matches.filter(
+        (x) => x.capacity > 0 && x.kickoffAt > NOW && x.isSeasonPassEligible,
       );
-      expect(d.waitlist.some((w) => holders.has(w.userId))).toBe(false);
-      const active = d.waitlist
-        .filter((w) => w.status === 'active')
-        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      expect(active[0].userId).toBe(user('varolistas').id);
-      const lastSale = Math.max(
-        ...d.tickets
-          .filter((t) => t.matchId === d.soldOutMatchId)
-          .map((t) => t.createdAt.getTime()),
+      const share = (x: { id: string }): number => ticketed(x.id) / sellable;
+      expect(share(m)).toBeGreaterThan(0.8);
+      expect(share(m)).toBeLessThan(0.9);
+      for (const other of upcoming.filter((x) => x.id !== m.id))
+        expect(share(other)).toBeLessThan(share(m) - 0.2);
+      const fill = (code: string): number =>
+        d.tickets.filter((t) => t.matchId === m.id && seatById.get(t.seatId)!.section === code)
+          .length / inp.seats.filter((s) => s.section === code).length;
+      expect(fill('C/2')).toBeGreaterThan(0.9);
+    });
+
+    it('leaves plenty of seats a season pass can still be issued for, in every tier', () => {
+      const passSeats = new Set(
+        d.passes.filter((p) => p.seasonLabel === '2026/2027').map((p) => p.seatId),
       );
-      expect(
-        d.waitlist.every(
-          (w) => w.createdAt.getTime() > lastSale && w.createdAt.getTime() <= NOW.getTime(),
-        ),
-      ).toBe(true);
+      const seasonEnd = new Date('2027-07-01T00:00:00Z');
+      const upcomingEligible = new Set(
+        d.matches
+          .filter((x) => x.isSeasonPassEligible && x.status !== 'cancelled')
+          .filter((x) => x.kickoffAt > NOW && x.kickoffAt < seasonEnd)
+          .map((x) => x.id),
+      );
+      const blocked = new Set(
+        d.tickets.filter((t) => upcomingEligible.has(t.matchId)).map((t) => t.seatId),
+      );
+      for (const tier of ['vip', 'lower', 'upper']) {
+        const seats = inp.seats.filter((s) => sectorByCode.get(s.section)!.priceCategory === tier);
+        const free = seats.filter((s) => !passSeats.has(s.id) && !blocked.has(s.id)).length;
+        expect(free).toBeGreaterThanOrEqual(
+          Math.max(MIN_FREE_PASS_SEATS, Math.ceil(MIN_FREE_PASS_SHARE * seats.length)),
+        );
+      }
+    });
+
+    it('creates no season-pass entry ticket for a match still ahead', () => {
+      const ahead = new Set(d.matches.filter((m) => m.kickoffAt > NOW).map((m) => m.id));
+      expect(d.tickets.filter((t) => t.source === 'season_pass' && ahead.has(t.matchId))).toEqual(
+        [],
+      );
+    });
+
+    it('sells the pass seats on a cup tie like any other, and never on a league match', () => {
+      const passSeats = new Set(
+        d.passes.filter((p) => p.seasonLabel === '2026/2027').map((p) => p.seatId),
+      );
+      const seasonStart = new Date('2026-07-01T00:00:00Z');
+      const single = d.tickets.filter(
+        (t) =>
+          t.source === 'single' &&
+          passSeats.has(t.seatId) &&
+          matchById(t.matchId).kickoffAt >= seasonStart,
+      );
+      expect(single.length).toBeGreaterThan(0); // the cup ties
+      for (const t of single) expect(matchById(t.matchId).isSeasonPassEligible).toBe(false);
     });
   });
 
@@ -443,13 +483,13 @@ describe('the demo dataset', () => {
     });
 
     it('puts one named account in each tier, by real points', () => {
-      expect(user('kek').loyaltyTier).toBe(LoyaltyTier.BRONZE);
+      expect(user('lila').loyaltyTier).toBe(LoyaltyTier.BRONZE);
       expect(user('ezust').loyaltyTier).toBe(LoyaltyTier.SILVER);
       expect(user('arany').loyaltyTier).toBe(LoyaltyTier.GOLD);
       expect(user('legenda').loyaltyTier).toBe(LoyaltyTier.PLATINUM);
     });
 
-    it('spreads the crowd over all four tiers instead of leaving everyone at Kék', () => {
+    it('spreads the crowd over all four tiers instead of leaving everyone at Lila', () => {
       const fans = d.users.filter((u) => u.role === 'fan');
       const share = (tier: LoyaltyTier) =>
         fans.filter((u) => u.loyaltyTier === tier).length / fans.length;

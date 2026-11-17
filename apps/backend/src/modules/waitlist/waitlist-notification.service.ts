@@ -116,6 +116,9 @@ export class WaitlistNotificationService {
     if (!entry) {
       throw new NotFoundException('Várólista bejegyzés nem található.');
     }
+    if (entry.match) {
+      this.waitlistService.assertMatchHasSale(entry.match);
+    }
     if (entry.status !== WaitlistStatus.NOTIFIED) {
       throw new ConflictException('A várólista bejegyzés nincs értesített állapotban.');
     }

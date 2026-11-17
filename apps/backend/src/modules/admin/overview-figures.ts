@@ -10,6 +10,10 @@ import { OverviewMatchDto, OverviewMetricsDto } from './dto/overview.dto';
  * `null`, it adds nothing to any total, and it is not one of the matches an average is
  * taken over. In particular the seats held by season passes are NOT counted as occupied
  * for an away match, which is what used to show every away round at "1%".
+ *
+ * A second rule: a pass seat is occupied only on a match the pass is valid for (see
+ * `passCoversMatch`). On a friendly or a cup tie the holder has no entry, so the seat is empty
+ * and not counted. `validPassSeats` below is already filtered that way.
  */
 const SOLD_STATUSES = [TicketStatus.PAID, TicketStatus.USED];
 
@@ -35,7 +39,8 @@ export interface TicketAggregate {
 export type HomeRow = OverviewMatchDto & {
   isHome: true;
   ticketCount: number;
-  passEntryCount: number;
+  passesValid: number | null;
+  passEntered: number | null;
   occupiedSeats: number;
   capacity: number;
   occupancyPercent: number;
@@ -52,8 +57,8 @@ export function percent(part: number, whole: number): number {
 export interface RowInput {
   matches: readonly FigureMatch[];
   ticketRows: readonly TicketAggregate[];
-  /** Seats held by an active season pass. */
-  passSeats: ReadonlySet<string>;
+  /** For each home match, the seats of the active passes VALID for that match (none if the match is not pass-eligible). */
+  validPassSeats: ReadonlyMap<string, ReadonlySet<string>>;
   /** For each match, the pass-held seats that already have an occupying ticket. */
   passSeatsWithTicket: ReadonlyMap<string, ReadonlySet<string>>;
   /**
@@ -80,7 +85,8 @@ export function matchRows(input: RowInput): OverviewMatchDto[] {
       return {
         ...base,
         ticketCount: null,
-        passEntryCount: null,
+        passesValid: null,
+        passEntered: null,
         occupiedSeats: null,
         capacity: null,
         occupancyPercent: null,
@@ -89,7 +95,7 @@ export function matchRows(input: RowInput): OverviewMatchDto[] {
     }
 
     let ticketCount = 0;
-    let passEntryCount = 0;
+    let passEntered = 0;
     let occupyingTickets = 0;
     let revenue = 0;
     for (const r of input.ticketRows) {
@@ -101,16 +107,23 @@ export function matchRows(input: RowInput): OverviewMatchDto[] {
       }
       if (OCCUPYING_TICKET_STATUSES.includes(r.status)) {
         occupyingTickets += n;
-        if (r.source !== TicketSource.SINGLE) passEntryCount += n;
       }
+      // Pass holders who really came in: a scanned pass or loan entry.
+      if (r.status === TicketStatus.USED && r.source !== TicketSource.SINGLE) passEntered += n;
     }
     const withTicket = input.passSeatsWithTicket.get(match.id) ?? new Set<string>();
-    const heldOnly = [...input.passSeats].filter((id) => !withTicket.has(id)).length;
+    const validSeats = input.validPassSeats.get(match.id) ?? new Set<string>();
+    const heldOnly = [...validSeats].filter((id) => !withTicket.has(id)).length;
     const occupiedSeats = Math.min(sellableSeats, occupyingTickets + heldOnly);
     return {
       ...base,
       ticketCount,
-      passEntryCount,
+      // Two different figures, never one under two names: ahead of the match, how many passes
+      // are valid for it (the entries that will be issued); once it is played, how many of
+      // their holders actually entered. Pass tickets exist only once a holder opens the QR or
+      // is scanned, so counting rows ahead of the match would read 0 with 36 passes valid.
+      passesValid: base.final ? null : validSeats.size,
+      passEntered: base.final ? passEntered : null,
       occupiedSeats,
       capacity: sellableSeats,
       occupancyPercent: percent(occupiedSeats, sellableSeats),
@@ -138,7 +151,7 @@ export function overviewMetrics(
   return {
     revenue: home.reduce((a, r) => a + r.revenue, 0),
     ticketsSold: home.reduce((a, r) => a + r.ticketCount, 0),
-    passEntries: home.reduce((a, r) => a + r.passEntryCount, 0),
+    passEntries: home.reduce((a, r) => a + (r.passEntered ?? 0), 0),
     averageOccupancyPercent:
       finals.length === 0
         ? null

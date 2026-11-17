@@ -4,9 +4,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { In, Repository } from 'typeorm';
 import { AppConfig } from '../../config';
-import { Match, Seat, Ticket } from '../../database/entities';
+import { Match, Seat, SeasonPass, SeasonPassStatus, Ticket } from '../../database/entities';
 import { isHomeMatch } from '../matches/match-home';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
+import { passCoversMatch } from '../season-passes/season-pass-validity';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { MatchOccupancyDto, SectorOccupancyDto } from './dto/occupancy.dto';
 import { findSellableSeats } from './sellable-seats';
@@ -19,6 +20,7 @@ export class AdminOccupancyService {
     @InjectRepository(Match) private readonly matchRepository: Repository<Match>,
     @InjectRepository(Seat) private readonly seatRepository: Repository<Seat>,
     @InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>,
+    @InjectRepository(SeasonPass) private readonly passRepository: Repository<SeasonPass>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     configService: ConfigService,
   ) {
@@ -57,6 +59,16 @@ export class AdminOccupancyService {
       select: ['seatId'],
     });
     const soldSeatIds = new Set(tickets.map((t) => t.seatId));
+    // The seats of passes valid for this match are taken whether or not the holder's entry
+    // ticket exists yet (it is created only when the holder opens the QR or is scanned). A match
+    // the passes do not cover (friendly, cup tie) has none: those seats are as free as any.
+    const passes = await this.passRepository.find({
+      where: { status: SeasonPassStatus.ACTIVE },
+      select: ['seatId', 'validFrom', 'validUntil'],
+    });
+    for (const pass of passes) {
+      if (pass.seatId && passCoversMatch(match, pass)) soldSeatIds.add(pass.seatId);
+    }
 
     const lockedSeatIds = await this.fetchLockedSeats(
       matchId,

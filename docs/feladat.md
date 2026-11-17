@@ -26,7 +26,7 @@ The backlog should reflect this application description from `/docs/application.
   - E-ticket delivery via email (Nodemailer)
   - User registration and login (JWT-based)
   - A user profile page showing active tickets, purchase history, and loyalty points
-  - A loyalty points dashboard showing current tier (Kék/Ezüst/Arany/KTE Legenda) 
+  - A loyalty points dashboard showing current tier (Lila/Ezüst/Arany/KTE Legenda) 
     and points breakdown
   - A season pass loan flow: a pass holder can loan their seat for a specific match 
     to another registered user via QR code

@@ -17,7 +17,7 @@ export interface TierDefinition {
 }
 
 export const TIER_DEFINITIONS: readonly TierDefinition[] = [
-  { tier: LoyaltyTier.BRONZE, label: 'Kék', minPoints: 0, discountPercent: 0, color: '#4B8EC9' },
+  { tier: LoyaltyTier.BRONZE, label: 'Lila', minPoints: 0, discountPercent: 0, color: '#6B2D96' },
   {
     tier: LoyaltyTier.SILVER,
     label: 'Ezüst',

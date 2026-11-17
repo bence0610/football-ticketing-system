@@ -40,7 +40,16 @@ export interface SectorRef {
 
 /** Share of the sellable seats an ordinary NB II visitor fills on an ordinary Saturday. */
 export const BASE_OCCUPANCY = 0.4;
+/** The biggest upcoming match: about this share of the seats open to singles is ticketed. */
+export const FULLEST_SHARE = 0.85;
 const SECTOR_CAP = 0.985;
+
+/**
+ * How full the dearest stand (VIP, 224 seats) gets for a match still ahead. Its buyers come late
+ * and few, and a season pass must stay buyable in it: the pass rule refuses every seat that has
+ * a ticket for any upcoming league match, so the stand must keep plenty of free seats.
+ */
+export const UPCOMING_VIP_CAP = 0.7;
 
 /** How many seats one order holds: weights for 1..6. */
 export const GROUP_SIZE_WEIGHTS: readonly number[] = [22, 38, 13, 18, 3, 6];
@@ -140,13 +149,15 @@ export function sectorTargets(
   freeBySector: ReadonlyMap<string, number>,
   weights: ReadonlyMap<string, number>,
   total: number,
+  caps: ReadonlyMap<string, number> = new Map(),
 ): Map<string, number> {
   const sectors = [...freeBySector.keys()].filter((c) => (weights.get(c) ?? 0) > 0);
+  const capOf = (c: string): number => Math.min(SECTOR_CAP, caps.get(c) ?? SECTOR_CAP);
   const sold = (lambda: number): number =>
     sectors.reduce(
       (sum, c) =>
         sum +
-        Math.min(SECTOR_CAP, lambda * (weights.get(c) as number)) * (freeBySector.get(c) as number),
+        Math.min(capOf(c), lambda * (weights.get(c) as number)) * (freeBySector.get(c) as number),
       0,
     );
   let lo = 0;
@@ -163,7 +174,7 @@ export function sectorTargets(
     const free = freeBySector.get(c) as number;
     const n = Math.min(
       free,
-      Math.round(Math.min(SECTOR_CAP, lambda * (weights.get(c) as number)) * free),
+      Math.round(Math.min(capOf(c), lambda * (weights.get(c) as number)) * free),
     );
     out.set(c, n);
     assigned += n;
@@ -278,14 +289,12 @@ export function placeOrders(
   total: number,
   rng: Rng,
   forcedSizes: readonly number[] = [],
-  fillCompletely = false,
+  caps: ReadonlyMap<string, number> = new Map(),
 ): { groups: SeatRef[][]; forced: SeatRef[][] } {
   const groups: SeatRef[][] = [];
   const forced: SeatRef[][] = [];
   const free = pool.freeCounts();
-  const targets = fillCompletely
-    ? new Map([...free].map(([c, n]) => [c, n]))
-    : sectorTargets(free, weights, total);
+  const targets = sectorTargets(free, weights, total, caps);
 
   const sectorsByWeight = [...targets.keys()].sort(
     (a, b) => (weights.get(b) ?? 0) - (weights.get(a) ?? 0),

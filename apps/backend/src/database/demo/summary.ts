@@ -70,9 +70,11 @@ export function summaryLines(
         `(range ${(100 * Math.min(...shares)).toFixed(0)}-${(100 * Math.max(...shares)).toFixed(0)}%)`,
     );
   }
-  const soldOut = data.matches.find((m) => m.id === data.soldOutMatchId);
-  if (soldOut)
-    out.push(`Sold-out match: ${sold.get(soldOut.id) ?? 0} of ${soldOut.capacity} seats taken`);
+  const fullest = data.matches.find((m) => m.id === data.fullestMatchId);
+  if (fullest)
+    out.push(
+      `Fullest upcoming match: ${sold.get(fullest.id) ?? 0} of ${fullest.capacity} seats ticketed`,
+    );
 
   const played = data.tickets.filter(
     (t) =>

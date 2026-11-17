@@ -334,7 +334,7 @@ describe('clear-transactional-data.sql (E2E)', () => {
 
     const after = await ctx.dataSource.getRepository(User).findOneByOrFail({ id: fan.id });
     expect(after.loyaltyPoints).toBe(100);
-    // 675 points was Ezüst; 100 is Kék again
+    // 675 points was Ezüst; 100 is Lila again
     expect(after.loyaltyTier).toBe(LoyaltyTier.BRONZE);
   });
 

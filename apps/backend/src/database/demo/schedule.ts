@@ -30,8 +30,12 @@ export interface MatchPlan {
   phase: Phase;
   status: MatchStatus;
   basePrice: number;
-  /** The one match whose home seats are all gone (the waitlist demo). */
-  soldOut: boolean;
+  /**
+   * The biggest upcoming match: clearly the fullest, about 85% of the sellable seats, but never
+   * sold out. (A fully ticketed league match would leave no seat for a season pass: the pass
+   * rule refuses every seat that already has a ticket for an upcoming pass-eligible match.)
+   */
+  fullest: boolean;
   passEligible: boolean;
   slot: Slot;
   /** Day-of-week, season and round effect on the crowd (1 = an ordinary Saturday). */
@@ -47,8 +51,8 @@ export interface SeasonWindow {
 
 /** Round 13 is the match "in progress" when the script runs. */
 export const LIVE_ROUND = 13;
-/** Round 15, the visit of Diósgyőri VTK, is sold out. */
-export const SOLD_OUT_ROUND = 15;
+/** Round 15, the visit of Diósgyőri VTK, is the fullest upcoming match (not sold out). */
+export const FULLEST_ROUND = 15;
 export const LEAGUE_ROUNDS = 30;
 
 interface RoundSeed {
@@ -122,11 +126,19 @@ function monthFactor(month: number): number {
   return 1;
 }
 
+/**
+ * The base ticket price (the cheapest, upper-arc seat; the other tiers multiply it). A strong
+ * visitor costs more, a cup tie less than any league match. The league prices are set so that
+ * buying the home matches still to come one by one costs clearly more than the season pass in
+ * every tier, even part-way through the season (the pass price is fixed, not prorated): with
+ * the eight matches left in mid-November the upper arc, the cheapest tier, comes to about 26,400 Ft
+ * against the 22,000 Ft pass. The audit checks it.
+ */
 function priceFor(competition: Competition, draw: number): number {
-  if (competition === Competition.MAGYAR_KUPA) return 2000;
-  if (draw >= 1.25) return 3200;
-  if (draw >= 1.0) return 2800;
-  return 2500;
+  if (competition === Competition.MAGYAR_KUPA) return 2400;
+  if (draw >= 1.25) return 3800;
+  if (draw >= 1.0) return 3400;
+  return 3000;
 }
 
 function weekdayMatch(day: number, weekday: number, direction: 1 | -1): number {
@@ -156,7 +168,7 @@ function plan(
   if (rest.phase === 'played') status = MatchStatus.FINISHED;
   else if (rest.phase === 'live') status = MatchStatus.ON_SALE;
   else if (!rest.home) status = MatchStatus.SCHEDULED;
-  else status = rest.soldOut ? MatchStatus.SOLD_OUT : MatchStatus.ON_SALE;
+  else status = MatchStatus.ON_SALE;
   return {
     ...rest,
     opponent,
@@ -253,7 +265,7 @@ export function buildSchedule(
       opponentKey: r.opponent,
       kickoffAt,
       phase,
-      soldOut: r.home && r.round === SOLD_OUT_ROUND,
+      fullest: r.home && r.round === FULLEST_ROUND,
       slot: slot as Slot,
       cup: false,
     });
@@ -274,7 +286,7 @@ export function buildSchedule(
     opponentKey: 'csakvar',
     kickoffAt: kickoffOn(cupDay1, 'midweek'),
     phase: 'played',
-    soldOut: false,
+    fullest: false,
     slot: 'midweek',
     cup: true,
   });
@@ -288,7 +300,7 @@ export function buildSchedule(
     opponentKey: 'gyirmot',
     kickoffAt: kickoffOn(cupDay2, 'midweek'),
     phase: 'upcoming',
-    soldOut: false,
+    fullest: false,
     slot: 'midweek',
     cup: true,
   });
@@ -311,7 +323,7 @@ export function buildSchedule(
         opponentKey: homeOpponents[(i + 5) % homeOpponents.length],
         kickoffAt: kickoffOn(day, m.slot),
         phase: 'played',
-        soldOut: false,
+        fullest: false,
         slot: m.slot,
         cup: false,
       }),
@@ -328,7 +340,7 @@ export function buildSchedule(
       opponentKey: 'karcag',
       kickoffAt: kickoffOn(dayNumberOf(cup1.kickoffAt) - 364, 'midweek'),
       phase: 'played',
-      soldOut: false,
+      fullest: false,
       slot: 'midweek',
       cup: true,
     }),

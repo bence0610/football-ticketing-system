@@ -19,15 +19,16 @@
   --tier-soft: var(--border-light);
 }
 
-// Kék: light neutral, outlined
+// Lila: the entry tier, purple to match its name. Light brand tint with a brand-mid icon and edge
+// (the KTE Legenda tier below is the solid, darker brand-deep one).
 [data-tier='bronze'] {
-  --tier-pill-bg: var(--border-light);
-  --tier-pill-fg: var(--ink);
-  --tier-pill-border: var(--muted);
-  --tier-star: var(--muted);
-  --tier-fill: var(--muted);
-  --tier-fill-edge: var(--muted);
-  --tier-soft: var(--border-light);
+  --tier-pill-bg: var(--brand-tint);
+  --tier-pill-fg: var(--brand-deep);
+  --tier-pill-border: var(--brand-mid);
+  --tier-star: var(--brand-mid);
+  --tier-fill: var(--brand-mid);
+  --tier-fill-edge: var(--brand-mid);
+  --tier-soft: var(--brand-tint);
 }
 
 // Ezüst: mid neutral, filled

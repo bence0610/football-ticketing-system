@@ -1234,6 +1234,16 @@ export class SeasonPassesService {
       throw new NotFoundException('Match not found');
     }
 
+    // A cup tie or a friendly is not covered by the pass: no entry, so no pass ticket to
+    // materialise (its seat is sold like any other: see passCoversMatch).
+    if (!match.isSeasonPassEligible || match.status === MatchStatus.CANCELLED) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: 'Erre a mérkőzésre a bérlet nem érvényes.',
+        code: 'match_not_pass_eligible',
+      });
+    }
+
     if (!isWithinValidity(match.kickoffAt, pass.validFrom, pass.validUntil)) {
       throw new BadRequestException({
         statusCode: 400,

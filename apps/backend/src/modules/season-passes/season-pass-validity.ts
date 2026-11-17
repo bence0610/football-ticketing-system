@@ -88,3 +88,22 @@ export function isWithinValidity(
   const { startsAt, endsBefore } = validityWindow(validFrom, validUntil, timeZone);
   return kickoff.getTime() >= startsAt.getTime() && kickoff.getTime() < endsBefore.getTime();
 }
+
+/**
+ * THE rule for "does this pass give an entry to this match": the match is eligible for season
+ * passes, is not cancelled, and kicks off inside the pass's validity window. Everything that
+ * treats a pass seat as taken, or counts the passes valid for a match, asks this: a cup tie or
+ * a friendly is not covered, so its pass seats are empty and are sold like any other seat.
+ * (Whether the match is a HOME match is the caller's business: tickets exist only for those.)
+ */
+export function passCoversMatch(
+  match: { kickoffAt: Date; isSeasonPassEligible: boolean; status: string },
+  pass: { validFrom: Date; validUntil: Date },
+  timeZone: string = STADIUM_TIMEZONE,
+): boolean {
+  return (
+    match.isSeasonPassEligible &&
+    match.status !== 'cancelled' &&
+    isWithinValidity(new Date(match.kickoffAt), pass.validFrom, pass.validUntil, timeZone)
+  );
+}

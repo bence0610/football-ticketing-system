@@ -1,4 +1,4 @@
-import { hasKickedOff, isCancelled, purchasableMatches } from './match-sale';
+import { hasKickedOff, isAway, isCancelled, purchasableMatches } from './match-sale';
 
 const at = (offsetMs: number, now: number): { kickoffAt: string } => ({
   kickoffAt: new Date(now + offsetMs).toISOString(),
@@ -42,5 +42,15 @@ describe('match sale window', () => {
     expect(purchasableMatches(list, NOW).map((m) => m.id)).toEqual(['on', 'sold']);
     expect(isCancelled(list[1])).toBeTrue();
     expect(isCancelled(list[0])).toBeFalse();
+  });
+
+  it('leaves away matches out of the purchasable list', () => {
+    const list = [
+      { id: 'home', isHome: true, ...at(3_600_000, NOW) },
+      { id: 'away', isHome: false, ...at(3_600_000, NOW) },
+    ];
+    expect(purchasableMatches(list, NOW).map((m) => m.id)).toEqual(['home']);
+    expect(isAway(list[1])).toBeTrue();
+    expect(isAway(list[0])).toBeFalse();
   });
 });

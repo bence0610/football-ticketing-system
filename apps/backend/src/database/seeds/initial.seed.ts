@@ -1,8 +1,9 @@
-import { DataSource } from 'typeorm';
+import { DataSource, MoreThan } from 'typeorm';
 import { Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { Match, MatchStatus, Competition } from '../entities/match.entity';
+import { dayNumberOf, wallClockToUtc, weekdayOf } from '../demo/time';
 import { Seat } from '../entities/seat.entity';
 import { Sector } from '../entities/sector.entity';
 import { SeasonPassPrice } from '../entities/season-pass-price.entity';
@@ -191,43 +192,53 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
     description: string;
   }
 
-  // Budapest local time is CEST (UTC+2) in July => subtract 2 hours for UTC.
+  // The friendlies are dated relative to the day the seed runs, so they are always still ahead
+  // (fixed dates went stale: two July 2026 friendlies sat in the past with no tickets). The next
+  // Saturday at least two weeks away at 18:00, and the Sunday after the one four weeks away at
+  // 17:00, Budapest time (the conversion handles summer and winter time).
+  const today = dayNumberOf(new Date());
+  const onOrAfter = (day: number, weekday: number): number => {
+    let d = day;
+    while (weekdayOf(d) !== weekday) d += 1;
+    return d;
+  };
   const upcomingMatches: FriendlyBlueprint[] = [
     {
       homeTeam: 'Kecskeméti TE',
       awayTeam: 'Szeged',
       competition: Competition.FRIENDLY,
       venue: 'Széktói Stadion, Kecskemét',
-      // 2026-07-12 (Saturday) 18:00 local => 16:00 UTC
-      kickoffAt: new Date('2026-07-12T16:00:00.000Z'),
+      kickoffAt: wallClockToUtc(onOrAfter(today + 14, 6), 18, 0),
       basePrice: '3500.00',
-      description:
-        'Felkészülési mérkőzés. KTE vs Szeged — nyári előszezoni teszt a Széktói Stadionban.',
+      description: 'Felkészülési mérkőzés. KTE vs Szeged — előszezoni teszt a Széktói Stadionban.',
     },
     {
       homeTeam: 'Kecskeméti TE',
       awayTeam: 'Szentlőrinc',
       competition: Competition.FRIENDLY,
       venue: 'Széktói Stadion, Kecskemét',
-      // 2026-07-26 (Sunday) 17:00 local => 15:00 UTC
-      kickoffAt: new Date('2026-07-26T15:00:00.000Z'),
+      kickoffAt: wallClockToUtc(onOrAfter(today + 28, 0), 17, 0),
       basePrice: '3000.00',
       description:
-        'Felkészülési mérkőzés. KTE vs Szentlőrinc — utolsó főpróba a bajnoki rajt előtt.',
+        'Felkészülési mérkőzés. KTE vs Szentlőrinc — főpróba a bajnoki mérkőzések előtt.',
     },
   ];
 
   for (const blueprint of upcomingMatches) {
+    // Already there if this fixture has an upcoming friendly. Matching on the exact kickoff would
+    // create a new pair on every run now that the dates move; a friendly that has been played
+    // does not count, so the seed provides fresh ones once they are over.
     const existing = await matchRepo.findOne({
       where: {
         homeTeam: blueprint.homeTeam,
         awayTeam: blueprint.awayTeam,
-        kickoffAt: blueprint.kickoffAt,
+        competition: Competition.FRIENDLY,
+        kickoffAt: MoreThan(new Date()),
       },
     });
     if (existing) {
       logger.log(
-        `Friendly already present: ${blueprint.homeTeam} vs ${blueprint.awayTeam} at ${blueprint.kickoffAt.toISOString()}, skipping.`,
+        `Friendly already present: ${blueprint.homeTeam} vs ${blueprint.awayTeam} at ${existing.kickoffAt.toISOString()}, skipping.`,
       );
       continue;
     }

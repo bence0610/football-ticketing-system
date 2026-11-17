@@ -17,7 +17,8 @@ export type OccupancyTone = 'full' | 'low' | 'normal';
 export type SoldMatch = OverviewMatch & {
   readonly isHome: true;
   readonly ticketCount: number;
-  readonly passEntryCount: number;
+  readonly passesValid: number | null;
+  readonly passEntered: number | null;
   readonly occupiedSeats: number;
   readonly capacity: number;
   readonly occupancyPercent: number;
@@ -84,7 +85,8 @@ export function matchesCsv(matches: readonly OverviewMatch[]): string {
     'Kezdés',
     'Végleges',
     'Eladott jegy',
-    'Bérletes belépő',
+    'Érvényes bérlet (hátralévő meccs)',
+    'Belépett bérletes (lejátszott meccs)',
     'Foglaltság (%)',
     'Bevétel (Ft)',
   ];
@@ -94,7 +96,8 @@ export function matchesCsv(matches: readonly OverviewMatch[]): string {
     m.final ? 'igen' : 'nem',
     // An away match has no figures: an empty cell, not a zero.
     m.ticketCount ?? '',
-    m.passEntryCount ?? '',
+    m.passesValid ?? '',
+    m.passEntered ?? '',
     m.occupancyPercent ?? '',
     m.revenue ?? '',
   ]);

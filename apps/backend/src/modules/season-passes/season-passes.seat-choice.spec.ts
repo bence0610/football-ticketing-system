@@ -174,7 +174,14 @@ function harness(): Harness {
   const service = new SeasonPassesService(
     { findOne: passFindOne } as never,
     { findOne: async () => null } as never,
-    { findOne: async () => ({ id: 'm1', kickoffAt: new Date(Date.now() + 86400000) }) } as never,
+    {
+      findOne: async () => ({
+        id: 'm1',
+        kickoffAt: new Date(Date.now() + 86400000),
+        isSeasonPassEligible: true,
+        status: 'on_sale',
+      }),
+    } as never,
     {
       findOne: async ({ where }: { where: { id?: string } }) => (where.id === 'u1' ? BUYER : null),
     } as never,

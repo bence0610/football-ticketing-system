@@ -215,8 +215,7 @@ import { loyaltyProgress } from '../../logic/loyalty-progress';
         color: var(--brand-deep);
       }
 
-      .strip[data-tier='silver'] .strip__trophy,
-      .strip[data-tier='bronze'] .strip__trophy {
+      .strip[data-tier='silver'] .strip__trophy {
         color: var(--muted);
       }
 

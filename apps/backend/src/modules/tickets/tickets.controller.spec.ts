@@ -142,7 +142,15 @@ describe('TicketsController – scan endpoint', () => {
         venue: 'Széktói Stadion',
         kickoffAt: new Date().toISOString(),
       },
-      seat: { id: 'seat-id', section: 'A', row: '1', number: 5, category: 'standard' },
+      seat: {
+        id: 'seat-id',
+        section: 'A',
+        row: '1',
+        number: 5,
+        category: 'standard',
+        sectorName: 'A szektor',
+        gate: 4,
+      },
     };
     (mockTicketsService.scanTicket as jest.Mock).mockResolvedValue(successResponse);
 

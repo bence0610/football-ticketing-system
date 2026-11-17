@@ -11,7 +11,7 @@ const LABEL_BAND = 48;
 
 /**
  * Revenue per match as bars of the money actually charged. A match still ahead
- * is grey and marked "nem végleges": its figure can still move.
+ * is grey and marked "még tart az értékesítés": its figure can still move.
  */
 @Component({
   selector: 'kte-revenue-bar-chart',
@@ -22,7 +22,7 @@ const LABEL_BAND = 48;
     <ul class="legend" aria-label="Jelmagyarázat">
       <li><span class="swatch swatch--final" aria-hidden="true"></span>Jegybevétel</li>
       <li>
-        <span class="swatch swatch--open" aria-hidden="true"></span>Nem végleges (még értékesítés alatt)
+        <span class="swatch swatch--open" aria-hidden="true"></span>még tart az értékesítés
       </li>
     </ul>
 
@@ -58,15 +58,16 @@ const LABEL_BAND = 48;
                 data-testid="revenue-bar"
               >
                 <title>
-                  {{ fixtureLabel(bar.match) }}: {{ bar.match.revenue | hufCurrency }}{{ bar.match.final ? '' : ' (nem végleges)' }}
+                  {{ fixtureLabel(bar.match) }}: {{ bar.match.revenue | hufCurrency }}{{ bar.match.final ? '' : ' (még tart az értékesítés)' }}
                 </title>
               </rect>
               <text [attr.x]="barX(i) + barWidth / 2" [attr.y]="top + plotHeight + 16" class="xlabel" text-anchor="middle">
                 {{ short(bar.match.awayTeam) }}
               </text>
               @if (!bar.match.final) {
-                <text [attr.x]="barX(i) + barWidth / 2" [attr.y]="top + plotHeight + 30" class="xlabel xlabel--open" text-anchor="middle">
-                  nem végleges
+                <text [attr.x]="barX(i) + barWidth / 2" [attr.y]="top + plotHeight + 29" class="xlabel xlabel--open" text-anchor="middle">
+                  <tspan [attr.x]="barX(i) + barWidth / 2">még tart az</tspan>
+                  <tspan [attr.x]="barX(i) + barWidth / 2" dy="11">értékesítés</tspan>
                 </text>
               }
             </g>
@@ -134,7 +135,7 @@ const LABEL_BAND = 48;
 
       .xlabel--open {
         fill: var(--faint);
-        font-size: 10px;
+        font-size: 9px;
       }
 
       .empty {

@@ -3,9 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, LessThan, Not, Repository } from 'typeorm';
+import { DataSource, LessThan, Repository } from 'typeorm';
 import { CronConfig } from '../../../config';
-import { Match, MatchStatus, Ticket, TicketStatus } from '../../../database/entities';
+import { Match, Ticket, TicketStatus } from '../../../database/entities';
 import { QrService } from '../../qr/qr.service';
 
 /**
@@ -34,13 +34,10 @@ export class ExpireTicketsJob {
     const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     this.logger.log(`Expiring unused tickets for matches finished before ${dayAgo.toISOString()}`);
 
+    // By the kickoff alone. This used to also require a status other than scheduled/on_sale,
+    // which nothing ever set after a match was played, so no ticket was ever expired.
     const matches = await this.dataSource.getRepository(Match).find({
-      where: [
-        {
-          kickoffAt: LessThan(dayAgo),
-          status: Not(In([MatchStatus.SCHEDULED, MatchStatus.ON_SALE])),
-        },
-      ],
+      where: { kickoffAt: LessThan(dayAgo) },
     });
     if (matches.length === 0) {
       this.logger.log('No finished matches found requiring expiry sweep.');

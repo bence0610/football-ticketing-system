@@ -1,11 +1,12 @@
 import { LoyaltyTier, UserRole } from '../entities/user.entity';
-import { WaitlistStatus } from '../entities/waitlist.entity';
 import { seatUnitPrice } from '../../modules/seats/seat-pricing';
 import { formatFullName } from '../../common/format-name';
 import { TIER_LABEL } from '../stadium-layout';
 import { blurbFor } from './blurbs';
 import {
   BASE_OCCUPANCY,
+  FULLEST_SHARE,
+  UPCOMING_VIP_CAP,
   SeatPool,
   SeatRef,
   SectorRef,
@@ -92,7 +93,8 @@ export interface DemoDataset {
   ledger: LedgerRow[];
   waitlist: WaitlistRow[];
   accounts: NamedAccount[];
-  soldOutMatchId: string;
+  /** The biggest upcoming match (about 85% full, never sold out). */
+  fullestMatchId: string;
   /** Matches by key, for the report. */
   matchKeys: Map<string, string>;
   notes: string[];
@@ -150,7 +152,7 @@ function purchaseTime(plan: MatchPlan, user: DemoUser, now: Date, rng: Rng): Dat
   const latest = Math.min(kickoff, now.getTime()) - 20 * MINUTE_MS;
   let t: number;
   if (plan.phase === 'upcoming') {
-    t = plan.soldOut
+    t = plan.fullest
       ? now.getTime() - 8 * HOUR_MS - Math.pow(rng.next(), 1.4) * 11 * DAY_MS
       : now.getTime() - rng.exponential(3.5) * DAY_MS;
   } else {
@@ -218,28 +220,37 @@ function generateOrders(ctx: OrderContext): Order[] {
       draw: plan.opponent.draw,
       cold: month >= 11 || month <= 3,
     });
-    const share = clamp(
-      BASE_OCCUPANCY *
-        plan.opponent.draw *
-        plan.timeFactor *
-        (plan.season === 'previous' ? PREVIOUS_SEASON_SHARE : 1) *
-        rng.between(0.92, 1.08),
-      0.06,
-      0.85,
-    );
+    const share = plan.fullest
+      ? FULLEST_SHARE
+      : clamp(
+          BASE_OCCUPANCY *
+            plan.opponent.draw *
+            plan.timeFactor *
+            (plan.season === 'previous' ? PREVIOUS_SEASON_SHARE : 1) *
+            rng.between(0.92, 1.08),
+          0.06,
+          0.85,
+        );
     let total = Math.round(free * share);
-    if (plan.phase === 'upcoming') {
+    // The fullest match is already at its level (it sold early); the others are still selling.
+    if (plan.phase === 'upcoming' && !plan.fullest) {
       total = Math.round(total * soldShareAt((plan.kickoffAt.getTime() - now.getTime()) / DAY_MS));
     }
 
     const forced = forcedByMatch.get(plan.key) ?? [];
+    // A match still ahead leaves the VIP stand mostly open (see UPCOMING_VIP_CAP).
+    const caps = new Map<string, number>();
+    if (plan.phase === 'upcoming') {
+      for (const sector of stadium.sectors)
+        if (sector.priceCategory === 'vip') caps.set(sector.code, UPCOMING_VIP_CAP);
+    }
     const placed = placeOrders(
       pool,
       weights,
       total,
       rng,
       forced.map((f) => f.order.size),
-      plan.soldOut,
+      caps,
     );
     forced.forEach((f, i) =>
       orders.push(make(plan, f.user, placed.forced[i], f.order.scanned ?? true)),
@@ -416,14 +427,13 @@ function loanRowsAndTickets(
   return { rows, tickets, events };
 }
 
-/** The entries season-pass holders opened: one per attended match, plus every holder for the sold-out one. */
+/** The entries season-pass holders opened: one per match they attended (never one for a match still ahead). */
 function passTickets(
   passes: readonly DemoPass[],
   plans: readonly MatchPlan[],
   matchIdByKey: ReadonlyMap<string, string>,
   lent: ReadonlySet<string>,
   stewardId: string,
-  now: Date,
   rng: Rng,
 ): TicketRow[] {
   const out: TicketRow[] = [];
@@ -450,21 +460,11 @@ function passTickets(
         confirmationEmailSentAt: null,
         version: 1,
       };
-      if (plan.phase === 'upcoming') {
-        // Opened the QR page ahead of time: only the sold-out match needs every seat accounted for.
-        if (!plan.soldOut) continue;
-        const createdAt = floorSecond(now.getTime() - 8 * HOUR_MS - rng.between(0, 9 * DAY_MS));
-        out.push({
-          ...base,
-          status: 'paid',
-          usedAt: null,
-          scannedAt: null,
-          scannedByUserId: null,
-          createdAt,
-          updatedAt: createdAt,
-        });
-        continue;
-      }
+      // No entry ticket for a match that is still ahead, whatever the seat: the application
+      // creates it only when the holder opens the QR page or is scanned at the gate, which can
+      // happen from a few hours before kickoff. (The admin overview counts the passes valid for
+      // the match instead.)
+      if (plan.phase === 'upcoming') continue;
       const comes = pass.alwaysAttends || rng.chance(plan.season === 'current' ? 0.85 : 0.8);
       if (!comes) continue;
       const scannedAt = floorSecond(kickoff - rng.between(8, 70) * MINUTE_MS);
@@ -492,7 +492,6 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
   const rOrders = root.fork('orders');
   const rExtra = root.fork('extra');
   const rLedger = root.fork('ledger');
-  const rWait = root.fork('waitlist');
   const now = input.now;
   const notes: string[] = [];
 
@@ -578,14 +577,18 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
   );
 
   // Single tickets. A seat held by an active pass (or by a pass that was not made here) is
-  // never offered for sale, whatever the match: that is how the seat map treats it.
+  // not offered for sale on a match the pass is valid for: that is how the seat map treats it.
   const orders = generateOrders({
     now,
     stadium,
     users,
     plans,
     blockedByPlan: (plan) => {
-      const blocked = new Set(foreign);
+      // A pass seat is the holder's only on a match the pass covers. On a cup tie the holder has no
+      // entry, so the seat stays empty and is sold like any other (the seat map does the same).
+      const blocked = new Set<string>();
+      if (!plan.passEligible) return blocked;
+      for (const id of foreign) blocked.add(id);
       for (const id of plan.season === 'current' ? passSeats.current : passSeats.previous)
         blocked.add(id);
       return blocked;
@@ -594,58 +597,11 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
   });
 
   const loanOut = loanRowsAndTickets(loans, planByKey, matchIdByKey, steward.id, now, rExtra);
-  const entryTickets = passTickets(passes, plans, matchIdByKey, lent, steward.id, now, rExtra);
+  const entryTickets = passTickets(passes, plans, matchIdByKey, lent, steward.id, rExtra);
 
-  // Waitlist for the sold-out match: fans without a place on it, first in line a named account.
-  const soldOutPlan = plans.find((p) => p.soldOut) as MatchPlan;
-  const soldOutId = matchIdByKey.get(soldOutPlan.key) as string;
-  const holdersOfSoldOut = new Set<string>(
-    orders.filter((o) => o.plan.soldOut).map((o) => o.user.id),
-  );
-  for (const t of entryTickets) if (t.matchId === soldOutId) holdersOfSoldOut.add(t.userId);
-  const lastSale = Math.max(
-    ...orders.filter((o) => o.plan.soldOut).map((o) => o.at.getTime()),
-    ...entryTickets.filter((t) => t.matchId === soldOutId).map((t) => t.createdAt.getTime()),
-  );
-  const waiters = rWait.shuffle(
-    users.filter(
-      (u) =>
-        !u.key &&
-        u.role === UserRole.FAN &&
-        !holdersOfSoldOut.has(u.id) &&
-        u.createdAt.getTime() < lastSale &&
-        !u.passHolder,
-    ),
-  );
-  const waitCount = 78;
-  const first = byKey.get('varolistas') as DemoUser;
-  const waitUsers = [first, ...waiters.slice(0, waitCount - 1)];
-  const waitStart = lastSale + 90 * MINUTE_MS;
-  const waitEnd = now.getTime() - 15 * MINUTE_MS;
-  const waitTimes = waitUsers
-    .map((_, i) =>
-      i === 0 ? waitStart : waitStart + Math.pow(rWait.next(), 1.5) * (waitEnd - waitStart),
-    )
-    .sort((a, b) => a - b);
-  const waitlist: WaitlistRow[] = waitUsers.map((u, i) => {
-    const cancelled = i > 0 && rWait.chance(0.06);
-    const createdAt = floorSecond(Math.max(waitTimes[i], u.createdAt.getTime() + HOUR_MS));
-    const preferred = rWait.chance(0.4)
-      ? rWait.pick(stadium.sectors.filter((s) => stadium.isSellable(s.code)).map((s) => s.code))
-      : null;
-    return {
-      id: rWait.uuid(),
-      userId: u.id,
-      matchId: soldOutId,
-      status: cancelled ? WaitlistStatus.CANCELLED : WaitlistStatus.ACTIVE,
-      requestedQuantity: [1, 2, 3, 4][rWait.weightedIndex([30, 40, 15, 15])],
-      preferredSection: preferred,
-      notifiedAt: null,
-      createdAt,
-      updatedAt: createdAt,
-      version: 1,
-    };
-  });
+  // No waitlist: it exists only for a sold-out match, and the demo has none (a fully ticketed
+  // league match would leave no seat to sell as a season pass).
+  const waitlist: WaitlistRow[] = [];
 
   // Loyalty: replay every event in time order for the points, tiers and prices paid.
   const events: LoyaltyEvent[] = [];
@@ -799,7 +755,7 @@ export function buildDemoDataset(input: DemoInput): DemoDataset {
     ledger: outcome.ledger,
     waitlist,
     accounts,
-    soldOutMatchId: soldOutId,
+    fullestMatchId: matchIdByKey.get((plans.find((p) => p.fullest) as MatchPlan).key) as string,
     matchKeys: matchIdByKey,
     notes,
   };

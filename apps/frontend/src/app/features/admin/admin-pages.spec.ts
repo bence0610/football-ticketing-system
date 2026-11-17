@@ -22,7 +22,8 @@ const match = (over: Partial<OverviewMatch>): OverviewMatch => ({
   final: true,
   isHome: true,
   ticketCount: 10,
-  passEntryCount: 0,
+  passesValid: null,
+  passEntered: 0,
   occupiedSeats: 10,
   capacity: 20,
   occupancyPercent: 50,
@@ -56,7 +57,8 @@ function overview(over: Partial<Overview> = {}): Overview {
         status: 'on_sale',
         occupancyPercent: 60,
         revenue: 15000,
-        passEntryCount: 3,
+        passesValid: 36,
+        passEntered: null,
       }),
     ],
     ...over,
@@ -128,7 +130,7 @@ describe('RevenueStatsPageComponent', async () => {
     expect(text(cards[0])).toContain('62 500');
     expect(text(cards[0])).toContain('ténylegesen terhelt');
     expect(text(cards[1])).toContain('17');
-    expect(text(cards[1])).toContain('3 bérletes belépő');
+    expect(text(cards[1])).toContain('3 belépett bérletes');
     expect(text(cards[2])).toContain('75%');
     expect(text(cards[2])).toContain('2 lejátszott meccs');
     expect(text(cards[3])).toContain('60%');
@@ -165,7 +167,7 @@ describe('RevenueStatsPageComponent', async () => {
       'bar bar--open',
     ]);
     expect(text(el.querySelector('.legend'))).toContain('Jegybevétel');
-    expect(text(el.querySelector('.legend'))).toContain('Nem végleges');
+    expect(text(el.querySelector('.legend'))).toContain('még tart az értékesítés');
     expect(el.querySelectorAll('.xlabel--open').length).toBe(1);
   });
 
@@ -176,7 +178,7 @@ describe('RevenueStatsPageComponent', async () => {
     const tones = rows.map((r) => r.querySelector('[data-testid="occupancy"]')?.getAttribute('data-tone'));
     expect(tones).toEqual(['full', 'low', 'normal']);
     expect(text(rows[0])).toContain('35 000');
-    expect(text(rows[2])).toContain('+ 3 bérletes');
+    expect(text(rows[2])).toContain('36 érvényes bérlet');
     expect(el.querySelectorAll('[data-testid="not-final"]').length).toBe(1);
   });
 
@@ -187,7 +189,8 @@ describe('RevenueStatsPageComponent', async () => {
       awayTeam: 'Kecskeméti TE',
       isHome: false,
       ticketCount: null,
-      passEntryCount: null,
+      passesValid: null,
+      passEntered: null,
       occupiedSeats: null,
       capacity: null,
       occupancyPercent: null,

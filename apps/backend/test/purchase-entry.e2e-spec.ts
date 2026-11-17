@@ -592,7 +592,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   }
 
   it('scenario 1 — season-pass holder obtains a QR and enters the stadium', async () => {
-    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource, { seasonPassEligible: true });
     const holder = await registerFan('sp-holder-1');
     const pass = await seedSeasonPass(ctx.dataSource, {
       userId: holder.userId,
@@ -655,7 +655,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('scenario 3 — after acceptance the owner cannot enter that match on that seat', async () => {
-    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource, { seasonPassEligible: true });
     const owner = await registerFan('loan-owner-3');
     const borrower = await registerFan('loan-borrower-3');
     const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
@@ -734,7 +734,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('scenario 5 — revocation before use: borrower QR rejected, owner can enter again', async () => {
-    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource, { seasonPassEligible: true });
     const owner = await registerFan('revoke-pre-owner-5');
     const borrower = await registerFan('revoke-pre-borrower-5');
     const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
@@ -789,7 +789,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('scenario 6 — revocation after borrower entered: no new usable entry for either party', async () => {
-    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource, { seasonPassEligible: true });
     const owner = await registerFan('revoke-post-owner-6');
     const borrower = await registerFan('revoke-post-borrower-6');
     const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
@@ -910,7 +910,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('scenario 8 — same QR presented at two gates simultaneously: exactly one scan succeeds', async () => {
-    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource, { seasonPassEligible: true });
     const holder = await registerFan('concurrent-sp-8');
     const pass = await seedSeasonPass(ctx.dataSource, {
       userId: holder.userId,
@@ -948,7 +948,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('scenario 9 — acceptLoan refused when owner already entered: USED ticket intact, no LOAN ticket, loan OWNER_ENTERED', async () => {
-    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource, { seasonPassEligible: true });
     const owner = await registerFan('accept-after-entry-owner-9');
     const borrower = await registerFan('accept-after-entry-borrower-9');
     const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
@@ -1821,7 +1821,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
 
   it("family b — each holder's per-match entry works at the gate and the scan names the holder", async () => {
     await seedSeasonPassPrice('upper');
-    const { match } = await seedMinimalFixture(ctx.dataSource);
+    const { match } = await seedMinimalFixture(ctx.dataSource, { seasonPassEligible: true });
     const { buyer, partner, passes } = await buyFamilyPasses('upper');
     const gate = await createGateUser(ctx.dataSource, { email: 'gate-fam-b@kte.hu' });
     const gateToken = await loginAs(gate.user.email, gate.plainPassword);
@@ -2027,7 +2027,9 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
 
   it('family f — lending: buyer and holder may both lend; a borrower displaces only one match of one pass', async () => {
     await seedSeasonPassPrice('upper');
-    const { match: match1 } = await seedMinimalFixture(ctx.dataSource);
+    const { match: match1 } = await seedMinimalFixture(ctx.dataSource, {
+      seasonPassEligible: true,
+    });
     const matchRepo = ctx.dataSource.getRepository(Match);
     const match2 = await matchRepo.save(
       matchRepo.create({
@@ -2039,7 +2041,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
         status: MatchStatus.ON_SALE,
         capacity: 2,
         basePrice: '5000.00',
-        isSeasonPassEligible: false,
+        isSeasonPassEligible: true,
       }),
     );
     const { buyer, partner, passes } = await buyFamilyPasses('upper');

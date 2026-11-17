@@ -44,7 +44,7 @@ export function hungarianArticle(name: string): HungarianArticle {
   return VOWEL_START.test(word) ? 'az' : 'a';
 }
 
-/** "az Arany", "a Kék", "a KTE Legenda". */
+/** "az Arany", "a Lila", "a KTE Legenda". */
 export function withArticle(name: string): string {
   return `${hungarianArticle(name)} ${name}`;
 }

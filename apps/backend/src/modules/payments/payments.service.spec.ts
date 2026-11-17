@@ -54,6 +54,7 @@ describe('PaymentsService', () => {
   };
   const mockConfigService = {
     getOrThrow: jest.fn().mockImplementation((key: string) => {
+      if (key === 'app') return { homeTeamName: 'KTE' };
       if (key === 'stripe') return { currency: 'HUF', webhookSecret: 'whsec_test' };
       if (key === 'loyalty') return { ticketPointsPerTicket: 10 };
       if (key === 'mail') return { retryDelayMs: 3000, baseUrl: 'http://localhost:4200' };
@@ -341,7 +342,7 @@ describe('PaymentsService', () => {
         expect(result.subtotal - result.discountAmount).toBe(result.amount);
       });
 
-      it('charges list price for a Kek (0 %) user', async () => {
+      it('charges list price for a Lila (0 %) user', async () => {
         mockUserRepo.findOne.mockResolvedValue({ id: userId, loyaltyTier: LoyaltyTier.BRONZE });
 
         const result = await create();

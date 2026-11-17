@@ -23,7 +23,7 @@ function contrast(a: Rgb, b: Rgb): number {
 }
 
 const LABELS: Record<LoyaltyTier, string> = {
-  bronze: 'Kék',
+  bronze: 'Lila',
   silver: 'Ezüst',
   gold: 'Arany',
   platinum: 'KTE Legenda',
@@ -76,7 +76,7 @@ describe('LoyaltyStripComponent', () => {
       expect(el.textContent).toContain(text);
       expect(el.textContent).not.toContain('(z)');
     });
-    // and "a Kék" for a tier that sits below nothing is covered by the helper spec
+    // and "a Lila" for a tier that sits below nothing is covered by the helper spec
   });
 
   it('shows halfway between Ezüst (500) and Arany (1500) at 1000 points', () => {

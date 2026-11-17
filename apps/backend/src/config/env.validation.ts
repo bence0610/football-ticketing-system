@@ -102,6 +102,7 @@ export const envValidationSchema = Joi.object({
   TICKET_EXPIRE_CRON: Joi.string().default('0 4 * * *'),
   CRON_TIMEZONE: Joi.string().default('Europe/Budapest'),
   LOAN_INVITATION_TTL_HOURS: Joi.number().integer().min(1).default(72),
+  MATCH_FINISH_DELAY_HOURS: Joi.number().integer().min(5).default(6),
 
   // Waitlist (Iteration 5)
   WAITLIST_CLAIM_TTL_SECONDS: Joi.number().integer().min(60).default(600),

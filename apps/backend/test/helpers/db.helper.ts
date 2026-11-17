@@ -73,7 +73,16 @@ export interface MinimalFixture {
  * total matches the match's `basePrice` exactly, which lets the suite
  * assert on an unambiguous `amount` field in the PaymentIntent response.
  */
-export async function seedMinimalFixture(dataSource: DataSource): Promise<MinimalFixture> {
+export async function seedMinimalFixture(
+  dataSource: DataSource,
+  options: {
+    /**
+     * Pass seats are held only on matches a pass covers (season-pass eligible). Tests that use a
+     * season pass on this match must say so; a plain purchase test leaves it off.
+     */
+    seasonPassEligible?: boolean;
+  } = {},
+): Promise<MinimalFixture> {
   const matchRepo = dataSource.getRepository(Match);
   const seatRepo = dataSource.getRepository(Seat);
 
@@ -88,7 +97,7 @@ export async function seedMinimalFixture(dataSource: DataSource): Promise<Minima
       status: MatchStatus.ON_SALE,
       capacity: 2,
       basePrice: '5000.00',
-      isSeasonPassEligible: false,
+      isSeasonPassEligible: options.seasonPassEligible ?? false,
     }),
   );
 

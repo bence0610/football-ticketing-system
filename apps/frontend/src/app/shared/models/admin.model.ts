@@ -20,7 +20,13 @@ export interface OverviewMatch {
    */
   readonly isHome: boolean;
   readonly ticketCount: number | null;
-  readonly passEntryCount: number | null;
+  /**
+   * Only for a match still ahead: how many season passes are valid for it. Not the number of
+   * pass tickets issued (those exist only once a holder opens the QR or is scanned). Null once played.
+   */
+  readonly passesValid: number | null;
+  /** Only for a match already played: pass and loan entries actually scanned at the gate. Null while ahead. */
+  readonly passEntered: number | null;
   readonly occupiedSeats: number | null;
   /** The sellable seats (the away section is not sold here). */
   readonly capacity: number | null;
@@ -32,6 +38,7 @@ export interface OverviewMatch {
 export interface OverviewMetrics {
   readonly revenue: number;
   readonly ticketsSold: number;
+  /** Pass and loan entries scanned at the gate over the matches already played. */
   readonly passEntries: number;
   readonly averageOccupancyPercent: number | null;
   readonly finalMatchCount: number;

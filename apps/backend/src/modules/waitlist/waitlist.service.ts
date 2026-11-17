@@ -6,9 +6,12 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { LessThan, Not, Repository } from 'typeorm';
+import { AppConfig } from '../../config';
+import { assertMatchIsHome, hasKickedOff } from '../matches/match-sale';
 import { Match, MatchStatus, Ticket, Waitlist, WaitlistStatus } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
@@ -28,7 +31,20 @@ export class WaitlistService {
     @InjectRepository(Ticket)
     private readonly ticketRepository: Repository<Ticket>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.homeTeamName = configService.getOrThrow<AppConfig>('app').homeTeamName;
+  }
+
+  private readonly homeTeamName: string;
+
+  /**
+   * The waitlist is part of the sale: an away match has no tickets, so no queue for them
+   * (409 `match_away`). Called by the join and by the claim, which load the match themselves.
+   */
+  assertMatchHasSale(match: Pick<Match, 'homeTeam'>): void {
+    assertMatchIsHome(match, this.homeTeamName);
+  }
 
   async count(): Promise<number> {
     return this.waitlistRepository.count();
@@ -45,7 +61,13 @@ export class WaitlistService {
     if (!match) {
       throw new NotFoundException('Meccs nem található.');
     }
-    if (match.status === MatchStatus.FINISHED || match.status === MatchStatus.CANCELLED) {
+    this.assertMatchHasSale(match);
+    // Over by the clock, not by a status the match may not have been given yet.
+    if (
+      match.status === MatchStatus.FINISHED ||
+      match.status === MatchStatus.CANCELLED ||
+      hasKickedOff(match)
+    ) {
       throw new BadRequestException('A meccs már lezárult, nem lehet várólistára kerülni.');
     }
 

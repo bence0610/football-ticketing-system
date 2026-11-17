@@ -221,7 +221,7 @@ describe('shared e-mail frame', () => {
     });
 
     it('loan withdrawn before acceptance does not talk about a QR that was never issued', () => {
-      const base = find('loan-cancelled').context as Record<string, unknown>;
+      const base = find('loan-cancelled').context as unknown as Record<string, unknown>;
       const html = service.render('loan-cancelled', { ...base, qrIssued: false } as never);
       expect(html).not.toContain('QR');
       expect(html).toContain('A meghívó már nem érvényes');
@@ -255,7 +255,7 @@ describe('shared e-mail frame', () => {
         expect(body).not.toMatch(/leiratkoz|unsubscribe|értesítési beállítás/i);
       }
       // Without a known sector the mail still reads correctly.
-      const base = find('waitlist-notification').context as Record<string, unknown>;
+      const base = find('waitlist-notification').context as unknown as Record<string, unknown>;
       const generic = service.render('waitlist-notification', {
         ...base,
         freedSectorName: undefined,

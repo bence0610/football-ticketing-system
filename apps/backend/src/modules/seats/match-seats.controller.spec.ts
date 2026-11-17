@@ -221,7 +221,9 @@ describe('MatchSeatsController – integration', () => {
         {
           provide: ConfigService,
           useValue: {
-            getOrThrow: jest.fn().mockReturnValue({ seatLockTtlSeconds: 300 }),
+            getOrThrow: jest
+              .fn()
+              .mockReturnValue({ seatLockTtlSeconds: 300, homeTeamName: 'Kecskeméti TE' }),
           },
         },
       ],
@@ -280,7 +282,14 @@ describe('MatchSeatsController – integration', () => {
     matchRepoMock.findOne.mockResolvedValue(match);
     seatRepoMock.find.mockResolvedValue(seats);
     ticketRepoMock.find.mockResolvedValue(tickets);
-    seasonPassRepoMock.find.mockResolvedValue(seasonPassSeatIds.map((id) => ({ seatId: id })));
+    // Passes of the whole season: they cover any pass-eligible match in it.
+    seasonPassRepoMock.find.mockResolvedValue(
+      seasonPassSeatIds.map((id) => ({
+        seatId: id,
+        validFrom: new Date('2000-01-01'),
+        validUntil: new Date('2999-12-31'),
+      })),
+    );
     // MGET returns one value per requested key, in order: a token for a locked seat, else null.
     redisMock.mget.mockImplementation(async (...keys: string[]) =>
       keys.map((key) => {
@@ -308,6 +317,15 @@ describe('MatchSeatsController – integration', () => {
       expect(Array.isArray(res.body.seats)).toBe(true);
       expect(res.body.seats).toHaveLength(2);
       expect(Array.isArray(res.body.sectorSummary)).toBe(true);
+    });
+
+    it('an away match has no sellable map: 409 match_away', async () => {
+      setData(makeMatch({ homeTeam: 'Ferencvárosi TC', awayTeam: 'Kecskeméti TE', capacity: 0 }), [
+        makeSeat(SEAT_ID_FREE, 'A', '1', 1),
+      ]);
+
+      const res = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(409);
+      expect(res.body.code).toBe('match_away');
     });
 
     it('should mark a seat as "sold" when there is a paid ticket for it', async () => {
@@ -773,6 +791,38 @@ describe('MatchSeatsController – integration', () => {
         .expect(409);
 
       expect(res.body.message).toBe('Ez a hely bérletes hely.');
+    });
+
+    it('a pass seat is sold like any other on a match the pass does not cover (friendly or cup tie)', async () => {
+      setData(
+        makeMatch({ isSeasonPassEligible: false }),
+        [makeSeat(SEAT_ID_SEASON_PASS, 'A', '1', 6)],
+        [],
+        [],
+        [SEAT_ID_SEASON_PASS],
+      );
+
+      await request(app.getHttpServer())
+        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_SEASON_PASS}/lock`)
+        .expect(201);
+
+      const map = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+      expect(map.body.seats[0].status).toBe('available');
+      expect(map.body.sectorSummary[0]).toMatchObject({ available: 1, sold: 0 });
+    });
+
+    it('a pass whose validity window does not include the match does not hold its seat', async () => {
+      setData(makeMatch(), [makeSeat(SEAT_ID_SEASON_PASS, 'A', '1', 6)], []);
+      seasonPassRepoMock.find.mockResolvedValue([
+        {
+          seatId: SEAT_ID_SEASON_PASS,
+          validFrom: new Date('2000-01-01'),
+          validUntil: new Date('2000-06-30'),
+        },
+      ]);
+
+      const map = await request(app.getHttpServer()).get(`/matches/${MATCH_ID}/seats`).expect(200);
+      expect(map.body.seats[0].status).toBe('available');
     });
 
     it('should return 409 when trying to lock an inactive seat', async () => {

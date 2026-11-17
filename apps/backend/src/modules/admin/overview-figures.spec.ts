@@ -42,10 +42,17 @@ const row = (
   status = TicketStatus.USED,
 ): TicketAggregate => ({ matchId, status, source, n, amount });
 
-const input = (matches: FigureMatch[], ticketRows: TicketAggregate[]) => ({
+/** Every home match is one the passes are valid for, unless a test says otherwise. */
+const input = (
+  matches: FigureMatch[],
+  ticketRows: TicketAggregate[],
+  validFor: (m: FigureMatch) => boolean = (m) => m.isHome,
+) => ({
   matches,
   ticketRows,
-  passSeats,
+  validPassSeats: new Map<string, ReadonlySet<string>>(
+    matches.filter(validFor).map((m) => [m.id, passSeats]),
+  ),
   passSeatsWithTicket: new Map<string, ReadonlySet<string>>(),
   sellableSeats: SELLABLE,
   now: NOW,
@@ -56,7 +63,8 @@ describe('admin overview figures: away matches', () => {
     const [away] = matchRows(input([awayMatch('away')], []));
     expect(away.isHome).toBe(false);
     expect(away.ticketCount).toBeNull();
-    expect(away.passEntryCount).toBeNull();
+    expect(away.passesValid).toBeNull();
+    expect(away.passEntered).toBeNull();
     expect(away.occupiedSeats).toBeNull();
     expect(away.capacity).toBeNull();
     expect(away.occupancyPercent).toBeNull();
@@ -160,5 +168,53 @@ describe('admin overview figures: the denominator is the sellable seats', () => 
       passSeatsWithTicket: withTicket,
     });
     expect(m.occupiedSeats).toBe(2 + (PASS_COUNT - 2));
+  });
+});
+
+describe('admin overview figures: pass seats only count where the pass is valid', () => {
+  it('leaves the pass seats empty on a match the passes do not cover (a friendly with no tickets reads 0%)', () => {
+    const friendly = homeMatch('friendly', {
+      status: MatchStatus.SCHEDULED,
+      kickoffAt: new Date('2026-12-05T15:00:00Z'),
+    });
+    const [m] = matchRows(input([friendly], [], () => false));
+    expect(m.occupiedSeats).toBe(0);
+    expect(m.occupancyPercent).toBe(0);
+    expect(m.passesValid).toBe(0);
+  });
+
+  it('still counts them on a match the passes cover', () => {
+    const league = homeMatch('league', {
+      status: MatchStatus.SCHEDULED,
+      kickoffAt: new Date('2026-12-05T15:00:00Z'),
+    });
+    const [m] = matchRows(input([league], []));
+    expect(m.occupiedSeats).toBe(PASS_COUNT);
+  });
+});
+
+describe('admin overview figures: the pass figure of a match', () => {
+  const upcoming = homeMatch('up', {
+    status: MatchStatus.ON_SALE,
+    kickoffAt: new Date('2026-12-05T15:00:00Z'),
+  });
+
+  it('is, for a match still ahead, the passes valid for it, whatever tickets exist yet', () => {
+    // one pass entry ticket was materialised (a holder opened the QR): the figure is still 36
+    const tickets = [row('up', TicketSource.SEASON_PASS, 1, 0, TicketStatus.PAID)];
+    const [m] = matchRows(input([upcoming], tickets));
+    expect(m.passesValid).toBe(PASS_COUNT);
+    expect(m.passEntered).toBeNull();
+  });
+
+  it('is, for a match already played, the pass entries that were scanned', () => {
+    const tickets = [
+      row('home', TicketSource.SEASON_PASS, 30, 0, TicketStatus.USED),
+      row('home', TicketSource.SEASON_PASS, 4, 0, TicketStatus.PAID), // materialised, never came
+      row('home', TicketSource.LOAN, 2, 0, TicketStatus.USED),
+    ];
+    const [m] = matchRows(input([homeMatch('home')], tickets));
+    expect(m.passEntered).toBe(32);
+    expect(m.passesValid).toBeNull();
   });
 });

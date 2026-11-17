@@ -66,7 +66,7 @@ export interface LoyaltySnapshotResponse {
  * Keep this in sync if the backend tier list ever changes.
  */
 export const TIER_LABELS: Record<LoyaltyTier, string> = {
-  bronze: 'Kék',
+  bronze: 'Lila',
   silver: 'Ezüst',
   gold: 'Arany',
   platinum: 'KTE Legenda',
@@ -80,7 +80,7 @@ export const TIER_LABELS: Record<LoyaltyTier, string> = {
  * reserved exclusively for the loyalty tier badge/card (--kte-gold).
  */
 export const TIER_COLORS: Record<LoyaltyTier, string> = {
-  bronze: '#1F5C8B',   // --kte-seat-pass
+  bronze: '#6B2D96',   // --kte-brand-mid
   silver: '#9D96A8',   // --kte-faint
   gold: '#C9A227',     // --kte-gold (reserved for loyalty tier)
   platinum: '#6B2D96', // --kte-brand-mid

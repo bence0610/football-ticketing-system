@@ -68,7 +68,7 @@ async function mockLoyalty(page: import('@playwright/test').Page): Promise<void>
       contentType: 'application/json',
       body: JSON.stringify({
         points: 0,
-        tier: { tier: 'bronze', label: 'Kék', minPoints: 0, discountPercent: 0, color: '#1F5C8B' },
+        tier: { tier: 'bronze', label: 'Lila', minPoints: 0, discountPercent: 0, color: '#6B2D96' },
         recentTransactions: [],
       }),
     }),

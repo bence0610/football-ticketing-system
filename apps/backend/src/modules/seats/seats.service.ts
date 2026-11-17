@@ -1,8 +1,11 @@
-import { assertMatchOpenForSale } from '../matches/match-sale';
+import { ConfigService } from '@nestjs/config';
+import { AppConfig } from '../../config';
+import { assertMatchIsHome, assertMatchOpenForSale } from '../matches/match-sale';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { In, Repository } from 'typeorm';
+import { passCoversMatch } from '../season-passes/season-pass-validity';
 import { Match, Seat, SeasonPass, SeasonPassStatus, Sector, Ticket } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
@@ -29,7 +32,12 @@ export class SeatsService {
     private readonly sectorRepository: Repository<Sector>,
     @Inject(REDIS_CLIENT)
     private readonly redis: Redis,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.homeTeamName = configService.getOrThrow<AppConfig>('app').homeTeamName;
+  }
+
+  private readonly homeTeamName: string;
 
   async findAll(): Promise<Seat[]> {
     const [seats, sectors] = await Promise.all([
@@ -49,6 +57,8 @@ export class SeatsService {
     if (!match) {
       throw new NotFoundException(`Match ${matchId} not found`);
     }
+    // An away match has nothing to sell: no sellable map for it either.
+    assertMatchIsHome(match, this.homeTeamName);
 
     // Only the columns the seat map shows: hydrating the timestamp and version columns of
     // 5,468 rows into entities was about half of this call's time (see seat-map-perf).
@@ -88,7 +98,7 @@ export class SeatsService {
       matchId,
       seats.map((s) => s.id),
     );
-    const seasonPassSeatIds = await this.fetchSeasonPassSeatIds();
+    const seasonPassSeatIds = await this.fetchSeasonPassSeatIds(match);
     const awaySections = this.awaySectionsOf(sectors);
 
     const basePrice = Number(match.basePrice);
@@ -165,7 +175,7 @@ export class SeatsService {
       matchId,
       rows.map((r) => r.id),
     );
-    const seasonPassSeatIds = await this.fetchSeasonPassSeatIds();
+    const seasonPassSeatIds = await this.fetchSeasonPassSeatIds(match);
     const awaySections = this.awaySectionsOf(sectors);
     const basePrice = Number(match.basePrice);
 
@@ -201,16 +211,16 @@ export class SeatsService {
   }
 
   /**
-   * Refuses a match that cannot be bought: unknown (404), or already kicked off
-   * (409 `match_started`), or cancelled (409 `match_cancelled`). The seat lock calls this
-   * before anything else.
+   * Refuses a match that cannot be bought: unknown (404), an away match (409 `match_away`),
+   * already kicked off (409 `match_started`), or cancelled (409 `match_cancelled`). The seat
+   * lock and the best-seats finder call this before anything else.
    */
   async assertMatchOpenForSale(matchId: string): Promise<void> {
     const match = await this.matchRepository.findOne({ where: { id: matchId } });
     if (!match) {
       throw new NotFoundException(`Match ${matchId} not found`);
     }
-    assertMatchOpenForSale(match);
+    assertMatchOpenForSale(match, this.homeTeamName);
   }
 
   /**
@@ -226,6 +236,10 @@ export class SeatsService {
       return new Map();
     }
 
+    const match = await this.matchRepository.findOne({ where: { id: matchId } });
+    if (!match) {
+      throw new NotFoundException(`Match ${matchId} not found`);
+    }
     const seats = await this.seatRepository.find({
       where: { id: In(seatIds) },
     });
@@ -237,7 +251,7 @@ export class SeatsService {
     const soldSeatIds = new Set<string>(tickets.map((t) => t.seatId));
 
     const lockedSeatIds = await this.fetchLockedSeatIds(matchId, seatIds);
-    const seasonPassSeatIds = await this.fetchSeasonPassSeatIds();
+    const seasonPassSeatIds = await this.fetchSeasonPassSeatIds(match);
     const awaySections = this.awaySectionsOf(await this.loadSectors());
 
     const result = new Map<string, SeatAvailability>();
@@ -288,19 +302,29 @@ export class SeatsService {
   }
 
   /**
-   * Fetches the set of seat ids occupied by ACTIVE season passes. These
+   * Fetches the set of seat ids occupied by ACTIVE season passes FOR THIS MATCH. These
    * seats are surfaced on the seat map with a distinct status so the
    * UI can render them visually different (and disable click-to-buy).
+   *
+   * A pass is an entry to the matches it is valid for (season-pass eligible ones). On a cup tie
+   * or a friendly the holder has no entry, so the seat stays empty and is sold like any other:
+   * the set is empty for a match that is not season-pass eligible.
    * Gracefully degrades to an empty set if the lookup fails.
    */
-  private async fetchSeasonPassSeatIds(): Promise<Set<string>> {
+  private async fetchSeasonPassSeatIds(
+    match: Pick<Match, 'kickoffAt' | 'isSeasonPassEligible' | 'status'>,
+  ): Promise<Set<string>> {
+    if (!match.isSeasonPassEligible) {
+      return new Set<string>();
+    }
     try {
       const rows = await this.seasonPassRepository.find({
         where: { status: SeasonPassStatus.ACTIVE },
-        select: ['seatId'],
+        select: ['seatId', 'validFrom', 'validUntil'],
       });
       return new Set(
         rows
+          .filter((r) => passCoversMatch(match, r))
           .map((r) => r.seatId)
           .filter((id): id is string => typeof id === 'string' && id.length > 0),
       );

@@ -217,7 +217,12 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
     ])(
       'rejects a match %s with 400 match_outside_validity and issues no QR',
       async (_label, kickoff) => {
-        mockMatchRepo.findOne.mockResolvedValue({ id: 'm1', kickoffAt: new Date(kickoff) });
+        mockMatchRepo.findOne.mockResolvedValue({
+          id: 'm1',
+          kickoffAt: new Date(kickoff),
+          isSeasonPassEligible: true,
+          status: 'on_sale',
+        });
         await expect(service.getMatchQr('pass-1', 'm1', 'u1')).rejects.toMatchObject({
           status: 400,
           response: { code: 'match_outside_validity' },
@@ -231,7 +236,12 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
       ['final day at UTC midnight', '2027-06-30T00:00:00Z'],
       ['final day, late evening (23:30 local)', '2027-06-30T21:30:00Z'],
     ])('lets a match on the %s through the validity check', async (_label, kickoff) => {
-      mockMatchRepo.findOne.mockResolvedValue({ id: 'm1', kickoffAt: new Date(kickoff) });
+      mockMatchRepo.findOne.mockResolvedValue({
+        id: 'm1',
+        kickoffAt: new Date(kickoff),
+        isSeasonPassEligible: true,
+        status: 'on_sale',
+      });
       jest
         .spyOn(service as never, 'materializeSeasonPassTicket')
         .mockRejectedValue(new Error('reached ticket materialisation') as never);
@@ -239,6 +249,20 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
       await expect(service.getMatchQr('pass-1', 'm1', 'u1')).rejects.toThrow(
         'reached ticket materialisation',
       );
+    });
+
+    it('refuses a match the pass does not cover (a friendly or cup tie) with 400 match_not_pass_eligible', async () => {
+      mockMatchRepo.findOne.mockResolvedValue({
+        id: 'm1',
+        kickoffAt: new Date('2026-11-09T19:00:00Z'),
+        isSeasonPassEligible: false,
+        status: 'on_sale',
+      });
+      const spy = jest.spyOn(service as never, 'materializeSeasonPassTicket');
+      await expect(service.getMatchQr('pass-1', 'm1', 'u1')).rejects.toMatchObject({
+        response: { code: 'match_not_pass_eligible' },
+      });
+      expect(spy).not.toHaveBeenCalled();
     });
 
     it('does not even reach the QR step for an outside match (nothing is materialised)', async () => {

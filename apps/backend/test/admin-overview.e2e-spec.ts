@@ -44,7 +44,11 @@ describe('Admin overview (E2E)', () => {
   });
 
   afterAll(async () => {
-    if (ctx) await closeTestApp(ctx);
+    // The sold-out test adds two sectors beside the real 19; leaving them breaks the layout suite.
+    if (ctx) {
+      await ctx.dataSource.query("DELETE FROM sectors WHERE code IN ('A', 'AWAY-T')");
+      await closeTestApp(ctx);
+    }
   });
 
   beforeEach(async () => {
@@ -297,7 +301,8 @@ describe('Admin overview (E2E)', () => {
         isHome: false,
         final: true,
         ticketCount: null,
-        passEntryCount: null,
+        passesValid: null,
+        passEntered: null,
         occupiedSeats: null,
         capacity: null,
         occupancyPercent: null,

@@ -198,7 +198,7 @@ const LEDGER_PAGE = 50;
                   <div class="calc__pay"><dt>Te fizetsz</dt><dd>{{ x.calc.pay | hufCurrency }}</dd></div>
                 </dl>
                 @if (s.tier.discountPercent === 0) {
-                  <p class="card__fine">A Kék szint nem ad kedvezményt; a következő szinttől jár.</p>
+                  <p class="card__fine">A Lila szint nem ad kedvezményt; a következő szinttől jár.</p>
                 }
               </section>
             }
@@ -253,7 +253,7 @@ const LEDGER_PAGE = 50;
         /* Tier fill tuned for a dark band: the page tokens are made for white. */
         --band-fill: var(--tier-fill);
       }
-      .band[data-tier='bronze'] { --band-fill: var(--on-ink-nav); }
+      .band[data-tier='bronze'] { --band-fill: var(--on-brand-eyebrow); }
       .band[data-tier='platinum'] { --band-fill: var(--on-brand-eyebrow); }
       .band__inner {
         max-width: 1180px;
@@ -337,6 +337,7 @@ const LEDGER_PAGE = 50;
         padding: 28px 16px 20px;
         text-align: center;
       }
+      .tier[data-tier='bronze'] { background: var(--brand-tint); border-color: var(--brand-mid); }
       .tier--current { border: 2px solid var(--tier-pill-border); padding: 27px 15px 19px; background: var(--tier-soft); }
       .tier__ribbon {
         position: absolute;

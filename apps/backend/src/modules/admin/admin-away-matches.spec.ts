@@ -59,6 +59,7 @@ const match = (id: string, home: boolean, over: Record<string, unknown> = {}) =>
   awayTeam: home ? 'Diósgyőri VTK' : HOME,
   kickoffAt: new Date('2026-11-01T15:00:00Z'),
   status: MatchStatus.FINISHED,
+  isSeasonPassEligible: true,
   ...over,
 });
 
@@ -98,7 +99,12 @@ describe('the admin overview', () => {
       { createQueryBuilder: () => ticketB.proxy, find: ticketFind } as any,
       {
         createQueryBuilder: () => passB.proxy,
-        find: async () => passSeatIds.map((seatId) => ({ seatId })),
+        find: async () =>
+          passSeatIds.map((seatId) => ({
+            seatId,
+            validFrom: new Date('2026-07-01'),
+            validUntil: new Date('2027-06-30'),
+          })),
       } as any,
       {
         find: async () => [
@@ -127,12 +133,13 @@ describe('the admin overview', () => {
     expect(a.isHome).toBe(false);
     expect([
       a.ticketCount,
-      a.passEntryCount,
+      a.passesValid,
+      a.passEntered,
       a.occupiedSeats,
       a.capacity,
       a.occupancyPercent,
       a.revenue,
-    ]).toEqual([null, null, null, null, null, null]);
+    ]).toEqual([null, null, null, null, null, null, null]);
   });
 
   it('measures the season over home matches only', async () => {
@@ -202,6 +209,7 @@ describe('the per-match occupancy report', () => {
       { findOne: async () => m } as any,
       { createQueryBuilder: () => seatB.proxy } as any,
       { find: async () => soldSeatIds.map((seatId) => ({ seatId })) } as any,
+      { find: async () => [] } as any,
       { pipeline: () => pipeline } as any,
       config,
     );
@@ -230,6 +238,7 @@ describe('the per-match occupancy report', () => {
     const svc = new AdminOccupancyService(
       { findOne: async () => match('home-1', true) } as any,
       { createQueryBuilder: () => seatB.proxy } as any,
+      { find: async () => [] } as any,
       { find: async () => [] } as any,
       { pipeline: () => ({ get: () => undefined, exec: async () => [] }) } as any,
       config,

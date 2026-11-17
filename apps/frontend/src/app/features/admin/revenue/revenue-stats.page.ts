@@ -136,7 +136,7 @@ const percentText = (value: number | null): string => (value === null ? '—' : 
                               @if (!m.isHome) {
                                 <span class="chip" data-testid="away">idegenben</span>
                               } @else if (!m.final) {
-                                <span class="chip" data-testid="not-final">nem végleges</span>
+                                <span class="chip" data-testid="not-final">még tart az értékesítés</span>
                               }
                             </span>
                           </th>
@@ -145,8 +145,10 @@ const percentText = (value: number | null): string => (value === null ? '—' : 
                               <span class="dash" data-testid="no-tickets" title="Idegenbeli mérkőzés: itt nem értékesítünk jegyet">–</span>
                             } @else {
                               {{ m.ticketCount }}
-                              @if (m.passEntryCount !== null && m.passEntryCount > 0) {
-                                <span class="sub">+ {{ m.passEntryCount }} bérletes</span>
+                              @if (m.passesValid !== null && m.passesValid > 0) {
+                                <span class="sub" data-testid="passes-valid" title="A meccsre érvényes bérletek száma (még nem lejátszott meccs)">{{ m.passesValid }} érvényes bérlet</span>
+                              } @else if (m.passEntered !== null && m.passEntered > 0) {
+                                <span class="sub" data-testid="pass-entered" title="A meccsen ténylegesen belépett bérletesek száma">{{ m.passEntered }} bérletes lépett be</span>
                               }
                             }
                           </td>
@@ -542,7 +544,7 @@ export class RevenueStatsPageComponent {
         label: 'Eladott jegy',
         value: String(m.ticketsSold),
         context:
-          m.passEntries > 0 ? `és ${m.passEntries} bérletes belépő` : 'bérletes belépő nélkül',
+          m.passEntries > 0 ? `és ${m.passEntries} belépett bérletes` : 'belépett bérletes nélkül',
       },
       {
         testId: 'metric-occupancy',

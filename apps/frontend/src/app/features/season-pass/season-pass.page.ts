@@ -1152,10 +1152,18 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
     return first?.seasonLabel ?? this.season()?.seasonLabel ?? '2026/2027';
   });
 
-  /** "Egy hely, N meccs" with the real count; without it, nothing numeric is claimed. */
+  /**
+   * "Egy hely, N meccs" with the real count; without it, nothing numeric is claimed. Once the season
+   * has started only the matches still to come can be used, so the headline says how many are left
+   * (the same test as the fixture list's played marker); before the first match that is all of them.
+   */
   protected readonly heroTitle = computed(() => {
-    const n = this.season()?.homeMatches.length ?? 0;
-    return n > 0 ? `Egy hely, ${n} meccs` : 'Egy hely az egész szezonra';
+    const all = this.season()?.homeMatches ?? [];
+    const left = all.filter((m) => !this.isPlayed(m)).length;
+    if (left === 0) {
+      return 'Egy hely az egész szezonra';
+    }
+    return left < all.length ? `Egy hely, a hátralévő ${left} meccs` : `Egy hely, ${left} meccs`;
   });
 
   /** Only a sector with a single, non-zero lead in passes sold earns the ribbon. */

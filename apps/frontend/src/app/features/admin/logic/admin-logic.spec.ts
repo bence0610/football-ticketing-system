@@ -24,7 +24,8 @@ const match = (over: Partial<SoldMatch> = {}): SoldMatch => ({
   final: true,
   isHome: true,
   ticketCount: 10,
-  passEntryCount: 2,
+  passesValid: null,
+  passEntered: 2,
   occupiedSeats: 12,
   capacity: 20,
   occupancyPercent: 60,
@@ -42,7 +43,8 @@ const awayMatch = (over: Partial<OverviewMatch> = {}): OverviewMatch => ({
   final: true,
   isHome: false,
   ticketCount: null,
-  passEntryCount: null,
+  passesValid: null,
+  passEntered: null,
   occupiedSeats: null,
   capacity: null,
   occupancyPercent: null,
@@ -93,15 +95,15 @@ describe('CSV', () => {
       .split('\r\n');
     expect(lines.length).toBe(3);
     expect(lines[0]).toBe(
-      'Mérkőzés;Kezdés;Végleges;Eladott jegy;Bérletes belépő;Foglaltság (%);Bevétel (Ft)',
+      'Mérkőzés;Kezdés;Végleges;Eladott jegy;Érvényes bérlet (hátralévő meccs);Belépett bérletes (lejátszott meccs);Foglaltság (%);Bevétel (Ft)',
     );
-    expect(lines[1]).toBe('Kecskeméti TE – Újpest FC;2026-07-12T16:00:00.000Z;igen;10;2;60;35000');
+    expect(lines[1]).toBe('Kecskeméti TE – Újpest FC;2026-07-12T16:00:00.000Z;igen;10;;2;60;35000');
     expect(lines[2]).toContain(';nem;');
   });
 
   it('leaves the figure cells of an away match empty: a dash, not a zero', () => {
     const lines = matchesCsv([awayMatch()]).trimEnd().split('\r\n');
-    expect(lines[1]).toBe('Szeged – Kecskeméti TE;2026-11-08T15:00:00.000Z;igen;;;;');
+    expect(lines[1]).toBe('Szeged – Kecskeméti TE;2026-11-08T15:00:00.000Z;igen;;;;;');
   });
 });
 

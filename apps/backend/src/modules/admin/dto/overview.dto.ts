@@ -28,12 +28,20 @@ export class OverviewMatchDto {
   ticketCount!: number | null;
   @ApiPropertyOptional({
     nullable: true,
-    description: 'Season-pass and loan entries issued for the match.',
+    description:
+      'Only for a match still ahead: how many season passes are valid for it (active, the match is pass-eligible and inside the pass window). Null once the match is played. Not the number of pass tickets issued, which exist only after a holder opens the QR or is scanned.',
   })
-  passEntryCount!: number | null;
+  passesValid!: number | null;
   @ApiPropertyOptional({
     nullable: true,
-    description: 'Seats taken: tickets plus seats held by an active pass.',
+    description:
+      'Only for a match already played: how many pass (or loan) entries were actually scanned at the gate. Null while the match is ahead.',
+  })
+  passEntered!: number | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Seats taken: tickets plus the seats of passes valid for the match (a pass seat is not taken on a match the pass does not cover).',
   })
   occupiedSeats!: number | null;
   @ApiPropertyOptional({
@@ -54,7 +62,10 @@ export class OverviewMetricsDto {
   @ApiProperty({ description: 'HUF actually charged for the matches in the period.' })
   revenue!: number;
   @ApiProperty() ticketsSold!: number;
-  @ApiProperty() passEntries!: number;
+  @ApiProperty({
+    description: 'Pass and loan entries scanned at the gate, over the matches already played.',
+  })
+  passEntries!: number;
   @ApiPropertyOptional({
     nullable: true,
     description: 'Mean occupancy of the final matches, 0..100; null when there are none.',

@@ -1,6 +1,6 @@
 import { Competition, MatchStatus } from '../entities/match.entity';
 import { OPPONENT_KEYS, OPPONENTS } from './data';
-import { LIVE_ROUND, SOLD_OUT_ROUND, buildSchedule, leagueRounds } from './schedule';
+import { FULLEST_ROUND, LIVE_ROUND, buildSchedule, leagueRounds } from './schedule';
 import { DAY_MS, HOUR_MS } from './time';
 
 const SEASON = {
@@ -64,15 +64,16 @@ describe('the demo league schedule', () => {
     expect(NOW.getTime() - live.kickoffAt.getTime()).toBeGreaterThan(0);
     expect(NOW.getTime() - live.kickoffAt.getTime()).toBeLessThan(2 * HOUR_MS);
 
-    const soldOut = byRound(SOLD_OUT_ROUND);
-    expect(soldOut.home).toBe(true);
-    expect(soldOut.status).toBe(MatchStatus.SOLD_OUT);
-    expect(league.filter((m) => m.soldOut)).toHaveLength(1);
+    const fullest = byRound(FULLEST_ROUND);
+    expect(fullest.home).toBe(true);
+    // never sold out: a fully ticketed league match would leave no seat for a season pass
+    expect(fullest.status).toBe(MatchStatus.ON_SALE);
+    expect(league.filter((m) => m.fullest)).toHaveLength(1);
+    expect([...current, ...previous].some((m) => m.status === MatchStatus.SOLD_OUT)).toBe(false);
 
     const upcoming = league.filter((m) => m.round! > LIVE_ROUND);
     expect(upcoming.every((m) => m.kickoffAt.getTime() > NOW.getTime() + 12 * HOUR_MS)).toBe(true);
-    for (const m of upcoming.filter((x) => x.home && !x.soldOut))
-      expect(m.status).toBe(MatchStatus.ON_SALE);
+    for (const m of upcoming.filter((x) => x.home)) expect(m.status).toBe(MatchStatus.ON_SALE);
     for (const m of upcoming.filter((x) => !x.home)) expect(m.status).toBe(MatchStatus.SCHEDULED);
   });
 
@@ -121,7 +122,7 @@ describe('the demo league schedule', () => {
     expect(l.filter((m) => m.home)).toHaveLength(15);
     expect(l.filter((m) => m.round! < LIVE_ROUND).every((m) => m.kickoffAt < now)).toBe(true);
     expect(l.filter((m) => m.round! > LIVE_ROUND).every((m) => m.kickoffAt > now)).toBe(true);
-    expect(l.filter((m) => m.soldOut)).toHaveLength(1);
+    expect(l.filter((m) => m.fullest)).toHaveLength(1);
   });
 
   it('says so when the season is too far gone for the rounds still to come', () => {

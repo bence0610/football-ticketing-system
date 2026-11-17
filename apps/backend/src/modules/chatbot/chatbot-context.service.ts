@@ -198,7 +198,7 @@ export class ChatbotContextService {
           this.toSnapshot(
             match,
             aggregates.get(match.id) ?? 0,
-            await this.loadSectors(match.id),
+            await this.loadSectors(match),
             await this.loadWeather(match),
           ),
         ),
@@ -313,7 +313,12 @@ export class ChatbotContextService {
   }
 
   /** Reuses the seat map's sector summary so the chatbot and the UI agree. */
-  private async loadSectors(matchId: string): Promise<ChatbotSectorSnapshot[] | null> {
+  private async loadSectors(match: Match): Promise<ChatbotSectorSnapshot[] | null> {
+    // An away match has nothing to sell, so there is no seat map to take sectors from.
+    if (!isHomeMatch(match, this.homeTeamName)) {
+      return null;
+    }
+    const matchId = match.id;
     try {
       const { sectorSummary } = await this.seatsService.findSeatsForMatch(matchId);
       return sectorSummary.map((s) => ({

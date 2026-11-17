@@ -1,5 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import { type Match, MatchStatus } from '../../database/entities';
+import { isHomeMatch } from './match-home';
 
 /**
  * The single definition of "this match can no longer be bought": its kickoff
@@ -28,13 +29,30 @@ export function assertMatchNotCancelled(match: Pick<Match, 'status'>): void {
 }
 
 /**
- * Everything that must hold before a seat is sold: the match is not cancelled and has not
- * kicked off. The seat lock and the payment intent both call this and nothing else.
+ * Throws 409 `match_away` when the club is not the home side. Tickets are sold only for home
+ * matches: an away match has no capacity, no prices and no seat map to sell from.
+ */
+export function assertMatchIsHome(match: Pick<Match, 'homeTeam'>, homeTeamName: string): void {
+  if (!isHomeMatch(match, homeTeamName)) {
+    throw new ConflictException({
+      statusCode: 409,
+      message: 'Idegenbeli mérkőzésre nem vásárolható jegy.',
+      code: 'match_away',
+    });
+  }
+}
+
+/**
+ * Everything that must hold before a seat is sold: the match is a home match, is not cancelled
+ * and has not kicked off. THE one rule for a sale: the seat lock, the best-seats finder, the
+ * payment intent, the waitlist join and the waitlist claim all go through this and nothing else.
  */
 export function assertMatchOpenForSale(
-  match: Pick<Match, 'kickoffAt' | 'status'>,
+  match: Pick<Match, 'homeTeam' | 'kickoffAt' | 'status'>,
+  homeTeamName: string,
   now: Date = new Date(),
 ): void {
+  assertMatchIsHome(match, homeTeamName);
   assertMatchNotCancelled(match);
   assertMatchNotStarted(match, now);
 }

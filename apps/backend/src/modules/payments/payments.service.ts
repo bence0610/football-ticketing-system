@@ -14,7 +14,7 @@ import { createHash, randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import Stripe from 'stripe';
 import { DataSource, In, Repository } from 'typeorm';
-import { LoyaltyConfig, MailConfig, StripeConfig } from '../../config';
+import { AppConfig, LoyaltyConfig, MailConfig, StripeConfig } from '../../config';
 import {
   LoyaltyTransactionSource,
   LoyaltyTransactionType,
@@ -73,6 +73,7 @@ export class PaymentsService {
   private readonly webhookSecret: string;
   private readonly loyaltyConfig: LoyaltyConfig;
   private readonly mailConfig: MailConfig;
+  private readonly homeTeamName: string;
 
   constructor(
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe,
@@ -95,6 +96,7 @@ export class PaymentsService {
     this.webhookSecret = stripeConfig.webhookSecret;
     this.loyaltyConfig = configService.getOrThrow<LoyaltyConfig>('loyalty');
     this.mailConfig = configService.getOrThrow<MailConfig>('mail');
+    this.homeTeamName = configService.getOrThrow<AppConfig>('app').homeTeamName;
   }
 
   async createPaymentIntent(
@@ -107,7 +109,7 @@ export class PaymentsService {
     }
     // Server-side guard: the client hides past and cancelled matches, but it is not the only
     // line of defence.
-    assertMatchOpenForSale(match);
+    assertMatchOpenForSale(match, this.homeTeamName);
 
     const lines = await this.assertSeatsAvailable(dto.matchId, dto.seats, match);
 

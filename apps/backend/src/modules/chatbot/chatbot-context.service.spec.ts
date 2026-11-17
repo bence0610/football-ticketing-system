@@ -132,6 +132,21 @@ describe('ChatbotContextService', () => {
       makeMatch('m-away', 'Újpest', HOME),
     ];
 
+    const config = {
+      getOrThrow: (key: string) =>
+        key === 'app'
+          ? { homeTeamName: HOME }
+          : key === 'loyalty'
+            ? LOYALTY_CONFIG
+            : key === 'redis'
+              ? { seatLockTtlSeconds: 300 }
+              : key === 'cron'
+                ? { loanInvitationTtlHours: 72 }
+                : key === 'waitlist'
+                  ? { claimTtlSeconds: 600 }
+                  : { contextCacheTtlSeconds: 300 },
+    } as unknown as ConfigService;
+
     // The REAL SeatsService (real sector-summary logic) over stubbed storage.
     seatsService = new SeatsService(
       { find: jest.fn(async () => seats) } as never,
@@ -148,6 +163,7 @@ describe('ChatbotContextService', () => {
         ]),
       } as never,
       redis as never,
+      config,
     );
 
     const qb = {
@@ -161,20 +177,6 @@ describe('ChatbotContextService', () => {
         { matchId: 'm-away', soldCount: '2' },
       ],
     };
-    const config = {
-      getOrThrow: (key: string) =>
-        key === 'app'
-          ? { homeTeamName: HOME }
-          : key === 'loyalty'
-            ? LOYALTY_CONFIG
-            : key === 'redis'
-              ? { seatLockTtlSeconds: 300 }
-              : key === 'cron'
-                ? { loanInvitationTtlHours: 72 }
-                : key === 'waitlist'
-                  ? { claimTtlSeconds: 600 }
-                  : { contextCacheTtlSeconds: 300 },
-    } as unknown as ConfigService;
     service = new ChatbotContextService(
       { find: jest.fn(async () => matches) } as never,
       { createQueryBuilder: () => qb } as never,
@@ -189,7 +191,7 @@ describe('ChatbotContextService', () => {
   it("includes each sector's coverage, from the same data as the seat map", async () => {
     const snapshot = await service.getUpcomingMatchesSnapshot();
 
-    for (const m of snapshot.upcomingMatches) {
+    for (const m of snapshot.upcomingMatches.filter((x) => x.isHome)) {
       const map = await seatsService.findSeatsForMatch(m.id);
       for (const sector of m.sectors!) {
         const onMap = map.sectorSummary.find((s) => s.section === sector.section)!;
@@ -205,7 +207,7 @@ describe('ChatbotContextService', () => {
   it("per-sector free counts equal the seat map's available seats", async () => {
     const snapshot = await service.getUpcomingMatchesSnapshot();
 
-    for (const m of snapshot.upcomingMatches) {
+    for (const m of snapshot.upcomingMatches.filter((x) => x.isHome)) {
       const map = await seatsService.findSeatsForMatch(m.id);
       expect(m.sectors).not.toBeNull();
       for (const sector of m.sectors!) {
@@ -225,7 +227,7 @@ describe('ChatbotContextService', () => {
 
   it('sector prices equal what the seat map reports for the same seats', async () => {
     const snapshot = await service.getUpcomingMatchesSnapshot();
-    for (const m of snapshot.upcomingMatches) {
+    for (const m of snapshot.upcomingMatches.filter((x) => x.isHome)) {
       const map = await seatsService.findSeatsForMatch(m.id);
       for (const sector of m.sectors!) {
         const prices = map.seats.filter((s) => s.section === sector.section).map((s) => s.price);
@@ -248,6 +250,8 @@ describe('ChatbotContextService', () => {
     const snapshot = await service.getUpcomingMatchesSnapshot();
     expect(snapshot.upcomingMatches.find((m) => m.id === 'm-home')!.isHome).toBe(true);
     expect(snapshot.upcomingMatches.find((m) => m.id === 'm-away')!.isHome).toBe(false);
+    // an away match has no seat map to take sectors from
+    expect(snapshot.upcomingMatches.find((m) => m.id === 'm-away')!.sectors).toBeNull();
   });
 
   it('marks sectors unavailable (null) instead of empty when the seat map fails', async () => {
@@ -321,7 +325,7 @@ describe('ChatbotContextService', () => {
         seasonLabel: '2026/2027',
         validFrom: '2026-08-01',
         validUntil: '2027-06-30',
-        prices: source.map((p) => ({
+        prices: source.map((p: { sectionId: string; sectionName: string; price: number }) => ({
           section: p.sectionId,
           sectionName: p.sectionName,
           price: p.price,

@@ -191,8 +191,8 @@ const NAMED: readonly NamedSpec[] = [
       'A fenti bérlet birtokosa: saját fiókjából látja és használja a nem általa vett bérletet.',
   },
   {
-    // 150 (registration + profile) + 3 tickets x 50 = 300 points: Kék (0-499).
-    key: 'kek',
+    // 150 (registration + profile) + 3 tickets x 50 = 300 points: Lila (0-499).
+    key: 'lila',
     firstName: 'Réka',
     lastName: 'Juhász',
     role: UserRole.FAN,
@@ -201,7 +201,7 @@ const NAMED: readonly NamedSpec[] = [
     profileDone: true,
     forced: [scanned('cur:r07', 2), scanned('cur:r11', 1)],
     expectedTier: LoyaltyTier.BRONZE,
-    purpose: 'Kék szint: a belépő szint, 0% kedvezmény, a következő szintig hátralévő pontok.',
+    purpose: 'Lila szint: a belépő szint, 0% kedvezmény, a következő szintig hátralévő pontok.',
   },
   {
     // Last season 8 tickets: 150 + 400 = 550, halved to 275; this season 12 tickets: +600 = 875: Ezüst (500-1499).
@@ -284,17 +284,6 @@ const NAMED: readonly NamedSpec[] = [
     ],
     expectedTier: LoyaltyTier.PLATINUM,
     purpose: 'KTE Legenda szint: a legmagasabb szint, 15% kedvezmény, a ranglista tetején.',
-  },
-  {
-    key: 'varolistas',
-    firstName: 'Viktória',
-    lastName: 'Simon',
-    role: UserRole.FAN,
-    fanClass: 'idle',
-    createdDaysAgo: 60,
-    profileDone: true,
-    purpose:
-      'Várólistás: az 1. helyen áll a teltházas meccs várólistáján (az első értesítést ő kapná).',
   },
 ];
 

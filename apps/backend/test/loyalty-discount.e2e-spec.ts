@@ -23,7 +23,7 @@ import {
 
 /**
  * The loyalty tier discount, end to end. Every user in the other suites is
- * Kék (0 %), which hides any discount mistake, so this suite buys as Ezüst,
+ * Lila (0 %), which hides any discount mistake, so this suite buys as Ezüst,
  * Arany and KTE Legenda and asserts that ONE discounted number is what
  *   - the create-intent response says (what the checkout displays),
  *   - Stripe is asked to charge,
@@ -295,7 +295,7 @@ describe('Loyalty tier discount (E2E)', () => {
     expect(sum(again.map((t) => Number(t.pricePaid)))).toBe(c.total);
   });
 
-  it('charges list price to a Kék (0 %) buyer and reports no discount', async () => {
+  it('charges list price to a Lila (0 %) buyer and reports no discount', async () => {
     const buyer = await registerBuyer(LoyaltyTier.BRONZE, 0);
     const intent = await createIntent(buyer);
 

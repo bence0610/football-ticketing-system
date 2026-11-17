@@ -185,7 +185,8 @@ describe('Stadium layout (E2E)', () => {
     expect(await ctx.dataSource.getRepository(Seat).count()).toBe(5468);
     const matches = await ctx.dataSource.getRepository(Match).find();
     expect(matches.length).toBeGreaterThan(0);
-    expect(matches.every((m) => m.capacity === 5468)).toBe(true);
+    // capacity is what a match can SELL: every seat but the 280 of the away section
+    expect(matches.every((m) => m.capacity === 5468 - 280)).toBe(true);
   }, 120_000);
 
   it('the seed refuses a database that still holds the old layout', async () => {

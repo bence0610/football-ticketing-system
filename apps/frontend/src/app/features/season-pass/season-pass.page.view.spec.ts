@@ -81,6 +81,24 @@ describe('SeasonPassPageComponent — what the page claims', () => {
     expect(el.querySelectorAll('[data-testid="fixtures"] li').length).toBe(3);
   });
 
+  it('says how many matches are left once the season has started', () => {
+    const at = (days: number): string => new Date(Date.now() + days * DAY).toISOString();
+    const el = render(
+      [price()],
+      season(3, {
+        homeMatches: [
+          { id: 'p1', awayTeam: 'A', kickoffAt: at(-14), status: 'finished' },
+          { id: 'p2', awayTeam: 'B', kickoffAt: at(-7), status: 'finished' },
+          { id: 'm1', awayTeam: 'C', kickoffAt: at(7), status: 'on_sale' },
+          { id: 'm2', awayTeam: 'D', kickoffAt: at(14), status: 'on_sale' },
+        ],
+      }),
+    );
+    expect(el.querySelector('h1')!.textContent).toContain('Egy hely, a hátralévő 2 meccs');
+    // the fixture list still shows the whole season
+    expect(text(el)).toContain('A szezon 4 hazai mérkőzése');
+  });
+
   it('claims no number and shows no fixture list when the season could not be loaded', () => {
     const el = render([price()], 'fail');
     expect(el.querySelector('h1')!.textContent).toContain('Egy hely az egész szezonra');

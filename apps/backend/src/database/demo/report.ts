@@ -1,5 +1,10 @@
 import { EntityManager } from 'typeorm';
 import { TIER_DEFINITIONS } from '../../modules/loyalty/loyalty.constants';
+import {
+  PASS_SEAT_FROM_SQL,
+  SEAT_FREE_FOR_PASS_SQL,
+} from '../../modules/season-passes/season-pass-seat-rule';
+import { PRICE_MODIFIER } from '../stadium-layout';
 import { HOME_TEAM } from './data';
 import { DEMO_ID_PREFIX } from './rng';
 
@@ -13,6 +18,66 @@ export interface AuditResult {
 async function count(manager: EntityManager, sql: string, params: unknown[] = []): Promise<number> {
   const rows = (await manager.query(sql, params)) as Array<{ n: string | number }>;
   return Number(rows[0]?.n ?? 0);
+}
+
+/** The pass tiers, in the order the season-pass page shows them. */
+export const PASS_TIER_CODES = ['vip', 'lower', 'upper'] as const;
+
+/**
+ * "Plenty" of free seats for a season pass in a tier: this share of the tier's seats, and at
+ * least this many. The demo must always leave a visitor something to buy.
+ */
+export const MIN_FREE_PASS_SHARE = 0.05;
+export const MIN_FREE_PASS_SEATS = 20;
+
+/** Free seats per pass tier by THE pass-seat rule (season-pass-seat-rule.ts), read from the database. */
+export async function freePassSeatsByTier(
+  manager: EntityManager,
+): Promise<Array<{ tier: string; total: number; free: number }>> {
+  const label = (await manager.query(
+    'SELECT season_label AS label FROM season_pass_prices WHERE is_active = 1 AND id NOT LIKE ? ORDER BY valid_until DESC LIMIT 1',
+    [P],
+  )) as Array<{ label: string }>;
+  if (label.length === 0) return [];
+  const rows = (await manager.query(
+    `SELECT c.price_category AS tier, COUNT(*) AS total, SUM(${SEAT_FREE_FOR_PASS_SQL}) AS free ${PASS_SEAT_FROM_SQL} ` +
+      'WHERE c.price_category IS NOT NULL AND c.is_away = 0 AND s.is_active = 1 GROUP BY c.price_category',
+    [label[0].label, label[0].label],
+  )) as Array<{ tier: string; total: string; free: string | null }>;
+  return PASS_TIER_CODES.map((tier) => {
+    const r = rows.find((x) => x.tier === tier);
+    return { tier, total: Number(r?.total ?? 0), free: Number(r?.free ?? 0) };
+  });
+}
+
+/**
+ * What the season-pass page's savings panel works from, read from the database the way the
+ * service does: per tier, the home matches still to come that the pass covers, bought one by
+ * one at the tier's seat price, against the (fixed, never prorated) pass price.
+ */
+export async function savingsByTier(
+  manager: EntityManager,
+): Promise<Array<{ tier: string; matches: number; separate: number; pass: number }>> {
+  const prices = (await manager.query(
+    'SELECT section AS tier, price, season_label AS label, valid_until AS validUntil FROM season_pass_prices WHERE is_active = 1 AND id NOT LIKE ?',
+    [P],
+  )) as Array<{ tier: string; price: string | number; label: string; validUntil: Date }>;
+  if (prices.length === 0) return [];
+  const latest = prices.reduce((a, b) => (b.validUntil > a.validUntil ? b : a));
+  const ofSeason = prices.filter((p) => p.label === latest.label);
+  const upcoming = (await manager.query(
+    "SELECT base_price AS basePrice FROM matches WHERE id LIKE ? AND home_team = ? AND is_season_pass_eligible = 1 AND status <> 'cancelled' AND kickoff_at > NOW() AND kickoff_at < DATE_ADD(?, INTERVAL 1 DAY)",
+    [P, HOME_TEAM, latest.validUntil],
+  )) as Array<{ basePrice: string | number }>;
+  return PASS_TIER_CODES.map((tier) => {
+    const modifier = Number(PRICE_MODIFIER[tier]);
+    const separate = upcoming.reduce(
+      (sum, m) => sum + Math.round(Number(m.basePrice) * modifier),
+      0,
+    );
+    const pass = Number(ofSeason.find((p) => p.tier === tier)?.price ?? 0);
+    return { tier, matches: upcoming.length, separate, pass };
+  });
 }
 
 const tierCase = (column: string): string =>
@@ -40,8 +105,8 @@ export async function auditDemoData(manager: EntityManager): Promise<AuditResult
       [P],
     ],
     [
-      "no single-match ticket on a pass seat during that pass's validity (seat occupancy rule)",
-      "SELECT COUNT(*) n FROM tickets t JOIN season_passes sp ON sp.seat_id = t.seat_id JOIN matches m ON m.id = t.match_id WHERE t.source = 'single' AND t.id LIKE ? AND m.kickoff_at >= sp.valid_from AND m.kickoff_at < DATE_ADD(sp.valid_until, INTERVAL 1 DAY)",
+      'no single-match ticket on a pass seat for a match the pass is valid for (a cup tie is not covered, so its pass seats are sold like any other)',
+      "SELECT COUNT(*) n FROM tickets t JOIN season_passes sp ON sp.seat_id = t.seat_id JOIN matches m ON m.id = t.match_id WHERE t.source = 'single' AND t.id LIKE ? AND m.is_season_pass_eligible = 1 AND m.kickoff_at >= sp.valid_from AND m.kickoff_at < DATE_ADD(sp.valid_until, INTERVAL 1 DAY)",
       [P],
     ],
     [
@@ -110,13 +175,18 @@ export async function auditDemoData(manager: EntityManager): Promise<AuditResult
       [P],
     ],
     [
-      'the waitlist is only on a match whose seats are all taken',
-      "SELECT COUNT(*) n FROM waitlist w JOIN matches m ON m.id = w.match_id WHERE w.id LIKE ? AND (SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id AND t.status IN ('pending_payment','paid','used')) < m.capacity",
+      'no waitlist (it exists only for a sold-out match, and there is none)',
+      'SELECT COUNT(*) n FROM waitlist WHERE id LIKE ? OR user_id LIKE ?',
+      [P, P],
+    ],
+    [
+      'no sold-out match: none has the status, and no home match has every seat taken',
+      "SELECT COUNT(*) n FROM matches m WHERE m.id LIKE ? AND (m.status = 'sold_out' OR (m.capacity > 0 AND (SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id AND t.status IN ('pending_payment','paid','used')) >= m.capacity))",
       [P],
     ],
     [
-      'nobody on the waitlist already has a place on that match',
-      'SELECT COUNT(*) n FROM waitlist w JOIN tickets t ON t.match_id = w.match_id AND t.user_id = w.user_id WHERE w.id LIKE ?',
+      'no season-pass entry ticket for a match still ahead (the application creates it only when the holder opens the QR or is scanned)',
+      "SELECT COUNT(*) n FROM tickets t JOIN matches m ON m.id = t.match_id WHERE t.id LIKE ? AND t.source = 'season_pass' AND m.kickoff_at > NOW()",
       [P],
     ],
     [
@@ -139,6 +209,25 @@ export async function auditDemoData(manager: EntityManager): Promise<AuditResult
   for (const [name, sql, params] of checks) {
     out.push({ name, violations: await count(manager, sql, params) });
   }
+  // A season pass must be buyable in every tier: each keeps plenty of free seats by the pass rule.
+  const tiers = await freePassSeatsByTier(manager);
+  const short = PASS_TIER_CODES.filter((code) => {
+    const t = tiers.find((x) => x.tier === code);
+    return !t || t.free < Math.max(MIN_FREE_PASS_SEATS, Math.ceil(MIN_FREE_PASS_SHARE * t.total));
+  });
+  out.push({
+    name: `every pass tier has plenty of free seats (at least ${MIN_FREE_PASS_SEATS} and ${100 * MIN_FREE_PASS_SHARE}% of the tier, by the pass-seat rule)`,
+    violations: short.length,
+  });
+  // The savings panel must show a saving in every tier, with only part of the season left.
+  const savings = await savingsByTier(manager);
+  out.push({
+    name: 'buying the remaining home matches one by one costs more than the pass, in every tier',
+    violations: PASS_TIER_CODES.filter((code) => {
+      const s = savings.find((x) => x.tier === code);
+      return !s || s.pass <= 0 || s.separate <= s.pass;
+    }).length,
+  });
   return out;
 }
 
@@ -200,11 +289,6 @@ export async function demoFigures(
     [P],
   );
   out.push(`Loans: ${loans.map((l) => `${l.status} ${l.n}`).join(', ')}`);
-  const wait = await rows<{ status: string; n: string }>(
-    'SELECT status, COUNT(*) n FROM waitlist WHERE id LIKE ? GROUP BY status',
-    [P],
-  );
-  out.push(`Waitlist (sold-out match): ${wait.map((w) => `${w.status} ${w.n}`).join(', ')}`);
   out.push(
     `Loyalty ledger rows: ${await count(manager, 'SELECT COUNT(*) n FROM loyalty_transactions WHERE user_id LIKE ?', [P])}`,
   );
@@ -226,11 +310,24 @@ export async function demoFigures(
         `(range ${(100 * Math.min(...share)).toFixed(0)}-${(100 * Math.max(...share)).toFixed(0)}%)`,
     );
   }
-  const [soldOut] = await rows<{ sold: string; cap: string }>(
-    "SELECT COUNT(t.id) sold, MAX(m.capacity) cap FROM matches m LEFT JOIN tickets t ON t.match_id = m.id AND t.status IN ('pending_payment','paid','used') WHERE m.id LIKE ? AND m.status = 'sold_out'",
-    [P],
+  const [fullest] = await rows<{ sold: string; cap: string; opponent: string }>(
+    "SELECT COUNT(t.id) sold, MAX(m.capacity) cap, MAX(m.away_team) opponent FROM matches m LEFT JOIN tickets t ON t.match_id = m.id AND t.status IN ('pending_payment','paid','used') WHERE m.id LIKE ? AND m.home_team = ? AND m.kickoff_at > NOW() AND m.is_season_pass_eligible = 1 GROUP BY m.id ORDER BY COUNT(t.id) DESC LIMIT 1",
+    [P, HOME_TEAM],
   );
-  if (soldOut) out.push(`Sold-out match: ${soldOut.sold} of ${soldOut.cap} seats taken`);
+  if (fullest)
+    out.push(
+      `Fullest upcoming league match (v ${fullest.opponent}): ${fullest.sold} of ${fullest.cap} seats ticketed = ${pct(Number(fullest.sold), Number(fullest.cap))}`,
+    );
+  for (const s of await savingsByTier(manager)) {
+    out.push(
+      `Pass saving, ${s.tier}: ${s.matches} remaining home matches one by one ${s.separate} Ft vs pass ${s.pass} Ft = ${s.separate - s.pass >= 0 ? '+' : ''}${s.separate - s.pass} Ft`,
+    );
+  }
+  for (const t of await freePassSeatsByTier(manager)) {
+    out.push(
+      `Free season-pass seats, ${t.tier}: ${t.free} of ${t.total} (${pct(t.free, t.total)})`,
+    );
+  }
 
   const [redemption] = await rows<{ used: string; total: string }>(
     "SELECT SUM(t.status = 'used') used, COUNT(*) total FROM tickets t JOIN matches m ON m.id = t.match_id WHERE t.id LIKE ? AND t.source = 'single' AND t.status IN ('paid','used') AND m.kickoff_at <= NOW() AND m.kickoff_at >= ? AND m.kickoff_at < DATE_ADD(?, INTERVAL 1 DAY)",

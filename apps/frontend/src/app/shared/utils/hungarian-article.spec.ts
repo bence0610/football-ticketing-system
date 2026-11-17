@@ -2,7 +2,7 @@ import { hungarianArticle, withArticle } from './hungarian-article';
 
 describe('hungarianArticle', () => {
   it('uses the right article for every loyalty tier name', () => {
-    expect(withArticle('Kék')).toBe('a Kék');
+    expect(withArticle('Lila')).toBe('a Lila');
     expect(withArticle('Ezüst')).toBe('az Ezüst');
     expect(withArticle('Arany')).toBe('az Arany');
     expect(withArticle('KTE Legenda')).toBe('a KTE Legenda');

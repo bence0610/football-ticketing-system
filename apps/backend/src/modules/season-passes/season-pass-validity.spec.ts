@@ -1,4 +1,4 @@
-import { isWithinValidity, validityWindow } from './season-pass-validity';
+import { isWithinValidity, passCoversMatch, validityWindow } from './season-pass-validity';
 
 // What the DATE columns hand us: UTC midnight of the calendar day.
 const FROM = new Date('2026-08-01T00:00:00.000Z');
@@ -75,5 +75,32 @@ describe('season pass validity window (Europe/Budapest)', () => {
       new Date('2026-12-31T00:00:00.000Z'),
     );
     expect(w.endsBefore.toISOString()).toBe('2026-12-31T23:00:00.000Z'); // 1 Jan 00:00 CET
+  });
+});
+
+describe('passCoversMatch: does a pass give an entry to a match', () => {
+  const kickoffAt = new Date('2026-11-20T15:00:00Z');
+  const pass = { validFrom: FROM, validUntil: UNTIL };
+
+  it('covers an eligible, uncancelled match inside the window', () => {
+    expect(
+      passCoversMatch({ kickoffAt, isSeasonPassEligible: true, status: 'on_sale' }, pass),
+    ).toBe(true);
+  });
+
+  it('does not cover a friendly or a cup tie (not season-pass eligible)', () => {
+    expect(
+      passCoversMatch({ kickoffAt, isSeasonPassEligible: false, status: 'on_sale' }, pass),
+    ).toBe(false);
+  });
+
+  it('does not cover a cancelled match, or one outside the window', () => {
+    expect(
+      passCoversMatch({ kickoffAt, isSeasonPassEligible: true, status: 'cancelled' }, pass),
+    ).toBe(false);
+    const late = new Date('2027-07-01T10:00:00Z');
+    expect(
+      passCoversMatch({ kickoffAt: late, isSeasonPassEligible: true, status: 'on_sale' }, pass),
+    ).toBe(false);
   });
 });

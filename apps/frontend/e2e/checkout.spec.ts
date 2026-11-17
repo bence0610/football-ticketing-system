@@ -52,7 +52,7 @@ async function mockLoyalty(page: Page, snapshot?: Record<string, unknown>): Prom
       body: JSON.stringify(
         snapshot ?? {
           points: 0,
-          tier: { tier: 'bronze', label: 'Kék', minPoints: 0, discountPercent: 0, color: '#1F5C8B' },
+          tier: { tier: 'bronze', label: 'Lila', minPoints: 0, discountPercent: 0, color: '#6B2D96' },
           ticketPointsPerTicket: 50,
           recentTransactions: [],
         },

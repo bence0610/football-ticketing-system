@@ -5,10 +5,10 @@
  *   npm run seed:demo -- --dry-run build it in memory, print the figures, write nothing
  *   npm run seed:demo -- --report  only audit and print the figures of what is already there
  *
- * What it writes: about 3,000 fans and 16 named demo accounts, the full 2026/2027 NB II
+ * What it writes: about 3,000 fans and 15 named demo accounts, the full 2026/2027 NB II
  * season (30 rounds, 15 at home and 15 away) and two Magyar Kupa ties around today's date,
  * last season's home matches, single tickets, season passes, loans, loyalty points and a
- * waitlist for the sold-out match.
+ * no waitlist (there is no sold-out match).
  *
  * It refuses to run unless NODE_ENV is "development" and the database is on this machine.
  * Every row it writes has an id starting with `de300000-`, so a second run removes the first
@@ -47,7 +47,9 @@ const NOTES: readonly string[] = [
   'Played matches are FINISHED. The roughly 10% of single tickets that were not scanned are left PAID, not EXPIRED: the admin redemption figure counts only PAID and USED tickets, so expired ones would hide the no-shows and read ~100%. The nightly ExpireTicketsJob (04:00) turns those PAID tickets into EXPIRED; to keep the figure while you demo, set TICKET_EXPIRE_CRON to something that never fires, e.g. "0 0 31 2 *".',
   'The match in progress has status ON_SALE: the application has no "live" status, and sales stop at kickoff on the time alone.',
   'Away matches have no stock (capacity 0), no tickets and status SCHEDULED/FINISHED. The admin figures leave them out: they are listed with dashes and are in no total or average.',
-  "Every home match has capacity = the sellable seats (the away section excluded); the sold-out one has every one of them taken, the season-pass holders' entries included.",
+  'Every home match has capacity = the sellable seats (the away section excluded). No match is sold out: the biggest upcoming league match is about 85% ticketed, and every season-pass tier keeps plenty of free seats (a fully ticketed league match would leave none: the pass rule refuses a seat that has a ticket for an upcoming pass-eligible match).',
+  'Season-pass entry tickets exist only for matches already played, as in the running application, which creates them when the holder opens the QR or is scanned. For a match still ahead the admin overview counts the passes valid for it instead.',
+  "A season-pass seat is the holder's only on a match the pass covers (the league home matches). On the Magyar Kupa ties the 36 pass seats are sold like any others.",
   'Loans: a withdrawn loan is CANCELLED, as the application does it; REVOKED is not used (no code path sets it).',
   'No Redis state is written: no seat locks, no revoked QR token ids, no waitlist claim slot.',
 ];
