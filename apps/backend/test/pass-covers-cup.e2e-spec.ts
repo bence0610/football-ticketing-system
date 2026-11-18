@@ -90,7 +90,11 @@ describe('A season pass covers the home cup ties (E2E)', () => {
     );
   }
 
-  async function seedPassSeat(): Promise<{ passSeat: Seat; holder: Awaited<ReturnType<typeof createUser>>; passId: string }> {
+  async function seedPassSeat(): Promise<{
+    passSeat: Seat;
+    holder: Awaited<ReturnType<typeof createUser>>;
+    passId: string;
+  }> {
     const repo = ctx.dataSource.getRepository(Seat);
     const make = (number: number): Promise<Seat> =>
       repo.save(
@@ -120,7 +124,8 @@ describe('A season pass covers the home cup ties (E2E)', () => {
 
   it('the entity decides the flag on creation: home league and cup yes, friendly and away no', async () => {
     const flag = async (m: Match): Promise<boolean> =>
-      (await ctx.dataSource.getRepository(Match).findOneByOrFail({ id: m.id })).isSeasonPassEligible;
+      (await ctx.dataSource.getRepository(Match).findOneByOrFail({ id: m.id }))
+        .isSeasonPassEligible;
     expect(await flag(await seedMatch(Competition.NB2, 5))).toBe(true);
     expect(await flag(await seedMatch(Competition.MAGYAR_KUPA, 5))).toBe(true);
     expect(await flag(await seedMatch(Competition.FRIENDLY, 5))).toBe(false);

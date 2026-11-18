@@ -13,7 +13,10 @@ export class SeasonHomeMatchDto {
   @ApiProperty({ example: 'on_sale' })
   status!: string;
 
-  @ApiProperty({ example: 'magyar_kupa', description: 'NB1 / NB2 / magyar_kupa (a felkészülési meccs nem része a bérletnek).' })
+  @ApiProperty({
+    example: 'magyar_kupa',
+    description: 'NB1 / NB2 / magyar_kupa (a felkészülési meccs nem része a bérletnek).',
+  })
   competition!: string;
 }
 

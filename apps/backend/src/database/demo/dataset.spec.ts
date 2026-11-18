@@ -347,7 +347,9 @@ describe('the demo dataset', () => {
     });
 
     it('covers the home cup ties with the pass: eligible, no single ticket on a pass seat, pass entries on the played one', () => {
-      const cups = d.matches.filter((m) => m.competition === 'magyar_kupa' && m.homeTeam === 'Kecskeméti TE');
+      const cups = d.matches.filter(
+        (m) => m.competition === 'magyar_kupa' && m.homeTeam === 'Kecskeméti TE',
+      );
       expect(cups.length).toBeGreaterThan(0);
       for (const c of cups) expect(c.isSeasonPassEligible).toBe(true);
       const cupIds = new Set(cups.map((c) => c.id));
@@ -367,8 +369,9 @@ describe('the demo dataset', () => {
       expect(singleOnPassSeat).toHaveLength(0);
       const played = cups.filter((c) => c.kickoffAt < NOW);
       expect(
-        d.tickets.filter((t) => t.source === 'season_pass' && played.some((c) => c.id === t.matchId))
-          .length,
+        d.tickets.filter(
+          (t) => t.source === 'season_pass' && played.some((c) => c.id === t.matchId),
+        ).length,
       ).toBeGreaterThan(0);
     });
   });
