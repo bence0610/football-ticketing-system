@@ -394,7 +394,10 @@ function loanRowsAndTickets(
     if (loan.outcome === 'used' || loan.outcome === 'completed') {
       completedAt = floorSecond(kickoff + hours(rng.between(2, 3)));
       if (loan.outcome === 'completed') qrRevokedAt = completedAt;
-      events.push({ kind: 'loan', userId: loan.lenderId, at: completedAt, loanId: loan.id });
+      // The lender is paid only when the borrowed entry was scanned (used), not for an unused loan.
+      if (loan.outcome === 'used') {
+        events.push({ kind: 'loan', userId: loan.lenderId, at: completedAt, loanId: loan.id });
+      }
     }
     rows.push({
       id: loan.id,

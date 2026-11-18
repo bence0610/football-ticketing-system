@@ -74,13 +74,14 @@ describe('SeasonPassesService.completeLoan', () => {
     );
   });
 
-  it('an accepted loan whose entry was never scanned becomes COMPLETED and is rewarded', async () => {
+  it('an accepted loan whose entry was never scanned becomes COMPLETED and credits nobody', async () => {
     const l = loan(PassLoanStatus.ACCEPTED);
     await service.completeLoan(l);
     expect(l.status).toBe(PassLoanStatus.COMPLETED);
     expect(l.completedAt).toBeInstanceOf(Date);
     expect(revoke).toHaveBeenCalledWith('ticket-jti');
-    expect(award).toHaveBeenCalledTimes(1);
+    // loyalty rewards attendance: nobody entered, so the lender earns nothing
+    expect(award).not.toHaveBeenCalled();
   });
 
   it('a loan whose entry was scanned stays USED - never rewritten to COMPLETED', async () => {
@@ -88,7 +89,11 @@ describe('SeasonPassesService.completeLoan', () => {
     await service.completeLoan(l);
     expect(l.status).toBe(PassLoanStatus.USED);
     expect(l.completedAt).toBeInstanceOf(Date);
+    // the borrowed entry was scanned: the lender is credited, once, with the loan as reference
     expect(award).toHaveBeenCalledTimes(1);
+    expect(award).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: l.lenderUserId, points: 25, referenceId: `loan:${l.id}` }),
+    );
   });
 
   it('a USED loan is rewarded only once', async () => {

@@ -159,9 +159,9 @@ export async function auditDemoData(manager: EntityManager): Promise<AuditResult
       [P],
     ],
     [
-      'every pass earned its points for its HOLDER (a pass for a holder without an account credited nobody); every used/completed loan paid its lender',
-      "SELECT (SELECT COUNT(*) FROM season_passes sp LEFT JOIN loyalty_transactions l ON l.source = 'season_pass_purchase' AND l.reference_id = CONCAT('season_pass:', sp.id) AND l.user_id = sp.holder_user_id WHERE sp.id LIKE ? AND sp.holder_user_id IS NOT NULL AND l.id IS NULL) + (SELECT COUNT(*) FROM loyalty_transactions l JOIN season_passes sp ON l.reference_id = CONCAT('season_pass:', sp.id) WHERE l.source = 'season_pass_purchase' AND sp.id LIKE ? AND (sp.holder_user_id IS NULL OR l.user_id <> sp.holder_user_id)) + (SELECT COUNT(*) FROM pass_loans pl LEFT JOIN loyalty_transactions l ON l.source = 'pass_loan' AND l.reference_id = CONCAT('loan:', pl.id) WHERE pl.id LIKE ? AND pl.status IN ('used','completed') AND l.id IS NULL) n",
-      [P, P, P],
+      'every pass earned its points for its HOLDER (a pass for a holder without an account credited nobody); every USED loan paid its lender and no other loan did',
+      "SELECT (SELECT COUNT(*) FROM season_passes sp LEFT JOIN loyalty_transactions l ON l.source = 'season_pass_purchase' AND l.reference_id = CONCAT('season_pass:', sp.id) AND l.user_id = sp.holder_user_id WHERE sp.id LIKE ? AND sp.holder_user_id IS NOT NULL AND l.id IS NULL) + (SELECT COUNT(*) FROM loyalty_transactions l JOIN season_passes sp ON l.reference_id = CONCAT('season_pass:', sp.id) WHERE l.source = 'season_pass_purchase' AND sp.id LIKE ? AND (sp.holder_user_id IS NULL OR l.user_id <> sp.holder_user_id)) + (SELECT COUNT(*) FROM pass_loans pl LEFT JOIN loyalty_transactions l ON l.source = 'pass_loan' AND l.reference_id = CONCAT('loan:', pl.id) WHERE pl.id LIKE ? AND pl.status = 'used' AND l.id IS NULL) + (SELECT COUNT(*) FROM loyalty_transactions l JOIN pass_loans pl ON l.reference_id = CONCAT('loan:', pl.id) WHERE l.source = 'pass_loan' AND pl.id LIKE ? AND pl.status <> 'used') n",
+      [P, P, P, P],
     ],
     [
       'a used ticket has a scan time; no other ticket has one',

@@ -1852,8 +1852,9 @@ export class SeasonPassesService {
   }
 
   /**
-   * Marks an accepted loan as COMPLETED once the match is over and
-   * awards loyalty points to the lender. Idempotent.
+   * Closes an accepted loan once the match is over. The lender is rewarded only when the
+   * borrowed entry was actually scanned (the loan reached USED); an accepted loan nobody used
+   * completes with no points. Idempotent.
    *
    * Also revokes the LOAN Ticket's QR if the borrower did not show up
    * (ticket is still PAID) so stale tokens cannot be presented after the
@@ -1868,12 +1869,12 @@ export class SeasonPassesService {
       }
       loan.completedAt = new Date();
       await this.passLoanRepository.save(loan);
+      await this.awardLoanPoints(loan);
     } else if (loan.status === PassLoanStatus.ACCEPTED) {
+      // Loyalty rewards attendance: a loan whose borrowed entry was never scanned earns nothing
+      // (otherwise a holder could lend to a second account of their own and collect for an empty seat).
       await this.closeUnusedLoan(loan);
-    } else {
-      return;
     }
-    await this.awardLoanPoints(loan);
   }
 
   /** Lent and accepted, but the borrowed entry was never scanned: COMPLETED. */

@@ -498,6 +498,16 @@ describe('the demo dataset', () => {
       }
     });
 
+    it('pays the loan points only for a used loan: an accepted but unused (completed) loan credits nobody', () => {
+      const paid = new Set(
+        d.ledger.filter((r) => r.source === 'pass_loan').map((r) => r.referenceId),
+      );
+      for (const l of d.loans) {
+        expect(paid.has(`loan:${l.id}`)).toBe(l.status === 'used');
+      }
+      expect(d.loans.some((l) => l.status === 'completed')).toBe(true);
+    });
+
     it('a person with several tickets and a pass entry for one match earned once for it', () => {
       const perMatch = new Map<string, number>();
       for (const l of d.ledger.filter((x) => x.source === 'attendance')) {
@@ -522,7 +532,7 @@ describe('the demo dataset', () => {
       }
     });
 
-    it('uses each (source, reference) once, and every pass and finished loan paid exactly once', () => {
+    it('uses each (source, reference) once, and every pass and every USED loan paid exactly once', () => {
       const keys = d.ledger.map((r) => `${r.source}|${r.referenceId}`);
       expect(new Set(keys).size).toBe(keys.length);
       const refs = new Set(d.ledger.map((r) => r.referenceId));
@@ -532,7 +542,8 @@ describe('the demo dataset', () => {
         if (p.holderUserId) expect(row?.userId).toBe(p.holderUserId);
         else expect(row).toBeUndefined();
       }
-      for (const l of d.loans.filter((x) => ['used', 'completed'].includes(x.status))) {
+      // loan points only for a loan whose borrowed entry was scanned
+      for (const l of d.loans.filter((x) => x.status === 'used')) {
         expect(refs.has(`loan:${l.id}`)).toBe(true);
       }
     });
