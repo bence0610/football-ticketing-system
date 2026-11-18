@@ -77,7 +77,7 @@ describe('GatePageComponent', () => {
       providers: [
         provideNoopAnimations(),
         { provide: TicketsService, useValue: { scan } },
-        { provide: MatchesService, useValue: { listAll: () => of(matches) } },
+        { provide: MatchesService, useValue: { list: () => of(matches) } },
         { provide: GateFeedback, useValue: feedback },
         {
           provide: GateCamera,

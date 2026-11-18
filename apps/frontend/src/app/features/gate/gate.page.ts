@@ -835,7 +835,8 @@ export class GatePageComponent {
     });
 
     this.matches
-      .listAll({ silent: true })
+      // Only the window currentMatch() looks at; the whole history would crowd out tonight's match.
+      .list({ from: new Date(Date.now() - MATCH_WINDOW_AFTER_MS), silent: true })
       .pipe(catchError(() => of<MatchResource[]>([])))
       .subscribe((all) => this.match.set(currentMatch(all, Date.now())));
   }

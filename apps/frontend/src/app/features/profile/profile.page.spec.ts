@@ -42,7 +42,7 @@ describe('ProfilePageComponent (account links)', () => {
           useValue: { listMine: () => of([]), listIncomingLoans: () => of([]) },
         },
         { provide: LoyaltyService, useValue: { getSnapshot: () => of(null) } },
-        { provide: MatchesService, useValue: { listAll: () => of([]) } },
+        { provide: MatchesService, useValue: { listUpcoming: () => of([]) } },
         { provide: WaitlistApiService, useValue: { listMine: () => of([]) } },
       ],
     }).compileComponents();

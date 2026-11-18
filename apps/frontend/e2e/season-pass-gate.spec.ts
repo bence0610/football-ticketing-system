@@ -159,7 +159,7 @@ async function mockBuyerApi(page: Page, backend: FakeBackend): Promise<void> {
   );
   await page.route('**/tickets/me', (route) => route.fulfill(json([])));
   await page.route('**/waitlist/me', (route) => route.fulfill(json([])));
-  await page.route('**/matches', (route) =>
+  await page.route('**/matches?*', (route) =>
     route.fulfill(
       json([
         {

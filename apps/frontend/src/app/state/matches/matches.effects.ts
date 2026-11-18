@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { catchError, map, of, switchMap } from 'rxjs';
-import { MatchesApiService } from '../../shared/services/matches.api.service';
+import { MatchesApiService, upcomingMatchesParams } from '../../shared/services/matches.api.service';
 import { MatchesActions } from './matches.actions';
 import { extractApiErrorMessage } from '../../shared/utils/api-error';
 
@@ -13,8 +13,11 @@ export class MatchesEffects {
   loadMatches$ = createEffect(() =>
     this.actions$.pipe(
       ofType(MatchesActions.loadMatches),
+      // Upcoming only: the list is capped and counted from the oldest match, so an unbounded
+      // request fills up with past matches and hides every upcoming one. Whoever needs a past
+      // match asks for it on its own (see loadSelectedMatch$, the season pass card).
       switchMap(() =>
-        this.api.list({ limit: 50 }).pipe(
+        this.api.list(upcomingMatchesParams()).pipe(
           map((matches) => MatchesActions.loadMatchesSuccess({ matches })),
           catchError((error: unknown) =>
             of(
@@ -24,6 +27,24 @@ export class MatchesEffects {
             ),
           ),
         ),
+      ),
+    ),
+  );
+
+  /**
+   * A deep link (?matchId=…) can point at a match that is no longer in the upcoming list (it
+   * has kicked off, say). The page still has to say so, so that one match is fetched by id.
+   */
+  loadSelectedMatch$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(MatchesActions.selectMatch),
+      switchMap(({ matchId }) =>
+        matchId
+          ? this.api.detail(matchId, { silent: true }).pipe(
+              map((match) => MatchesActions.loadSelectedMatchSuccess({ match })),
+              catchError(() => of(MatchesActions.loadSelectedMatchSuccess({ match: null }))),
+            )
+          : of(MatchesActions.loadSelectedMatchSuccess({ match: null })),
       ),
     ),
   );

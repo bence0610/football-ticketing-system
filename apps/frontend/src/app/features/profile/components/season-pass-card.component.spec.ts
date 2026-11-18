@@ -96,7 +96,7 @@ describe('SeasonPassCardComponent — match-row states', () => {
 
   beforeEach(async () => {
     matchesServiceSpy = jasmine.createSpyObj<MatchesService>('MatchesService', [
-      'listAll',
+      'list',
       'findOne',
     ]) as unknown as jasmine.SpyObj<MatchesService>;
     seasonPassesServiceSpy = jasmine.createSpyObj<SeasonPassesService>(
@@ -139,7 +139,7 @@ describe('SeasonPassCardComponent — match-row states', () => {
     tickets: TicketResponse[],
     kickoffAt = new Date(FUTURE_MS).toISOString(),
   ): Promise<ComponentFixture<SeasonPassCardComponent>> {
-    matchesServiceSpy.listAll.and.returnValue(
+    matchesServiceSpy.list.and.returnValue(
       of([{ ...baseMatch, kickoffAt }]),
     );
 
@@ -330,7 +330,7 @@ describe('SeasonPassCardComponent — match-row states', () => {
       const inside = { ...baseMatch, id: 'in', homeTeam: 'Belül', kickoffAt: new Date(FUTURE_MS).toISOString() };
       const before = { ...baseMatch, id: 'before', homeTeam: 'Előtte', kickoffAt: '2026-07-31T18:00:00Z' };
       const after = { ...baseMatch, id: 'after', homeTeam: 'Utána', kickoffAt: '2027-07-01T18:00:00Z' };
-      matchesServiceSpy.listAll.and.returnValue(of([before, inside, after]));
+      matchesServiceSpy.list.and.returnValue(of([before, inside, after]));
       const fixture = TestBed.createComponent(SeasonPassCardComponent);
       fixture.componentRef.setInput('pass', { ...basePass, loans: [] });
       fixture.componentRef.setInput('myTickets', []);

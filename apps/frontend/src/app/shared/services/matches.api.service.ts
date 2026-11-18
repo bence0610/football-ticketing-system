@@ -1,4 +1,5 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
+import { SKIP_ERROR_SNACKBAR } from '../../core/interceptors/error.interceptor';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
@@ -6,6 +7,14 @@ import {
   MatchListItem,
   QueryMatchesParams,
 } from '../models/match.model';
+
+/** The server returns at most 100 per request. */
+const MAX_LIST = 100;
+
+/** Query for the public pages: every match from `now` on, up to the server's page size. */
+export function upcomingMatchesParams(now: Date = new Date()): QueryMatchesParams {
+  return { from: now.toISOString(), limit: MAX_LIST };
+}
 
 @Injectable({ providedIn: 'root' })
 export class MatchesApiService {
@@ -41,7 +50,9 @@ export class MatchesApiService {
   /**
    * GET /matches/:id — detailed match record.
    */
-  detail(matchId: string): Observable<MatchDetail> {
-    return this.http.get<MatchDetail>(`/matches/${matchId}`);
+  detail(matchId: string, options: { silent?: boolean } = {}): Observable<MatchDetail> {
+    return this.http.get<MatchDetail>(`/matches/${matchId}`, {
+      context: options.silent ? new HttpContext().set(SKIP_ERROR_SNACKBAR, true) : undefined,
+    });
   }
 }

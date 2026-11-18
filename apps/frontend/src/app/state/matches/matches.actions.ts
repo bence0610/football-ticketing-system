@@ -13,5 +13,6 @@ export const MatchesActions = createActionGroup({
     'Load Upcoming Failure': props<{ error: string }>(),
 
     'Select Match': props<{ matchId: string | null }>(),
+    'Load Selected Match Success': props<{ match: MatchListItem | null }>(),
   },
 });

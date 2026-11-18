@@ -415,8 +415,10 @@ export class SeasonPassCardComponent implements OnInit, OnChanges {
   }
 
   ngOnInit(): void {
+    // The card lists the matches the pass covers, played ones included: ask for exactly the
+    // pass period (a season fits well inside one page), not the club's whole history.
     this.matchesService
-      .listAll()
+      .list({ from: new Date(this.pass.coversFrom), to: new Date(this.pass.coversBefore) })
       .pipe(catchError(() => of<MatchResource[]>([])))
       .subscribe((matches) => {
         this.rawMatches.set(matches);

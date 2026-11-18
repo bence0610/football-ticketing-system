@@ -984,7 +984,7 @@ export class LoanInitiationDialogComponent implements OnInit {
     this.matchesError.set(null);
 
     this.matchesService
-      .listAll()
+      .listUpcoming()
       .pipe(
         catchError((err: HttpErrorResponse) => {
           this.matchesError.set(

@@ -102,7 +102,7 @@ async function openGate(
     };
   }, camera);
   await page.route('**/auth/refresh', (r) => r.fulfill(json(GATE_AUTH)));
-  await page.route('**/matches', (r) =>
+  await page.route('**/matches?*', (r) =>
     r.fulfill(json([{ ...MATCH, status: 'on_sale', capacity: 1, basePrice: '1', competition: 'NB1', isSeasonPassEligible: true }])),
   );
   await page.route(`**/tickets/${TICKET_ID}/scan`, (route) => {

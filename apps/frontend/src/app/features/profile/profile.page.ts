@@ -826,7 +826,8 @@ export class ProfilePageComponent implements OnInit {
       .pipe(catchError(() => of(null)), takeUntilDestroyed(this.destroyRef))
       .subscribe((s) => this.snapshot.set(s));
     this.matchesService
-      .listAll()
+      // Both uses (next on-sale match, home matches left on the pass) look forward only.
+      .listUpcoming()
       .pipe(catchError(() => of<MatchResource[]>([])), takeUntilDestroyed(this.destroyRef))
       .subscribe((m) => this.matches.set(m));
   }

@@ -6,6 +6,8 @@ export interface MatchesState {
   readonly matches: readonly MatchListItem[];
   readonly upcoming: readonly MatchListItem[];
   readonly selectedMatchId: string | null;
+  /** The selected match fetched by id: covers one that is not in `matches` (already played). */
+  readonly selectedMatchDetail: MatchListItem | null;
   readonly loading: boolean;
   readonly upcomingLoading: boolean;
   readonly error: string | null;
@@ -15,6 +17,7 @@ export const initialMatchesState: MatchesState = {
   matches: [],
   upcoming: [],
   selectedMatchId: null,
+  selectedMatchDetail: null,
   loading: false,
   upcomingLoading: false,
   error: null,
@@ -54,5 +57,12 @@ export const matchesReducer = createReducer(
   on(MatchesActions.selectMatch, (state, { matchId }) => ({
     ...state,
     selectedMatchId: matchId,
+    // A stale fetched match must not outlive the selection it was fetched for.
+    selectedMatchDetail: state.selectedMatchDetail?.id === matchId ? state.selectedMatchDetail : null,
+  })),
+  on(MatchesActions.loadSelectedMatchSuccess, (state, { match }) => ({
+    ...state,
+    // Ignore an answer for a match that is no longer the selected one.
+    selectedMatchDetail: match && match.id === state.selectedMatchId ? match : state.selectedMatchDetail,
   })),
 );

@@ -35,8 +35,16 @@ export const selectSelectedMatchId = createSelector(
   (state) => state.selectedMatchId,
 );
 
+export const selectSelectedMatchDetail = createSelector(
+  selectMatchesFeature,
+  (state) => state.selectedMatchDetail,
+);
+
+/** From the (upcoming) list when it is there, else the match fetched by id. */
 export const selectSelectedMatch = createSelector(
   selectAllMatches,
   selectSelectedMatchId,
-  (matches, id) => (id ? matches.find((m) => m.id === id) ?? null : null),
+  selectSelectedMatchDetail,
+  (matches, id, detail) =>
+    id ? (matches.find((m) => m.id === id) ?? (detail?.id === id ? detail : null)) : null,
 );
