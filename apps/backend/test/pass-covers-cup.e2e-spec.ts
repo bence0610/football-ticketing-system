@@ -127,6 +127,16 @@ describe('A season pass covers the home cup ties (E2E)', () => {
     expect(await flag(await seedMatch(Competition.MAGYAR_KUPA, 5, 'Újpest FC'))).toBe(false);
   });
 
+  it('an insert that bypasses the entity (raw SQL) is NOT covered: the column default is 0', async () => {
+    const id = randomUUID();
+    await ctx.dataSource.query(
+      "INSERT INTO matches (id, home_team, away_team, competition, venue, kickoff_at, status, capacity, base_price) VALUES (?, 'Kecskeméti TE', 'Teszt FC', 'magyar_kupa', 'Széktói', DATE_ADD(NOW(), INTERVAL 5 DAY), 'on_sale', 10, 3000)",
+      [id],
+    );
+    const row = await ctx.dataSource.getRepository(Match).findOneByOrFail({ id });
+    expect(row.isSeasonPassEligible).toBe(false);
+  });
+
   it('a pass holder enters a home cup tie with the pass (and earns the attendance points)', async () => {
     const { holder, passId } = await seedPassSeat();
     const cup = await seedMatch(Competition.MAGYAR_KUPA, 7);

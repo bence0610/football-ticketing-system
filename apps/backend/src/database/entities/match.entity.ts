@@ -73,13 +73,14 @@ export class Match extends BaseEntity {
    * Whether season passes cover this match. Left unset on creation it is DECIDED from the match
    * itself (see {@link isPassEligibleMatch}), so a cup tie added after the passes were sold is
    * covered from its first instant: its pass seats are held and no single ticket is sold on them.
-   * An explicit value is kept.
+   * An explicit value is kept. The column default is 0 (keep in step with migration
+   * PassEligibleDefaultOff): an insert that bypasses the entity is NOT covered, the safe failure.
    */
-  @Column({ type: 'boolean', default: true, name: 'is_season_pass_eligible' })
+  @Column({ type: 'boolean', default: false, name: 'is_season_pass_eligible' })
   isSeasonPassEligible!: boolean;
 
   @BeforeInsert()
-  protected decidePassEligibility(): void {
+  decidePassEligibility(): void {
     if (this.isSeasonPassEligible === undefined || this.isSeasonPassEligible === null) {
       this.isSeasonPassEligible = isPassEligibleMatch(
         this.competition ?? Competition.NB2,
