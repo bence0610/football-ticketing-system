@@ -12,6 +12,9 @@ export class SeasonHomeMatchDto {
 
   @ApiProperty({ example: 'on_sale' })
   status!: string;
+
+  @ApiProperty({ example: 'magyar_kupa', description: 'NB1 / NB2 / magyar_kupa (a felkészülési meccs nem része a bérletnek).' })
+  competition!: string;
 }
 
 export class SeasonOverviewDto {
@@ -28,7 +31,7 @@ export class SeasonOverviewDto {
   @ApiProperty({
     type: [SeasonHomeMatchDto],
     description:
-      'A szezon hazai mérkőzései, amelyekre a bérlet érvényes (nem törölt, bérletre jogosító, az érvényességi időn belüli).',
+      'A szezon hazai bajnoki és Magyar Kupa-mérkőzései, amelyekre a bérlet érvényes (nem törölt, bérletre jogosító, az érvényességi időn belüli); a felkészülési meccs nem tartozik ide.',
   })
   homeMatches!: SeasonHomeMatchDto[];
 }

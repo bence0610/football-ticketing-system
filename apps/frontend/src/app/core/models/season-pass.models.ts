@@ -133,6 +133,7 @@ export interface SeasonHomeMatch {
   awayTeam: string;
   kickoffAt: string;
   status: string;
+  competition?: string;
 }
 
 export interface SeasonOverview {

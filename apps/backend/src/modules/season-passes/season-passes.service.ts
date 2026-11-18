@@ -524,6 +524,7 @@ export class SeasonPassesService {
         awayTeam: m.awayTeam,
         kickoffAt: m.kickoffAt.toISOString(),
         status: m.status,
+        competition: m.competition,
       })),
     };
   }

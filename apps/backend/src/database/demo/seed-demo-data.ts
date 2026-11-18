@@ -49,7 +49,7 @@ const NOTES: readonly string[] = [
   'Away matches have no stock (capacity 0), no tickets and status SCHEDULED/FINISHED. The admin figures leave them out: they are listed with dashes and are in no total or average.',
   'Every home match has capacity = the sellable seats (the away section excluded). No match is sold out: the biggest upcoming league match is about 85% ticketed, and every season-pass tier keeps plenty of free seats (a fully ticketed league match would leave none: the pass rule refuses a seat that has a ticket for an upcoming pass-eligible match).',
   'Season-pass entry tickets exist only for matches already played, as in the running application, which creates them when the holder opens the QR or is scanned. For a match still ahead the admin overview counts the passes valid for it instead.',
-  "A season-pass seat is the holder's only on a match the pass covers (the league home matches). On the Magyar Kupa ties the 36 pass seats are sold like any others.",
+  "A season-pass seat is the holder's only on a match the pass covers: every home league match AND every home Magyar Kupa tie (no friendly is in the demo). No single ticket sits on a pass seat for any of them.",
   'Loans: a withdrawn loan is CANCELLED, as the application does it; REVOKED is not used (no code path sets it).',
   'No Redis state is written: no seat locks, no revoked QR token ids, no waitlist claim slot.',
 ];

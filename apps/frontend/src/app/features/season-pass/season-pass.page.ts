@@ -457,7 +457,12 @@ interface HeldSeat {
             <ul class="fixtures">
               @for (m of s.homeMatches; track m.id) {
                 <li class="fixture" [class.fixture--played]="isPlayed(m)">
-                  <span class="fixture__opp">{{ m.awayTeam }}</span>
+                  <span class="fixture__opp">
+                    {{ m.awayTeam }}
+                    @if (m.competition === 'magyar_kupa') {
+                      <small class="fixture__cup">Magyar Kupa</small>
+                    }
+                  </span>
                   <span class="fixture__when">
                     {{ m.kickoffAt | date: 'yyyy. MMM d. · HH:mm' : '' : 'hu-HU' }}
                     @if (m.status === 'postponed') {
@@ -470,8 +475,9 @@ interface HeldSeat {
               }
             </ul>
             <p class="block__note">
-              A menetrend változhat. A bérlet minden hazai mérkőzésre érvényes, a dátumtól
-              függetlenül.
+              A menetrend változhat. A bérlet a szezon minden hazai bajnoki és Magyar Kupa-mérkőzésére
+              érvényes, a később kiírt kupameccsekre is automatikusan; a felkészülési mérkőzésekre
+              nem.
             </p>
           </section>
         }
@@ -876,6 +882,13 @@ interface HeldSeat {
         gap: 2px;
         padding: 12px 0;
         border-bottom: 1px solid var(--border);
+      }
+      .fixture__cup {
+        margin-left: 8px;
+        opacity: 0.7;
+        font-size: 0.75em;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
       }
       .fixture__opp {
         font-weight: 600;

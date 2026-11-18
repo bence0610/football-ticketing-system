@@ -62,6 +62,8 @@ export interface ChatbotMatchSnapshot {
   homeTeam: string;
   awayTeam: string;
   competition: string;
+  /** Whether a season pass is valid for this match (home league or cup match, not a friendly). */
+  seasonPassValid: boolean;
   venue: string;
   kickoffAt: string;
   status: string;
@@ -358,6 +360,10 @@ export class ChatbotContextService {
       homeTeam: match.homeTeam,
       awayTeam: match.awayTeam,
       competition: match.competition,
+      seasonPassValid:
+        isHomeMatch(match, this.homeTeamName) &&
+        match.isSeasonPassEligible === true &&
+        match.status !== MatchStatus.CANCELLED,
       venue: match.venue,
       kickoffAt: match.kickoffAt.toISOString(),
       status: match.status,

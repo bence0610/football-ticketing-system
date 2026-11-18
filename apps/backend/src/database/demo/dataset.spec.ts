@@ -346,19 +346,30 @@ describe('the demo dataset', () => {
       );
     });
 
-    it('sells the pass seats on a cup tie like any other, and never on a league match', () => {
-      const passSeats = new Set(
-        d.passes.filter((p) => p.seasonLabel === '2026/2027').map((p) => p.seatId),
+    it('covers the home cup ties with the pass: eligible, no single ticket on a pass seat, pass entries on the played one', () => {
+      const cups = d.matches.filter((m) => m.competition === 'magyar_kupa' && m.homeTeam === 'Kecskeméti TE');
+      expect(cups.length).toBeGreaterThan(0);
+      for (const c of cups) expect(c.isSeasonPassEligible).toBe(true);
+      const cupIds = new Set(cups.map((c) => c.id));
+      // a seat is a pass seat for a cup tie when a pass valid on that day holds it
+      const coveredBy = (t: { matchId: string; seatId: string }): boolean => {
+        const k = matchById(t.matchId).kickoffAt.getTime();
+        return d.passes.some(
+          (p) =>
+            p.seatId === t.seatId &&
+            k >= p.validFrom.getTime() &&
+            k < p.validUntil.getTime() + 86_400_000,
+        );
+      };
+      const singleOnPassSeat = d.tickets.filter(
+        (t) => t.source === 'single' && cupIds.has(t.matchId) && coveredBy(t),
       );
-      const seasonStart = new Date('2026-07-01T00:00:00Z');
-      const single = d.tickets.filter(
-        (t) =>
-          t.source === 'single' &&
-          passSeats.has(t.seatId) &&
-          matchById(t.matchId).kickoffAt >= seasonStart,
-      );
-      expect(single.length).toBeGreaterThan(0); // the cup ties
-      for (const t of single) expect(matchById(t.matchId).isSeasonPassEligible).toBe(false);
+      expect(singleOnPassSeat).toHaveLength(0);
+      const played = cups.filter((c) => c.kickoffAt < NOW);
+      expect(
+        d.tickets.filter((t) => t.source === 'season_pass' && played.some((c) => c.id === t.matchId))
+          .length,
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -548,9 +559,9 @@ describe('the demo dataset', () => {
       expect(bySource('season_pass_purchase')).toBeGreaterThanOrEqual(4);
       expect(bySource('attendance')).toBeGreaterThan(50);
       expect(bySource('season_carryover')).toBeGreaterThanOrEqual(3);
-      // single tickets of this account: only the two cup ties (the pass covers the league matches)
+      // the pass covers every home match, the cup ties included: no single ticket of this account
       const bought = d.tickets.filter((t) => t.userId === legenda.id && t.source === 'single');
-      expect(bought.length).toBeLessThanOrEqual(2);
+      expect(bought).toHaveLength(0);
     });
 
     it('puts one named account in each tier, by real points', () => {

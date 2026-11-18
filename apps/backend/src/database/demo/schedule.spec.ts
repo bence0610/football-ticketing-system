@@ -84,7 +84,8 @@ describe('the demo league schedule', () => {
   it('has two Magyar Kupa home ties, one played and one to come', () => {
     const cups = current.filter((m) => m.competition === Competition.MAGYAR_KUPA);
     expect(cups).toHaveLength(2);
-    expect(cups.every((m) => m.home && !m.passEligible)).toBe(true);
+    // the pass covers the home cup ties like the league matches
+    expect(cups.every((m) => m.home && m.passEligible)).toBe(true);
     expect(cups.map((m) => m.phase).sort()).toEqual(['played', 'upcoming']);
   });
 

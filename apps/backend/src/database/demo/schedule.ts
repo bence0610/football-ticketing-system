@@ -1,4 +1,4 @@
-import { Competition, MatchStatus } from '../entities/match.entity';
+import { Competition, MatchStatus, isPassEligibleMatch } from '../entities/match.entity';
 import { HOME_TEAM, HOME_VENUE, OPPONENTS, Opponent } from './data';
 import {
   DAY_MS,
@@ -179,8 +179,8 @@ function plan(
     status,
     timeFactor,
     basePrice: rest.home ? priceFor(rest.competition, opponent.draw) : 0,
-    // The pass covers the league home matches; the cup is sold separately.
-    passEligible: rest.home && rest.competition === Competition.NB2,
+    // The pass covers every home match of the league and the Magyar Kupa (not friendlies).
+    passEligible: isPassEligibleMatch(rest.competition, rest.home),
   };
 }
 

@@ -2,7 +2,7 @@ import { DataSource, MoreThan } from 'typeorm';
 import { Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
-import { Match, MatchStatus, Competition } from '../entities/match.entity';
+import { Match, MatchStatus, Competition, isPassEligibleMatch } from '../entities/match.entity';
 import { dayNumberOf, wallClockToUtc, weekdayOf } from '../demo/time';
 import { Seat } from '../entities/seat.entity';
 import { Sector } from '../entities/sector.entity';
@@ -254,7 +254,8 @@ export async function runInitialSeed(dataSource: DataSource): Promise<void> {
       capacity: totalCapacity,
       basePrice: blueprint.basePrice,
       description: blueprint.description,
-      isSeasonPassEligible: false,
+      // By the one rule (a friendly is not covered by the pass).
+      isSeasonPassEligible: isPassEligibleMatch(blueprint.competition, true),
     });
     await matchRepo.save(match);
     logger.log(

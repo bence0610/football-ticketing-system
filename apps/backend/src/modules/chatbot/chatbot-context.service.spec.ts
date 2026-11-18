@@ -401,6 +401,7 @@ describe('ChatbotContextService', () => {
           'homeTeam',
           'awayTeam',
           'competition',
+          'seasonPassValid',
           'venue',
           'kickoffAt',
           'status',

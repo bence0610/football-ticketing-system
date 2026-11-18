@@ -206,7 +206,7 @@ describe('SeasonPassPageComponent — what the page claims', () => {
   it('does not list rights that do not exist', () => {
     const el = render([price()], season(2));
     const t = text(el);
-    for (const invented of ['VIP catering', 'parkolás', 'kupa', 'elővásárlási']) {
+    for (const invented of ['VIP catering', 'parkolás', 'elővásárlási']) {
       expect(t.toLowerCase()).not.toContain(invented.toLowerCase());
     }
     expect(t).toContain('véglegesen nem ruházható át, csak meccsenként kölcsönadható');

@@ -23,8 +23,8 @@ import { closeTestApp, createTestApp, TestContext } from './helpers/app.helper';
 import { seedSeasonPass, truncateAll } from './helpers/db.helper';
 
 /**
- * A season pass is an entry to the matches it is valid for: the season-pass eligible league home
- * matches. On a friendly or a cup tie the holder has no entry, so the pass seat is empty, is sold
+ * A season pass is an entry to the matches it is valid for: the season-pass eligible home matches
+ * (league and Magyar Kupa; see pass-covers-cup.e2e-spec.ts). On a friendly the holder has no entry, so the pass seat is empty, is sold
  * like any other seat and is not counted as occupied; on a league match it is held and counted.
  * Also: the pass figure of the admin match list (valid passes ahead, entered passes once played),
  * the job that marks matches finished, and the ticket expiry that must not wait for that status.

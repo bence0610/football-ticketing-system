@@ -109,7 +109,7 @@ export async function auditDemoData(manager: EntityManager): Promise<AuditResult
       [P],
     ],
     [
-      'no single-match ticket on a pass seat for a match the pass is valid for (a cup tie is not covered, so its pass seats are sold like any other)',
+      'no single-match ticket on a pass seat for a match the pass is valid for (the home league matches AND the home Magyar Kupa ties are covered; only friendlies are not)',
       "SELECT COUNT(*) n FROM tickets t JOIN season_passes sp ON sp.seat_id = t.seat_id JOIN matches m ON m.id = t.match_id WHERE t.source = 'single' AND t.id LIKE ? AND m.is_season_pass_eligible = 1 AND m.kickoff_at >= sp.valid_from AND m.kickoff_at < DATE_ADD(sp.valid_until, INTERVAL 1 DAY)",
       [P],
     ],

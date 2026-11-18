@@ -256,6 +256,7 @@ export class ChatbotService {
       lines.push(
         `- ${match.homeTeam} vs ${match.awayTeam} (${match.competition})
   Hazai/idegenbeli: ${match.isHome ? 'hazai mérkőzés (a KTE otthon játszik)' : 'idegenbeli mérkőzés'}
+  Bérlet: ${match.seasonPassValid ? 'érvényes erre a mérkőzésre' : 'nem érvényes erre a mérkőzésre (a bérlethelyek itt a többi helyhez hasonlóan megvehetők)'}
   Időpont: ${dateLabel}, helyszín: ${match.venue}
   ${this.formatSales(match)}
   Szektorok: ${this.formatSectors(match)}
@@ -299,7 +300,7 @@ export class ChatbotService {
     return [
       `Bérletek (${sp.seasonLabel} szezon, érvényes ${sp.validFrom} első napjától ${sp.validUntil} utolsó napjának végéig; az első és az utolsó napon játszott mérkőzés is lefedett, a napokat a stadion időzónájában, Europe/Budapest szerint számítjuk):`,
       prices,
-      '  A bérlet a választott szektorban fix helyet ad az érvényességi időszakba eső mérkőzésekre; minden mérkőzéshez a profil oldalon érhető el a belépő QR-kód.',
+      '  A bérlet a választott szektorban fix helyet ad az érvényességi időszakba eső MINDEN hazai bajnoki és Magyar Kupa-mérkőzésre (a későbbre kiírt kupameccsre is automatikusan); a felkészülési (barátságos) mérkőzésre nem érvényes. Minden érvényes mérkőzéshez a profil oldalon érhető el a belépő QR-kód.',
       '  Egy fiók szezononként egy bérlet birtokosa lehet. Megvehető másnak is (családtag, gyerek): ilyenkor a vásárláskor meg kell adni a birtokos nevét, vagy ha van fiókja, az e-mail-címét.',
       '  Ha egy szektorban elfogytak a bérletes helyek, abban a szektorban nem lehet bérletet venni.',
     ].join('\n');
