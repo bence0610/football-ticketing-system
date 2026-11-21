@@ -491,11 +491,35 @@ describe('Season-pass seat choice (E2E)', () => {
       expect(await ctx.dataSource.getRepository(SeasonPass).count()).toBe(0);
     });
 
-    it('should keep blocking when the only ticket for the upcoming match is void (the unique slot is still taken)', async () => {
-      const { seats } = await seedTier('upper', 2);
+    it('should offer, count and sell a seat whose only ticket for the upcoming match is void', async () => {
+      // Since the slot index only counts occupying tickets (pending_payment, paid, used), a
+      // CANCELLED / REFUNDED / EXPIRED ticket leaves the seat free, and SEAT_TICKETED_UPCOMING_SQL
+      // (same three statuses) agrees with it.
+      const { seats } = await seedTier('upper', 3);
       const fan = await registerFan('void-ticket-owner');
-      await ticketSeat(seats[0].id, fan.userId, 3, TicketStatus.CANCELLED, 'void');
-      expect(await statusOf('D/1', seats[0].id)).toBe('ticketed');
+      await ticketSeat(seats[0].id, fan.userId, 3, TicketStatus.CANCELLED, 'void-cancelled');
+      await ticketSeat(seats[1].id, fan.userId, 3, TicketStatus.REFUNDED, 'void-refunded');
+      await ticketSeat(seats[2].id, fan.userId, 3, TicketStatus.EXPIRED, 'void-expired');
+
+      expect(await statusOf('D/1', seats[0].id)).toBe('available');
+      expect(await statusOf('D/1', seats[1].id)).toBe('available');
+      expect(await statusOf('D/1', seats[2].id)).toBe('available');
+      expect(await freeSeatsOf('upper', 'D/1')).toBe(3);
+
+      const buyer = await registerFan('void-pass-buyer');
+      const pass = await buyPass(buyer, 'upper', seats[0]);
+      expect(pass.seatId).toBe(seats[0].id);
+      expect(await freeSeatsOf('upper', 'D/1')).toBe(2);
+    });
+
+    it('should keep blocking a seat whose upcoming-match ticket occupies it (pending, paid, used)', async () => {
+      const { seats } = await seedTier('upper', 3);
+      const fan = await registerFan('occupying-ticket-owner');
+      await ticketSeat(seats[0].id, fan.userId, 3, TicketStatus.PENDING_PAYMENT, 'occ-pending');
+      await ticketSeat(seats[1].id, fan.userId, 3, TicketStatus.PAID, 'occ-paid');
+      await ticketSeat(seats[2].id, fan.userId, 1, TicketStatus.USED, 'occ-used');
+      for (const seat of seats) expect(await statusOf('D/1', seat.id)).toBe('ticketed');
+      expect(await freeSeatsOf('upper', 'D/1')).toBe(0);
     });
 
     it('should still offer and sell a seat whose only ticket is for a match already played', async () => {

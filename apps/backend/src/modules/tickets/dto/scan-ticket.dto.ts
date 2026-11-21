@@ -57,9 +57,28 @@ export class TicketScanResponseDto {
   success!: boolean;
 
   @ApiProperty({
-    enum: ['ok', 'already_used', 'invalid', 'expired', 'wrong_match', 'match_cancelled'],
+    enum: [
+      'ok',
+      'already_used',
+      'invalid',
+      'expired',
+      'wrong_match',
+      'match_cancelled',
+      'match_postponed',
+      'not_today',
+    ],
+    description:
+      '`not_today`: the ticket is for a match whose scan window (a few hours before kickoff until 4 hours after) is not open now; the ticket stays unused. `match_postponed`: the match is postponed.',
   })
-  result!: 'ok' | 'already_used' | 'invalid' | 'expired' | 'wrong_match' | 'match_cancelled';
+  result!:
+    | 'ok'
+    | 'already_used'
+    | 'invalid'
+    | 'expired'
+    | 'wrong_match'
+    | 'match_cancelled'
+    | 'match_postponed'
+    | 'not_today';
 
   @ApiProperty({ required: false })
   ticketId?: string;

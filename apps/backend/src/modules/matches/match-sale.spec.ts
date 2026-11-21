@@ -68,4 +68,18 @@ describe('assertMatchOpenForSale', () => {
       }),
     );
   });
+
+  it('refuses a postponed match with 409 match_postponed, like a cancelled one (F10)', () => {
+    expect(() =>
+      assertMatchOpenForSale(
+        { homeTeam: HOME, kickoffAt: future, status: MatchStatus.POSTPONED },
+        HOME,
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        status: 409,
+        response: expect.objectContaining({ code: 'match_postponed' }),
+      }),
+    );
+  });
 });

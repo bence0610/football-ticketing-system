@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppConfig } from '../../config';
 import { Match, SeasonPass, Ticket, TicketSource, TicketStatus } from '../../database/entities';
+import { SOLD_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { PASS_REVENUE_STATUSES, passRevenueByTier, sumTiers } from './season-pass-revenue';
 import {
   RevenueByMatchDto,
@@ -14,7 +15,8 @@ import {
   SeasonPassRevenueDto,
 } from './dto/revenue-stats.dto';
 
-const REVENUE_STATUSES: TicketStatus[] = [TicketStatus.PAID, TicketStatus.USED];
+// Paid tickets, scanned or not: an expired ticket's money was received (see SOLD_TICKET_STATUSES).
+const REVENUE_STATUSES: TicketStatus[] = [...SOLD_TICKET_STATUSES];
 
 @Injectable()
 export class AdminRevenueService {

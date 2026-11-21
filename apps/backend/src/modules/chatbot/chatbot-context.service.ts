@@ -15,10 +15,10 @@ import { Match, MatchStatus, Ticket } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { TIER_DEFINITIONS } from '../loyalty/loyalty.constants';
 import { isHomeMatch } from '../matches/match-home';
+import { seatsTakenByMatch } from '../matches/match-seats-taken';
 import { MAX_SEATS_PER_ORDER } from '../payments/dto/create-payment-intent.dto';
 import { SeasonPassesService } from '../season-passes/season-passes.service';
 import { SeatsService } from '../seats/seats.service';
-import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { FORECAST_HORIZON_HOURS, WeatherService } from '../weather/weather.service';
 
 const UPCOMING_STATUSES: MatchStatus[] = [MatchStatus.ON_SALE, MatchStatus.SCHEDULED];
@@ -196,7 +196,8 @@ export class ChatbotContextService {
       take: TOP_MATCHES,
     });
 
-    const aggregates = await this.aggregateSold(matches.map((m) => m.id));
+    // The same figure as the match list: tickets plus the seats the valid passes hold.
+    const aggregates = await seatsTakenByMatch(this.ticketRepository, matches);
     const [upcomingMatches, seasonPass] = await Promise.all([
       Promise.all(
         matches.map(async (match) =>
@@ -297,25 +298,6 @@ export class ChatbotContextService {
       carryoverPercent: c.carryoverPercent,
       discountTicketLimit: c.discountTicketLimit,
     };
-  }
-
-  private async aggregateSold(matchIds: string[]): Promise<Map<string, number>> {
-    const result = new Map<string, number>();
-    if (matchIds.length === 0) {
-      return result;
-    }
-    const rows = await this.ticketRepository
-      .createQueryBuilder('t')
-      .select('t.matchId', 'matchId')
-      .addSelect('COUNT(t.id)', 'soldCount')
-      .where('t.matchId IN (:...matchIds)', { matchIds })
-      .andWhere('t.status IN (:...statuses)', { statuses: [...OCCUPYING_TICKET_STATUSES] })
-      .groupBy('t.matchId')
-      .getRawMany<{ matchId: string; soldCount: string | number }>();
-    for (const row of rows) {
-      result.set(row.matchId, Number(row.soldCount));
-    }
-    return result;
   }
 
   /** Reuses the seat map's sector summary so the chatbot and the UI agree. */

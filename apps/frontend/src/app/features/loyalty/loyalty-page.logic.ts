@@ -81,7 +81,7 @@ export function earningRules(rules: LoyaltyEarningRules): readonly EarningRule[]
       label: 'Bérlet kölcsönadása',
       amount: `+${points(rules.passLoanPoints)}`,
       detail:
-        'akkor jár, amikor a kölcsönkapó be is lép a meccsre (a belépő beolvasása után); ha senki nem jön, nem jár',
+        'a meccs után jóváírjuk (nem a beolvasáskor), és csak akkor, ha a kölcsönkapó be is lépett; ha senki nem jött, nem jár',
     },
   ];
 }

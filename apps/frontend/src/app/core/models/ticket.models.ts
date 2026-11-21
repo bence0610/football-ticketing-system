@@ -48,7 +48,9 @@ export type ScanResult =
   | 'invalid'
   | 'expired'
   | 'wrong_match'
-  | 'match_cancelled';
+  | 'match_cancelled'
+  | 'match_postponed'
+  | 'not_today';
 
 export interface ScanMatchInfo {
   id: string;

@@ -370,12 +370,13 @@ describe('SeasonPassesService – price list and season overview', () => {
       const statsSql = (dataSource.query.mock.calls as Array<[string]>)
         .map(([sql]) => sql)
         .find((sql) => sql.includes('MIN(s.price_modifier)'))!;
-      // a ticket (any status) for a pass-eligible, uncancelled match that kicks off after now
-      // and before the season's end blocks; a match already played does not
+      // an OCCUPYING ticket (pending_payment / paid / used: the statuses the unique index counts)
+      // for a pass-eligible, uncancelled match that kicks off after now and before the season's
+      // end blocks; a void ticket or a match already played does not
       expect(statsSql).toMatch(/FROM tickets t JOIN matches m/);
       expect(statsSql).toContain('m.kickoff_at > NOW()');
       expect(statsSql).toContain('m.kickoff_at < (SELECT DATE_ADD(MAX(spp.valid_until)');
-      expect(statsSql).not.toMatch(/t\.status/);
+      expect(statsSql).toContain("t.status IN ('pending_payment','paid','used')");
       // any season_passes row of the season blocks, whatever its status: no status filter
       expect(statsSql).toContain('sp.season_label = ?');
       expect(statsSql).not.toMatch(/sp\.status/);

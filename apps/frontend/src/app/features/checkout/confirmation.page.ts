@@ -21,7 +21,7 @@ import {
   shouldGiveUp,
 } from './logic/confirmation-polling';
 
-type View = 'checking' | 'issued' | 'processing' | 'failed' | 'missing';
+type View = 'checking' | 'issued' | 'processing' | 'failed' | 'refunded' | 'missing';
 
 /**
  * Confirmation. The result comes from the server, not from the browser's
@@ -120,6 +120,20 @@ type View = 'checking' | 'issued' | 'processing' | 'failed' | 'missing';
           </p>
           <div class="confirm__actions">
             <a mat-flat-button color="primary" routerLink="/cart">Vissza a kosárhoz</a>
+          </div>
+        </ng-container>
+
+        <!-- paid, but no ticket could be issued: the whole payment is refunded -->
+        <ng-container *ngIf="view() === 'refunded'">
+          <div class="badge badge--fail" aria-hidden="true"><mat-icon>undo</mat-icon></div>
+          <h2 class="confirm__title" data-testid="confirm-title">Visszatérítjük a teljes összeget</h2>
+          <p class="confirm__lead" data-testid="confirm-lead">
+            A kiválasztott helyet közben más vette meg, vagy bérletes hely lett, ezért jegyet nem tudtunk
+            kiállítani. A kifizetett teljes összeget visszatérítjük az eredeti fizetési módra
+            (általában 3–5 munkanap), erről e-mailt is küldünk.
+          </p>
+          <div class="confirm__actions">
+            <a mat-flat-button color="primary" routerLink="/stadium">Új hely választása</a>
           </div>
         </ng-container>
 
@@ -391,6 +405,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         }
         if (status.status === 'failed') {
           this.view.set('failed');
+          return;
+        }
+        if (status.status === 'refunded') {
+          this.view.set('refunded');
           return;
         }
         this.view.set('processing');

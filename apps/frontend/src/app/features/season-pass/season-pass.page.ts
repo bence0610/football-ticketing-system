@@ -1172,7 +1172,8 @@ export class SeasonPassPageComponent implements OnInit, OnDestroy {
    */
   protected readonly heroTitle = computed(() => {
     const all = this.season()?.homeMatches ?? [];
-    const left = all.filter((m) => !this.isPlayed(m)).length;
+    // A postponed match is listed ("elhalasztva") but not counted: it cannot be used until it has a new date.
+    const left = all.filter((m) => !this.isPlayed(m) && m.status !== 'postponed').length;
     if (left === 0) {
       return 'Egy hely az egész szezonra';
     }

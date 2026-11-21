@@ -20,6 +20,25 @@ export const OCCUPYING_TICKET_STATUSES: readonly TicketStatus[] = [
 ] as const;
 
 /**
+ * What was SOLD, for the figures that look back (revenue, tickets sold, how full a match was):
+ * a ticket that was paid for whether or not its holder came. An EXPIRED ticket is a paid ticket
+ * nobody used (the nightly job expires unscanned PAID tickets after the match): the money was
+ * received and the seat was taken, so it counts as sold, and as "not entered". Do not use this to
+ * decide whether a seat can be resold: that is {@link OCCUPYING_TICKET_STATUSES}.
+ */
+export const SOLD_TICKET_STATUSES: readonly TicketStatus[] = [
+  TicketStatus.PAID,
+  TicketStatus.USED,
+  TicketStatus.EXPIRED,
+] as const;
+
+/** The seats a match had taken, looking back: occupying tickets plus the expired (unused) ones. */
+export const TAKEN_SEAT_TICKET_STATUSES: readonly TicketStatus[] = [
+  ...OCCUPYING_TICKET_STATUSES,
+  TicketStatus.EXPIRED,
+] as const;
+
+/**
  * Returns true if a ticket with the given status occupies its seat for the
  * corresponding match. Prefer this helper over inlining the array when the
  * check is on a single ticket; use {@link OCCUPYING_TICKET_STATUSES} with

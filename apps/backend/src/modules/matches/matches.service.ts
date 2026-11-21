@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppConfig } from '../../config';
 import { Match, MatchStatus, Ticket } from '../../database/entities';
-import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
+import { seatsTakenByMatch } from './match-seats-taken';
 import { isHomeMatch } from './match-home';
 import { MatchDetailDto, MatchListItemDto, QueryMatchesDto } from './dto';
 
@@ -27,7 +27,8 @@ export class MatchesService {
 
   /**
    * Returns matches filtered by query params. Each row is enriched with
-   * `availableSeats` (capacity - active tickets) and a `isHome` badge.
+   * `availableSeats` (capacity - taken seats: tickets AND the seats of the passes valid for the
+   * match, see seatsTakenByMatch) and a `isHome` badge.
    */
   async findAll(query: QueryMatchesDto): Promise<MatchListItemDto[]> {
     const qb = this.matchRepository
@@ -46,7 +47,7 @@ export class MatchesService {
     }
 
     const matches = await qb.getMany();
-    const soldByMatch = await this.aggregateSoldTickets(matches.map((m) => m.id));
+    const soldByMatch = await seatsTakenByMatch(this.ticketRepository, matches);
     return matches.map((match) => this.toListItem(match, soldByMatch.get(match.id) ?? 0));
   }
 
@@ -64,7 +65,7 @@ export class MatchesService {
       .limit(limit)
       .getMany();
 
-    const soldByMatch = await this.aggregateSoldTickets(matches.map((m) => m.id));
+    const soldByMatch = await seatsTakenByMatch(this.ticketRepository, matches);
     return matches.map((match) => this.toListItem(match, soldByMatch.get(match.id) ?? 0));
   }
 
@@ -76,7 +77,7 @@ export class MatchesService {
     if (!match) {
       return null;
     }
-    const soldByMatch = await this.aggregateSoldTickets([id]);
+    const soldByMatch = await seatsTakenByMatch(this.ticketRepository, [match]);
     return this.toDetail(match, soldByMatch.get(id) ?? 0);
   }
 
@@ -86,34 +87,6 @@ export class MatchesService {
    */
   async findEntity(id: string): Promise<Match | null> {
     return this.matchRepository.findOne({ where: { id } });
-  }
-
-  /**
-   * Returns a `Map<matchId, soldCount>` for the supplied match ids.
-   * Sold = any ticket occupying its seat (PENDING_PAYMENT / PAID / USED).
-   * See {@link OCCUPYING_TICKET_STATUSES} for the business rule.
-   */
-  private async aggregateSoldTickets(matchIds: string[]): Promise<Map<string, number>> {
-    const result = new Map<string, number>();
-    if (matchIds.length === 0) {
-      return result;
-    }
-
-    const rows = await this.ticketRepository
-      .createQueryBuilder('ticket')
-      .select('ticket.matchId', 'matchId')
-      .addSelect('COUNT(ticket.id)', 'soldCount')
-      .where('ticket.matchId IN (:...matchIds)', { matchIds })
-      .andWhere('ticket.status IN (:...statuses)', {
-        statuses: [...OCCUPYING_TICKET_STATUSES],
-      })
-      .groupBy('ticket.matchId')
-      .getRawMany<{ matchId: string; soldCount: string | number }>();
-
-    for (const row of rows) {
-      result.set(row.matchId, Number(row.soldCount));
-    }
-    return result;
   }
 
   private toListItem(match: Match, sold: number): MatchListItemDto {

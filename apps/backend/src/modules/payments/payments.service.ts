@@ -399,6 +399,27 @@ export class PaymentsService {
       };
     }
 
+    // Paid, but nothing could be issued and the whole payment was refunded.
+    try {
+      const refunded = await this.redis.get(`payment-refunded:${paymentIntentId}`);
+      if (refunded) {
+        const own = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+        if (!own.metadata.userId || own.metadata.userId === userId) {
+          return {
+            status: 'refunded',
+            ticketIds: [],
+            amountPaid: 0,
+            currency: own.currency,
+            confirmationEmailSentAt: null,
+            match: null,
+            seats: [],
+          };
+        }
+      }
+    } catch {
+      // fall through to the ordinary Stripe lookup
+    }
+
     let intent: Stripe.PaymentIntent;
     try {
       intent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
@@ -524,7 +545,8 @@ export class PaymentsService {
       where: { stripePaymentIntentId: intent.id },
       select: ['id', 'userId'],
     });
-    let createdTickets: Ticket[];
+    let createdTickets: Ticket[] = [];
+    let refundedWhole = false;
     if (existing.length > 0) {
       this.logger.log(
         `PaymentIntent ${intent.id} already produced tickets — running idempotent post-steps.`,
@@ -590,52 +612,76 @@ export class PaymentsService {
         );
       }
 
+      // A seat that a season pass covers for this match is not for sale: the pass seat was bought
+      // (or the pass issued) after this payment started. Nothing is issued; the whole payment is
+      // refunded, as for a season pass that cannot be issued.
+      const passHeldSeatIds = await this.passHeldSeatIds(matchId, fulfillableSeatIds);
+      if (passHeldSeatIds.length > 0) {
+        this.logger.warn(
+          `Payment ${intent.id}: seat(s) held by a season pass for match ${matchId}: ${passHeldSeatIds.join(', ')} - refunding the whole payment`,
+        );
+        createdTickets = [];
+        refundedWhole = await this.refundWholePayment(intent, seatIds, paidBySeatId, 'pass_seat');
+      }
+
       // Create tickets for fulfillable seats; catch ER_DUP_ENTRY from a
       // concurrent webhook+confirm race (scenario 13) and re-fetch instead.
-      try {
-        createdTickets = await this.dataSource.transaction(async (em) => {
-          const persisted: Ticket[] = [];
-          for (const seatId of fulfillableSeatIds) {
-            const seat = seatById.get(seatId);
-            if (!seat) {
-              this.logger.error(`Seat ${seatId} missing while finalizing payment ${intent.id}`);
-              continue;
+      if (!refundedWhole) {
+        try {
+          createdTickets = await this.dataSource.transaction(async (em) => {
+            const persisted: Ticket[] = [];
+            for (const seatId of fulfillableSeatIds) {
+              const seat = seatById.get(seatId);
+              if (!seat) {
+                this.logger.error(`Seat ${seatId} missing while finalizing payment ${intent.id}`);
+                continue;
+              }
+              const price =
+                paidBySeatId.get(seatId) ?? seatUnitPrice(basePrice, seat.priceModifier);
+              const ticket = em.create(Ticket, {
+                matchId,
+                seatId,
+                userId,
+                status: TicketStatus.PAID,
+                source: TicketSource.SINGLE,
+                pricePaid: price.toFixed(2),
+                currency: 'HUF',
+                qrCode: `KTE-${randomUUID()}`,
+                qrJti: this.qrService.generateJti(),
+                stripePaymentIntentId: intent.id,
+              });
+              const saved = await em.save(Ticket, ticket);
+              persisted.push(saved);
             }
-            const price = paidBySeatId.get(seatId) ?? seatUnitPrice(basePrice, seat.priceModifier);
-            const ticket = em.create(Ticket, {
-              matchId,
-              seatId,
-              userId,
-              status: TicketStatus.PAID,
-              source: TicketSource.SINGLE,
-              pricePaid: price.toFixed(2),
-              currency: 'HUF',
-              qrCode: `KTE-${randomUUID()}`,
-              qrJti: this.qrService.generateJti(),
-              stripePaymentIntentId: intent.id,
-            });
-            const saved = await em.save(Ticket, ticket);
-            persisted.push(saved);
-          }
-          return persisted;
-        });
-      } catch (txError) {
-        if (isDuplicateKeyError(txError)) {
-          this.logger.warn(
-            `Payment ${intent.id}: concurrent finalization detected (ER_DUP_ENTRY) — re-fetching existing tickets`,
-          );
-          createdTickets = await this.ticketRepository.find({
-            where: { stripePaymentIntentId: intent.id },
+            return persisted;
           });
-        } else {
-          throw txError;
+        } catch (txError) {
+          if (isDuplicateKeyError(txError)) {
+            this.logger.warn(
+              `Payment ${intent.id}: concurrent finalization detected (ER_DUP_ENTRY) — re-fetching existing tickets`,
+            );
+            createdTickets = await this.ticketRepository.find({
+              where: { stripePaymentIntentId: intent.id },
+            });
+            if (createdTickets.length === 0) {
+              // Not a concurrent finalization of THIS payment: another ticket holds the seat (the
+              // transaction rolled back, so none of this payment's seats got a ticket). The buyer
+              // paid for nothing: refund it all and say so.
+              this.logger.warn(
+                `Payment ${intent.id}: a seat was taken by another ticket (ER_DUP_ENTRY, no ticket for this payment) - refunding the whole payment`,
+              );
+              refundedWhole = await this.refundWholePayment(intent, seatIds, paidBySeatId, 'taken');
+            }
+          } else {
+            throw txError;
+          }
         }
       }
 
       // Issue Stripe refund for every seat that was taken before we could
       // fulfill it (sub-case b). Fire-and-forget the notification email so
       // the webhook response is never delayed by SMTP latency.
-      if (takenSeatIds.length > 0) {
+      if (takenSeatIds.length > 0 && !refundedWhole) {
         // Refund exactly what was paid for the taken seats (discounted lines).
         const refundHuf = takenSeatIds.reduce(
           (acc, seatId) => acc + (paidBySeatId.get(seatId) ?? 0),
@@ -731,6 +777,82 @@ export class PaymentsService {
       `Finalized payment ${intent.id}: ${createdTickets.length} ticket(s) PAID for user ${userId}.`,
     );
     return createdTickets;
+  }
+
+  /**
+   * The seats (of the given ones) that an active season pass covers for this match: the pass
+   * holder has the right of entry, so no single ticket may be issued on them. Asked of the same
+   * rule the seat map uses; if that lookup fails the purchase is completed as before.
+   */
+  private async passHeldSeatIds(matchId: string, seatIds: readonly string[]): Promise<string[]> {
+    if (seatIds.length === 0) return [];
+    try {
+      const availability = await this.seatsService.resolveAvailabilityForSeats(matchId, [
+        ...seatIds,
+      ]);
+      return seatIds.filter((id) => availability?.get(id) === SeatAvailability.SEASON_PASS);
+    } catch (error) {
+      this.logger.warn(
+        `Pass-seat check failed for match ${matchId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Refunds the whole payment (nothing was issued), remembers it for the confirmation page and
+   * tells the buyer once. Returns true: the payment is settled as refunded, whatever Stripe said
+   * (a failed refund is logged for staff, as everywhere else).
+   */
+  private async refundWholePayment(
+    intent: Stripe.PaymentIntent,
+    seatIds: readonly string[],
+    paidBySeatId: ReadonlyMap<string, number>,
+    reason: 'taken' | 'pass_seat',
+  ): Promise<boolean> {
+    const refundHuf = seatIds.reduce((acc, id) => acc + (paidBySeatId.get(id) ?? 0), 0);
+    try {
+      await this.stripe.refunds.create(
+        { payment_intent: intent.id },
+        { idempotencyKey: `refund_${intent.id}` },
+      );
+      this.logger.warn(`Payment ${intent.id}: refunded the whole payment (${reason})`);
+    } catch (refundError) {
+      this.logger.error(
+        `Payment ${intent.id}: whole-payment refund FAILED, manual action required: ${
+          refundError instanceof Error ? refundError.message : String(refundError)
+        }`,
+      );
+    }
+    try {
+      await this.redis.set(`payment-refunded:${intent.id}`, reason, 'EX', 60 * 60 * 24 * 30);
+      // One e-mail per payment, however many times the event is delivered.
+      const first = await this.redis.set(
+        `payment-refund-email:${intent.id}`,
+        '1',
+        'EX',
+        60 * 60 * 24 * 30,
+        'NX',
+      );
+      if (first === 'OK') {
+        setImmediate(() => {
+          this.sendRefundNotificationEmail(intent, [...seatIds], refundHuf, reason).catch(
+            (error: unknown) => {
+              this.logger.error(
+                `Refund notification email failed for payment ${intent.id}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            },
+          );
+        });
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not record the refund of ${intent.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return true;
   }
 
   /**
@@ -887,6 +1009,7 @@ export class PaymentsService {
     intent: Stripe.PaymentIntent,
     takenSeatIds: string[],
     refundHuf: number,
+    reason: 'taken' | 'pass_seat' | 'partial' = 'partial',
   ): Promise<void> {
     const userId = intent.metadata.userId;
     const matchId = intent.metadata.matchId;
@@ -916,6 +1039,8 @@ export class PaymentsService {
         matchTitle,
         matchKickoffLabel: kickoffLabel,
         takenSeatCount: takenSeatIds.length,
+        wholePayment: reason !== 'partial',
+        passSeat: reason === 'pass_seat',
         refundLabel: `${refundHuf.toLocaleString('hu-HU')} Ft`,
       },
       correlationId: `seat-refund:${intent.id}`,

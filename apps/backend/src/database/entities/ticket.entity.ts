@@ -1,4 +1,4 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, Unique } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { Match } from './match.entity';
 import { Seat } from './seat.entity';
@@ -21,7 +21,9 @@ export enum TicketSource {
 }
 
 @Entity({ name: 'tickets' })
-@Unique('uq_tickets_match_seat', ['matchId', 'seatId'])
+// Only a ticket that occupies its seat holds the (match, seat) slot: see activeSlot and migration
+// TicketSlotOnlyForOccupying. A void ticket (cancelled / refunded / expired) leaves the seat free.
+@Index('uq_tickets_match_seat', ['matchId', 'seatId', 'activeSlot'], { unique: true })
 @Index('IDX_tickets_qr', ['qrCode'], { unique: true })
 @Index('uq_tickets_qr_jti', ['qrJti'], { unique: true })
 @Index('idx_tickets_user', ['userId'])
@@ -37,6 +39,19 @@ export class Ticket extends BaseEntity {
 
   @Column({ type: 'varchar', length: 36, name: 'user_id' })
   userId!: string;
+
+  /** 1 while the ticket occupies its seat, NULL otherwise (database-generated; never written). */
+  @Column({
+    type: 'tinyint',
+    name: 'active_slot',
+    nullable: true,
+    insert: false,
+    update: false,
+    select: false,
+    generatedType: 'STORED',
+    asExpression: "CASE WHEN `status` IN ('pending_payment','paid','used') THEN 1 ELSE NULL END",
+  })
+  activeSlot?: number | null;
 
   @Column({ type: 'varchar', length: 36, nullable: true, name: 'season_pass_id' })
   seasonPassId?: string;

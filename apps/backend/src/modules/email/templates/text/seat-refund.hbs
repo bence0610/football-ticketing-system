@@ -2,14 +2,14 @@ Visszatérítés folyamatban
 
 Szia {{recipientName}},
 
-Sajnáljuk, de {{article matchTitle}} {{matchTitle}} mérkőzésen {{takenSeatCount}} széket a fizetési folyamat alatt már elfoglalt egy másik vásárló.
+{{#if passSeat}}Sajnáljuk, de {{article matchTitle}} {{matchTitle}} mérkőzésen a kiválasztott hely közben bérletes hely lett, ezért jegyet nem tudtunk kiállítani. A teljes kifizetett összeget visszatérítjük.{{else if wholePayment}}Sajnáljuk, de {{article matchTitle}} {{matchTitle}} mérkőzésen a kiválasztott helyet a fizetési folyamat alatt már elfoglalta egy másik vásárló, ezért jegyet nem tudtunk kiállítani. A teljes kifizetett összeget visszatérítjük.{{else}}Sajnáljuk, de {{article matchTitle}} {{matchTitle}} mérkőzésen {{takenSeatCount}} széket a fizetési folyamat alatt már elfoglalt egy másik vásárló.{{/if}}
 
 Mérkőzés: {{matchTitle}}
 Időpont: {{matchKickoffLabel}}
 Elfoglalt székek: {{takenSeatCount}}
 Visszatérítés: {{refundLabel}}
 
-Az érintett szék(ek) árát automatikusan visszatérítjük az eredeti fizetési módra. A visszatérítés általában 3–5 munkanapon belül megjelenik a számláján.
+{{#if wholePayment}}A teljes összeget{{else}}Az érintett szék(ek) árát{{/if}} automatikusan visszatérítjük az eredeti fizetési módra. A visszatérítés általában 3–5 munkanapon belül megjelenik a számláján.
 
 Ha kérdésed van, kérjük, lépj kapcsolatba az ügyfélszolgálatunkkal.
 

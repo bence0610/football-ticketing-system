@@ -219,6 +219,7 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
       async (_label, kickoff) => {
         mockMatchRepo.findOne.mockResolvedValue({
           id: 'm1',
+          homeTeam: 'KTE FC',
           kickoffAt: new Date(kickoff),
           isSeasonPassEligible: true,
           status: 'on_sale',
@@ -238,6 +239,7 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
     ])('lets a match on the %s through the validity check', async (_label, kickoff) => {
       mockMatchRepo.findOne.mockResolvedValue({
         id: 'm1',
+        homeTeam: 'KTE FC',
         kickoffAt: new Date(kickoff),
         isSeasonPassEligible: true,
         status: 'on_sale',
@@ -254,6 +256,7 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
     it('refuses a match the pass does not cover (a friendly or cup tie) with 400 match_not_pass_eligible', async () => {
       mockMatchRepo.findOne.mockResolvedValue({
         id: 'm1',
+        homeTeam: 'KTE FC',
         kickoffAt: new Date('2026-11-09T19:00:00Z'),
         isSeasonPassEligible: false,
         status: 'on_sale',
@@ -268,6 +271,7 @@ describe('SeasonPassesService – previewLoan and match QR', () => {
     it('does not even reach the QR step for an outside match (nothing is materialised)', async () => {
       mockMatchRepo.findOne.mockResolvedValue({
         id: 'm1',
+        homeTeam: 'KTE FC',
         kickoffAt: new Date('2028-01-01T18:00:00Z'),
       });
       const spy = jest.spyOn(service as never, 'materializeSeasonPassTicket');

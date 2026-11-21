@@ -11,6 +11,7 @@ import loyaltyConfig from './loyalty.config';
 import cronConfig from './cron.config';
 import waitlistConfig from './waitlist.config';
 import chatbotConfig from './chatbot.config';
+import gateConfig from './gate.config';
 
 export const configurations = [
   appConfig,
@@ -26,6 +27,7 @@ export const configurations = [
   cronConfig,
   waitlistConfig,
   chatbotConfig,
+  gateConfig,
 ];
 
 export * from './app.config';
@@ -41,4 +43,5 @@ export * from './loyalty.config';
 export * from './cron.config';
 export * from './waitlist.config';
 export * from './chatbot.config';
+export * from './gate.config';
 export * from './env.validation';

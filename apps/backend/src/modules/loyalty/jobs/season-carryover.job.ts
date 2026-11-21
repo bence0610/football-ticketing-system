@@ -12,10 +12,16 @@ import {
 } from '../../../database/entities';
 import { LoyaltyService } from '../loyalty.service';
 import { tierForPoints } from '../loyalty.constants';
-import { tierAtSeasonEnd, tierRank } from '../loyalty-tier-keeping';
+import {
+  budapestYearMonth,
+  lastInstantOfSeason,
+  tierAtSeasonEnd,
+  tierRank,
+} from '../loyalty-tier-keeping';
 
 /**
- * Runs once a year on June 30 at 03:00 Europe/Budapest. For every user, the
+ * Runs once a year just after the season turn: 00:05 on 1 July, Europe/Budapest (the season ends at
+ * the end of 30 June, so nothing earned on the last day is left out of the conversion). For every user, the
  * outstanding points balance is reduced to LOYALTY_CARRYOVER_PERCENT% (the
  * remainder is logged as an EXPIRY transaction so the audit trail stays clean).
  *
@@ -23,6 +29,9 @@ import { tierAtSeasonEnd, tierRank } from '../loyalty-tier-keeping';
  * earned again) during the season that is ending is kept through the next season even when the
  * points fall below its threshold; one whose protection is used up falls to what the points give.
  */
+/** 00:05 on 1 July (Budapest): after the season that ended on 30 June, never before its last instant. */
+export const SEASON_CARRYOVER_CRON = '5 0 1 7 *';
+
 @Injectable()
 export class SeasonCarryoverJob {
   private readonly logger = new Logger(SeasonCarryoverJob.name);
@@ -36,11 +45,15 @@ export class SeasonCarryoverJob {
     this.loyaltyConfig = this.configService.getOrThrow<LoyaltyConfig>('loyalty');
   }
 
-  @Cron('0 3 30 6 *', { timeZone: 'Europe/Budapest', name: 'loyaltySeasonCarryover' })
+  @Cron(SEASON_CARRYOVER_CRON, { timeZone: 'Europe/Budapest', name: 'loyaltySeasonCarryover' })
   async run(): Promise<void> {
     const carryoverPercent = this.loyaltyConfig.carryoverPercent;
     const at = new Date();
-    const seasonStamp = at.toISOString().slice(0, 10);
+    // The season that has just ended ends on 30 June of this Budapest year (the run is on 1 July;
+    // a manual run in June converts the season about to end). The ledger reference and the tier
+    // stamp belong to that season, whatever the moment of the run.
+    const seasonYear = budapestYearMonth(at).year;
+    const seasonStamp = `${seasonYear}-06-30`;
     this.logger.log(`Season-end carryover starting (carryover=${carryoverPercent}%)`);
 
     const userRepo = this.dataSource.getRepository(User);
@@ -50,7 +63,7 @@ export class SeasonCarryoverJob {
     let skipped = 0;
     for (const user of users) {
       try {
-        if (await this.convert(user, carryoverPercent, seasonStamp, at)) {
+        if (await this.convert(user, carryoverPercent, seasonStamp, seasonYear)) {
           processed += 1;
         } else {
           skipped += 1;
@@ -80,7 +93,7 @@ export class SeasonCarryoverJob {
     user: User,
     carryoverPercent: number,
     seasonStamp: string,
-    at: Date,
+    seasonYear: number,
   ): Promise<boolean> {
     const pointsBefore = user.loyaltyPoints;
     const expiring = Math.floor((pointsBefore * (100 - carryoverPercent)) / 100);
@@ -110,8 +123,9 @@ export class SeasonCarryoverJob {
         reachedAt: fresh.loyaltyTierReachedAt ?? null,
         pointsBefore,
         pointsAfter,
-        year: at.getUTCFullYear(),
-        at,
+        year: seasonYear,
+        // A kept tier is stamped inside the season that ended, so it lasts through the whole next one.
+        at: lastInstantOfSeason(seasonYear),
       });
       if (
         decided.tier !== fresh.loyaltyTier ||

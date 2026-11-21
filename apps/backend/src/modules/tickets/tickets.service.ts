@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import {
@@ -24,6 +25,7 @@ import {
   User,
 } from '../../database/entities';
 import { formatFullName } from '../../common/format-name';
+import { DEFAULT_GATE_CONFIG, GateConfig, scanWindowState } from '../../config';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { QrService } from '../qr/qr.service';
 import { loadSectorMap } from '../seats/sector-lookup';
@@ -43,7 +45,13 @@ export class TicketsService {
     @Inject(forwardRef(() => WaitlistNotificationService))
     private readonly waitlistNotifier?: WaitlistNotificationService,
     @Optional() private readonly loyaltyService?: LoyaltyService,
+    @Optional() private readonly configService?: ConfigService,
   ) {}
+
+  /** The scan window around kickoff (GATE_OPENS_HOURS_BEFORE / GATE_CLOSES_HOURS_AFTER). */
+  private gateWindow(): GateConfig {
+    return this.configService?.get<GateConfig>('gate') ?? DEFAULT_GATE_CONFIG;
+  }
 
   async count(): Promise<number> {
     return this.ticketRepository.count();
@@ -177,10 +185,38 @@ export class TicketsService {
           ...(await this.scanDetails(ticket)),
         };
       }
+      // A postponed match admits nobody either: its own verdict, the ticket stays as it is.
+      if (ticket.match?.status === MatchStatus.POSTPONED) {
+        return {
+          success: false,
+          result: 'match_postponed',
+          ticketId: ticket.id,
+          source: ticket.source,
+          holderName: await this.resolveEnteringName(manager, ticket),
+          ...(await this.scanDetails(ticket)),
+        };
+      }
       if (tokenRevoked) {
         return { success: false, result: 'invalid', ticketId: ticket.id, message: 'revoked' };
       }
       const now = new Date();
+      // A ticket (single, season-pass entry or loan entry) admits only inside the scan window of
+      // its match. Outside it the ticket stays unused, nothing is recorded and no points are
+      // awarded; the steward is shown which match the ticket is for.
+      if (ticket.match) {
+        const state = scanWindowState(ticket.match.kickoffAt, now, this.gateWindow());
+        if (state !== 'open') {
+          return {
+            success: false,
+            result: 'not_today',
+            ticketId: ticket.id,
+            message: state === 'early' ? 'too_early' : 'too_late',
+            source: ticket.source,
+            holderName: await this.resolveEnteringName(manager, ticket),
+            ...(await this.scanDetails(ticket)),
+          };
+        }
+      }
       ticket.status = TicketStatus.USED;
       ticket.usedAt = now;
       ticket.scannedAt = now;

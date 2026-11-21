@@ -394,7 +394,8 @@ describe('ChatbotService', () => {
       expect(text).toContain('5 percig tartjuk fenn');
       expect(text).toContain('legfeljebb 6 jegy');
       expect(text).toContain('A meghívó 72 óráig érvényes');
-      expect(text).toContain('10 percig erősítheti meg');
+      expect(text).toContain('A várólista csak értesít, a helyet NEM foglalja le');
+      expect(text).toContain('10 percen belül nem vesz jegyet');
       expect(text).toContain('Gyenge eső, 12 °C, csapadék valószínűsége 65%');
       expect(text).toContain('Leírás: Rangadó a bajnokságban.');
       expect(text).toContain('nincs önkiszolgáló jegylemondás');

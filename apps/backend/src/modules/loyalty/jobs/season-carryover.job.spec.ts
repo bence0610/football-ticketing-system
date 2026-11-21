@@ -1,5 +1,5 @@
 import { LoyaltyTier } from '../../../database/entities';
-import { SeasonCarryoverJob } from './season-carryover.job';
+import { SEASON_CARRYOVER_CRON, SeasonCarryoverJob } from './season-carryover.job';
 
 describe('SeasonCarryoverJob', () => {
   interface Fake {
@@ -110,5 +110,41 @@ describe('SeasonCarryoverJob', () => {
     expect(awards).toHaveLength(1);
     expect(row.loyaltyTier).toBe(LoyaltyTier.PLATINUM);
     expect(row.loyaltyPoints).toBe(2165);
+  });
+
+  describe('the season turn is read in Budapest time (F16)', () => {
+    it('is scheduled just after midnight on 1 July Budapest, not at 03:00 on 30 June', () => {
+      expect(SEASON_CARRYOVER_CRON).toBe('5 0 1 7 *');
+      const meta = Reflect.getMetadata('SCHEDULE_CRON_OPTIONS', SeasonCarryoverJob.prototype.run);
+      expect(meta).toMatchObject({ cronTime: '5 0 1 7 *', timeZone: 'Europe/Budapest' });
+    });
+
+    it('run at 00:05 on 1 July (30 June 22:05 UTC) converts the season that just ended', async () => {
+      jest.setSystemTime(new Date('2027-06-30T22:05:00Z')); // 00:05 on 1 July in Budapest
+      const { job, awards, row } = setup({
+        tier: LoyaltyTier.GOLD,
+        points: 1200,
+        reachedAt: new Date('2026-11-20T12:00:00Z'),
+      });
+      await job.run();
+      expect(awards).toHaveLength(1);
+      expect(awards[0].points).toBe(-360);
+      expect(row.loyaltyPoints).toBe(840);
+      // the reference names the season that ended, whatever the UTC date of the run
+      expect((awards[0] as { referenceId?: string }).referenceId).toBe('season:2027-06-30:u1');
+    });
+
+    it('stamps a kept tier inside the season that ended, so it lasts through the whole next one', async () => {
+      jest.setSystemTime(new Date('2027-06-30T22:05:00Z'));
+      const { job, row } = setup({
+        tier: LoyaltyTier.GOLD,
+        points: 1200, // 840 after the conversion: below Arany (1000), the tier is kept
+        reachedAt: new Date('2026-11-20T12:00:00Z'),
+      });
+      await job.run();
+      expect(row.loyaltyTier).toBe(LoyaltyTier.GOLD);
+      // the stamp is 30 June 23:59:59 Budapest of the ended season, not a moment of the new one
+      expect(row.loyaltyTierReachedAt!.toISOString()).toBe('2027-06-30T21:59:59.999Z');
+    });
   });
 });

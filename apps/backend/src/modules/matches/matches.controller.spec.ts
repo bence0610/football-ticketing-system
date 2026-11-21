@@ -5,7 +5,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { MatchesController } from './matches.controller';
 import { MatchesService } from './matches.service';
-import { Match, MatchStatus, Competition, Ticket, TicketStatus } from '../../database/entities';
+import {
+  Match,
+  MatchStatus,
+  Competition,
+  SeasonPass,
+  Ticket,
+  TicketStatus,
+} from '../../database/entities';
 import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 
 /**
@@ -119,8 +126,11 @@ describe('MatchesController – integration', () => {
   };
   let ticketRepoMock: {
     createQueryBuilder: jest.Mock;
+    find: jest.Mock;
+    manager: { getRepository: jest.Mock };
     _qb: typeof ticketQb;
   };
+  let passRepoMock: { find: jest.Mock };
 
   // Compile the NestJS module once for the whole suite.
   beforeAll(async () => {
@@ -145,8 +155,11 @@ describe('MatchesController – integration', () => {
       findOne: jest.fn().mockResolvedValue(null),
       _qb: matchQb,
     };
+    passRepoMock = { find: jest.fn().mockResolvedValue([]) };
     ticketRepoMock = {
       createQueryBuilder: jest.fn().mockReturnValue(ticketQb),
+      find: jest.fn().mockResolvedValue([]),
+      manager: { getRepository: jest.fn().mockReturnValue(passRepoMock) },
       _qb: ticketQb,
     };
 
@@ -193,6 +206,9 @@ describe('MatchesController – integration', () => {
     matchRepoMock.createQueryBuilder.mockReturnValue(matchQb);
     matchRepoMock.findOne.mockResolvedValue(null);
     ticketRepoMock.createQueryBuilder.mockReturnValue(ticketQb);
+    ticketRepoMock.find.mockResolvedValue([]);
+    ticketRepoMock.manager.getRepository.mockReturnValue(passRepoMock);
+    passRepoMock.find.mockResolvedValue([]);
   });
 
   /**
@@ -338,6 +354,75 @@ describe('MatchesController – integration', () => {
 
       const res = await request(app.getHttpServer()).get('/matches').expect(200);
       expect(res.body[0].availableSeats).toBe(50);
+    });
+
+    describe('season-pass seats are not for sale (F6)', () => {
+      const pass = (seatId: string): Partial<SeasonPass> => ({
+        seatId,
+        validFrom: new Date('2020-01-01'),
+        validUntil: new Date('2099-12-31'),
+      });
+
+      it('subtracts the seats of the passes valid for the match, whether or not the holder opened the QR', async () => {
+        // 100 seats, 2 tickets, 3 pass seats valid for the match with no entry ticket yet
+        setData(
+          [makeMatch({ id: UUID_1, capacity: 100 })],
+          [
+            makeTicket(UUID_1, 'seat-1', TicketStatus.PAID),
+            makeTicket(UUID_1, 'seat-2', TicketStatus.PAID),
+          ],
+        );
+        passRepoMock.find.mockResolvedValue([pass('p-1'), pass('p-2'), pass('p-3')]);
+
+        const res = await request(app.getHttpServer()).get('/matches').expect(200);
+        expect(res.body[0].availableSeats).toBe(100 - 2 - 3);
+      });
+
+      it('does not count a pass seat twice once its entry ticket exists', async () => {
+        setData(
+          [makeMatch({ id: UUID_1, capacity: 100 })],
+          [makeTicket(UUID_1, 'p-1', TicketStatus.PAID)], // the holder's entry ticket, on pass seat p-1
+        );
+        passRepoMock.find.mockResolvedValue([pass('p-1'), pass('p-2')]);
+        ticketRepoMock.find.mockResolvedValue([{ matchId: UUID_1, seatId: 'p-1' }]);
+
+        const res = await request(app.getHttpServer()).get('/matches').expect(200);
+        // 1 ticket (p-1) + 1 held-only pass seat (p-2)
+        expect(res.body[0].availableSeats).toBe(100 - 1 - 1);
+      });
+
+      it('leaves a match the passes do not cover (a friendly) untouched', async () => {
+        setData([makeMatch({ id: UUID_1, capacity: 100, isSeasonPassEligible: false })], []);
+        passRepoMock.find.mockResolvedValue([pass('p-1'), pass('p-2')]);
+
+        const res = await request(app.getHttpServer()).get('/matches').expect(200);
+        expect(res.body[0].availableSeats).toBe(100);
+      });
+
+      it('applies to the single match and the upcoming list too', async () => {
+        const m = makeMatch({ id: UUID_1, capacity: 10 });
+        setData([m], []);
+        passRepoMock.find.mockResolvedValue([pass('p-1'), pass('p-2')]);
+
+        const one = await request(app.getHttpServer()).get(`/matches/${UUID_1}`).expect(200);
+        expect(one.body.availableSeats).toBe(8);
+        const up = await request(app.getHttpServer()).get('/matches/upcoming').expect(200);
+        expect(up.body[0].availableSeats).toBe(8);
+      });
+
+      it('a sold-out match (tickets + pass seats fill the capacity) shows 0', async () => {
+        setData(
+          [makeMatch({ id: UUID_1, capacity: 3 })],
+          [
+            makeTicket(UUID_1, 'seat-1', TicketStatus.PAID),
+            makeTicket(UUID_1, 'seat-2', TicketStatus.PAID),
+          ],
+        );
+        passRepoMock.find.mockResolvedValue([pass('p-1')]);
+
+        const res = await request(app.getHttpServer()).get('/matches').expect(200);
+        expect(res.body[0].availableSeats).toBe(0);
+      });
     });
 
     it('should clamp availableSeats to 0 when sold > capacity', async () => {

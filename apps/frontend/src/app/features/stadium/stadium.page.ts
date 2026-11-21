@@ -45,7 +45,7 @@ import { BestSeatsPanelComponent, BestSeatsPlaced } from './components/best-seat
 import { SeatSummaryComponent } from './components/seat-summary/seat-summary.component';
 import { WaitlistJoinButtonComponent } from './components/waitlist-join-button/waitlist-join-button.component';
 import { lockErrorMessage } from '../../shared/utils/lock-error';
-import { hasKickedOff, isAway, isCancelled, purchasableMatches } from '../../shared/utils/match-sale';
+import { hasKickedOff, isAway, isCancelled, isPostponed, purchasableMatches } from '../../shared/utils/match-sale';
 
 @Component({
   selector: 'kte-stadium-page',
@@ -106,7 +106,7 @@ import { hasKickedOff, isAway, isCancelled, purchasableMatches } from '../../sha
         >
           <mat-icon>event_busy</mat-icon>
           <div>
-            <strong>Ez a mérkőzés elmarad.</strong>
+            <strong>{{ called.status === 'postponed' ? 'Ez a mérkőzés el lett halasztva.' : 'Ez a mérkőzés elmarad.' }}</strong>
             <p>
               {{ called.homeTeam }} – {{ called.awayTeam }}: a mérkőzésre nem vásárolható jegy.
               Válassz egy másik mérkőzést a fenti listából.
@@ -138,7 +138,7 @@ import { hasKickedOff, isAway, isCancelled, purchasableMatches } from '../../sha
               <mat-icon>info</mat-icon>
               <div>
                 <strong>Telt ház!</strong>
-                <p>Erre a meccsre minden hely elkelt vagy átmenetileg foglalt. Ha mégis szeretnél jönni, iratkozz fel a várólistára - értesítünk, ha valaki visszamondja a jegyét.</p>
+                <p>Erre a meccsre minden hely elkelt vagy átmenetileg foglalt. Ha mégis szeretnél jönni, iratkozz fel a várólistára - értesítünk, ha hely szabadul fel. A hely ilyenkor nincs lefoglalva neked: aki előbb megveszi, azé lesz.</p>
               </div>
               <kte-waitlist-join-button [matchId]="activeMatch.id" />
             </div>
@@ -416,7 +416,9 @@ export class StadiumPageComponent implements OnInit {
   /** The match a deep link (?matchId=...) points at, when it has already kicked off. */
   protected readonly startedMatch$ = this.selectedMatch$.pipe(
     map((match) =>
-      match && !isAway(match) && !isCancelled(match) && hasKickedOff(match) ? match : null,
+      match && !isAway(match) && !isCancelled(match) && !isPostponed(match) && hasKickedOff(match)
+        ? match
+        : null,
     ),
   );
   /** The match a deep link points at, when it is an away match: no tickets are sold for it. */
@@ -425,7 +427,9 @@ export class StadiumPageComponent implements OnInit {
   );
   /** The match a deep link points at, when it has been called off. */
   protected readonly cancelledMatch$ = this.selectedMatch$.pipe(
-    map((match) => (match && !isAway(match) && isCancelled(match) ? match : null)),
+    map((match) =>
+      match && !isAway(match) && (isCancelled(match) || isPostponed(match)) ? match : null,
+    ),
   );
   protected readonly seats$ = this.store.select(selectSeats);
   protected readonly summaries$ = this.store.select(selectSectorSummary);
@@ -550,7 +554,12 @@ export class StadiumPageComponent implements OnInit {
       await this.onRemoveChosen(seat.id);
       return;
     }
-    if (isAway(this.currentMatch) || isCancelled(this.currentMatch) || hasKickedOff(this.currentMatch)) {
+    if (
+      isAway(this.currentMatch) ||
+      isCancelled(this.currentMatch) ||
+      isPostponed(this.currentMatch) ||
+      hasKickedOff(this.currentMatch)
+    ) {
       this.snackBar.open('Erre a mérkőzésre már nem vásárolható jegy.', 'Bezárás', { duration: 4000 });
       return;
     }

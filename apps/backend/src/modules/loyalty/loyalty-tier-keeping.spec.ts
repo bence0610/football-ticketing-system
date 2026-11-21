@@ -1,6 +1,7 @@
 import { LoyaltyTier } from '../../database/entities';
 import loyaltyConfig from '../../config/loyalty.config';
 import {
+  lastInstantOfSeason,
   seasonEndYear,
   tierAfterAward,
   tierAtSeasonEnd,
@@ -252,5 +253,25 @@ describe('simulation: how long it takes to reach a tier by attending', () => {
     }
     expect(peak).toBeLessThan(1200);
     expect(peak).toBeGreaterThan(1000);
+  });
+});
+
+describe('the season boundary is Budapest time (F16)', () => {
+  it('an instant in the first two hours of 1 July Budapest already belongs to the new season', () => {
+    // 1 July 00:30 CEST = 30 June 22:30 UTC: the UTC reading put it in the old season
+    expect(seasonEndYear(new Date('2027-06-30T22:30:00Z'))).toBe(2028);
+    // 30 June 23:30 CEST = 21:30 UTC: still the old season
+    expect(seasonEndYear(new Date('2027-06-30T21:30:00Z'))).toBe(2027);
+  });
+
+  it('works in winter time too (CET, UTC+1)', () => {
+    expect(seasonEndYear(new Date('2027-01-15T12:00:00Z'))).toBe(2027);
+    expect(seasonEndYear(new Date('2026-12-31T23:30:00Z'))).toBe(2027);
+  });
+
+  it('the last instant of a season is just before 1 July 00:00 Budapest', () => {
+    expect(lastInstantOfSeason(2027).toISOString()).toBe('2027-06-30T21:59:59.999Z');
+    expect(seasonEndYear(lastInstantOfSeason(2027))).toBe(2027);
+    expect(seasonEndYear(new Date(lastInstantOfSeason(2027).getTime() + 1))).toBe(2028);
   });
 });

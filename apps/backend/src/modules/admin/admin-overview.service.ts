@@ -17,7 +17,7 @@ import { isHomeMatch } from '../matches/match-home';
 import { passCoversMatch } from '../season-passes/season-pass-validity';
 import { compareSeats } from '../seats/seat-order';
 import { compareSectors } from '../seats/sector-catalogue.service';
-import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
+import { TAKEN_SEAT_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { passRevenueByTier, sumTiers } from './season-pass-revenue';
 import { countSellableSeats } from './sellable-seats';
 import { OverviewDto, OverviewPeriod, OverviewSeasonDto, SeatSalesDto } from './dto/overview.dto';
@@ -198,7 +198,7 @@ export class AdminOverviewService {
 
     if (matchIds.length > 0) {
       const tickets = await this.ticketRepository.find({
-        where: { matchId: In(matchIds), status: In([...OCCUPYING_TICKET_STATUSES]) },
+        where: { matchId: In(matchIds), status: In([...TAKEN_SEAT_TICKET_STATUSES]) },
         select: ['matchId', 'seatId'],
       });
       const ticketSeatsByMatch = new Map<string, Set<string>>();
@@ -267,7 +267,7 @@ export class AdminOverviewService {
       where: {
         matchId: In(matchIds),
         seatId: In([...passSeats]),
-        status: In([...OCCUPYING_TICKET_STATUSES]),
+        status: In([...TAKEN_SEAT_TICKET_STATUSES]),
       },
       select: ['matchId', 'seatId'],
     });

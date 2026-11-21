@@ -110,6 +110,10 @@ export const envValidationSchema = Joi.object({
   LOAN_INVITATION_TTL_HOURS: Joi.number().integer().min(1).default(72),
   MATCH_FINISH_DELAY_HOURS: Joi.number().integer().min(5).default(6),
 
+  // Gate scan window around kickoff (hours). The close must stay shorter than the match-finish delay.
+  GATE_OPENS_HOURS_BEFORE: Joi.number().min(0).max(1000).default(3),
+  GATE_CLOSES_HOURS_AFTER: Joi.number().min(0).max(1000).default(4),
+
   // Waitlist (Iteration 5)
   WAITLIST_CLAIM_TTL_SECONDS: Joi.number().integer().min(60).default(600),
 

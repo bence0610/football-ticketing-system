@@ -20,6 +20,14 @@ export function isCancelled(match: Partial<Pick<MatchListItem, 'status'>>): bool
 }
 
 /**
+ * "This match has been postponed." Mirrors the server's `match_postponed` refusal: like a cancelled
+ * match it is not offered for sale.
+ */
+export function isPostponed(match: Partial<Pick<MatchListItem, 'status'>>): boolean {
+  return match.status === 'postponed';
+}
+
+/**
  * "This is an away match": the club does not host it, so no ticket is sold for it. Mirrors the
  * server's `match_away` refusal. Only an explicit `isHome: false` counts (the API always sends it).
  */
@@ -27,9 +35,9 @@ export function isAway(match: Partial<Pick<MatchListItem, 'isHome'>>): boolean {
   return match.isHome === false;
 }
 
-/** The matches a visitor may still buy for (home, not started, not cancelled), in the order given. */
+/** The matches a visitor may still buy for (home, not started, not cancelled or postponed), in the order given. */
 export function purchasableMatches<
   T extends Pick<MatchListItem, 'kickoffAt'> & Partial<Pick<MatchListItem, 'status' | 'isHome'>>,
 >(matches: readonly T[], now: number = Date.now()): readonly T[] {
-  return matches.filter((m) => !isAway(m) && !isCancelled(m) && !hasKickedOff(m, now));
+  return matches.filter((m) => !isAway(m) && !isCancelled(m) && !isPostponed(m) && !hasKickedOff(m, now));
 }

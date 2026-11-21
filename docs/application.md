@@ -31,7 +31,8 @@ A bérletes szurkolók egy adott mérkőzésre digitálisan átruházhatják hel
 a bérletből ideiglenes QR-kód generálódik a kiválasztott mérkőzésre,
 az átruházás regisztrált felhasználók között történik, e-mailes visszaigazolással,
 a rendszer automatikusan feloldja az átruházást a mérkőzés után,
-ha az átruházott jegy kiadásra kerül a közösségbe, a Várólistán szereplő szurkolók értesítést kapnak.
+csak olyan mérkőzésre lehet kölcsönözni, amelyre a bérlet érvényes (hazai bajnoki vagy Magyar Kupa-meccs a bérlet időszakán belül) és amely még nem kezdődött el; a meghívó elfogadása is csak a kezdés előtt lehetséges. Olyan meccsre, amelyre a birtokos már belépett, a meghívó még létrehozható, de nem fogadható el.
+Belépés a kapunál csak a mérkőzés körül lehetséges: a kezdés előtt GATE_OPENS_HOURS_BEFORE órával (alapértelmezés 3) nyit, a kezdés után GATE_CLOSES_HOURS_AFTER óráig (alapértelmezés 4) tart. Más napon a beolvasás 'not_today' verdiktet ad, a jegy érintetlen marad, pont nem jár. Elhalasztott vagy elmaradt mérkőzésre jegy nem vehető és belépés sincs.
 
 3.4 Profil- és Jogosultságkezelés
 
@@ -45,7 +46,7 @@ Biztonságos kijelentkezés és session kezelés.
 4. Loyalty (Hűségprogram) Rendszer
 A hűségprogram célja, hogy jutalmazzon minden interakciót, és erősítse a szurkolói elköteleződést.
 Pontszerzési lehetőségek
-EseményPontRészvétel (az első beolvasott belépő egy meccsen: jegy, bérletes belépő vagy kölcsönkapott belépő)+50 pont, meccsenként és személyenként egyszer, akárhány jegy van arra a meccsreBérletvásárlás+500 pont (a bérlet birtokosának fiókjába, nem a vevőnek; birtokos-fiók nélkül senkinek)Jegyvásárlás0 pont (a hűségpont a részvételt jutalmazza, nem a költést)Bérlet kölcsönadása+25 pont (csak ha a kölcsönkapó be is lépett a meccsre; elfogadott, de fel nem használt kölcsönért nem jár)Regisztráció+100 pont (egyszeri)Profil kitöltése+50 pont (egyszeri)
+EseményPontRészvétel (az első beolvasott belépő egy meccsen: jegy, bérletes belépő vagy kölcsönkapott belépő)+50 pont, meccsenként és személyenként egyszer, akárhány jegy van arra a meccsreBérletvásárlás+500 pont (a bérlet birtokosának fiókjába, nem a vevőnek; birtokos-fiók nélkül senkinek)Jegyvásárlás0 pont (a hűségpont a részvételt jutalmazza, nem a költést)Bérlet kölcsönadása+25 pont (csak ha a kölcsönkapó be is lépett a meccsre; a meccs után, a kapu zárását követő óránkénti seprésnél kerül jóváírásra, nem a beolvasáskor; elfogadott, de fel nem használt kölcsönért nem jár)Regisztráció+100 pont (egyszeri)Profil kitöltése+50 pont (egyszeri)
 Szintek és jutalmak
 SzintPonthatárJutalom🟣 Lila Szurkoló0–299 pontAlap hozzáférés⚪ Ezüst Szurkoló300–999 pont5% kedvezmény jegyekre🟡 Arany Szurkoló1000–2499 pont10% kedvezmény, korai jegyelővétel🔴 KTE Legenda2500+ pont15% kedvezmény, VIP előtérhozzáférés, dedikált support
 A szint kedvezménye vevőnként és meccsenként legfeljebb 2 jegyre jár (LOYALTY_DISCOUNT_TICKETS_PER_MATCH), a már megvett jegyeket is beleszámolva; a többi jegy teljes áron vásárolható, a szerver dönti el, melyik jegy kap kedvezményt, és a fizetési oldal mutatja. A pontok és szintek a felhasználó profiljában valós időben frissülnek (a részvételi pont a kapunál a beolvasáskor kerül jóváírásra, a belépést sosem akadályozza), és az évad végén (június 30.) részlegesen (70%) átvihetők a következő szezonba. A szezon közben elért szintet a rendszer a következő szezon végéig megtartja akkor is, ha a pontkonverzió után a pontok a szint határa alá esnek (a szint és az elérésének ideje tárolt adat, nem csak a pontokból számolt).
@@ -77,8 +78,8 @@ Várólistás Rendszer Telt Ház Esetén
 Ha egy mérkőzésre minden jegy elfogy:
 
 a vásárlás gomb átváltozik „Várólistára feliratkozom" gombra,
-felszabaduló helynél (pl. bérletkölcsönzés) a várólistán elsőként álló szurkoló 10 perces időkorláttal értesítést kap e-mailben,
-a 10 perc lejárta után a hely automatikusan a következő várakozónak kerül felajánlásra.
+ha hely szabadul fel, a várólistán elsőként álló szurkoló e-mailben értesítést kap; a várólista csak értesít, a helyet NEM foglalja le: aki előbb megveszi, azé lesz,
+ha az értesített 10 percen belül nem vesz jegyet, a következő várakozónak is szólunk.
 
 Dinamikus Árképzés
 Az alapár a mérkőzés fontosságától, az ellenfél rangsorától és a maradék helyek számától függ. Ha kevesebb mint 15% hely szabad, az árak automatikusan 10–20%-kal emelkednek. Az aktuális ár mindig látható a térképen.

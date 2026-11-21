@@ -518,6 +518,119 @@ describe('PaymentsService', () => {
         expect(mockDataSource.transaction).not.toHaveBeenCalled();
         expect(mockStripe.refunds.create).not.toHaveBeenCalled();
       });
+
+      describe('whole-payment refund (F1, F5)', () => {
+        const dupKey = Object.assign(new Error('Duplicate entry for key uq_tickets_match_seat'), {
+          code: 'ER_DUP_ENTRY',
+        });
+
+        beforeEach(() => {
+          mockRedis.set.mockResolvedValue('OK');
+          mockEmailService.send.mockResolvedValue(undefined);
+          mockUserRepo.findOne.mockResolvedValue({ email: 'a@b.hu', firstName: 'Anna' });
+          mockMatchRepo.findOne.mockResolvedValue({
+            ...match,
+            kickoffAt: new Date(Date.now() + 86_400_000),
+          });
+        });
+
+        it('refunds the whole payment and mails the buyer when another ticket took the seat (no ticket for this payment)', async () => {
+          // the seat looked free, then the insert hit the unique index of ANOTHER payment's ticket
+          mockDataSource.transaction.mockRejectedValue(dupKey);
+          mockTicketRepo.find.mockResolvedValue([]);
+
+          await succeed(intentWith({ discountPercent: '15', paidPrices: '2833,4250' }));
+          jest.runAllTimers();
+          await Promise.resolve();
+          await Promise.resolve();
+
+          expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+            { payment_intent: 'pi_disc' },
+            { idempotencyKey: 'refund_pi_disc' },
+          );
+          expect(mockRedis.set).toHaveBeenCalledWith(
+            'payment-refunded:pi_disc',
+            'taken',
+            'EX',
+            expect.any(Number),
+          );
+          expect(mockEmailService.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+              template: 'seat-refund',
+              context: expect.objectContaining({ wholePayment: true, passSeat: false }),
+            }),
+          );
+        });
+
+        it('does not refund when the duplicate key is this payment finalized concurrently', async () => {
+          mockDataSource.transaction.mockRejectedValue(dupKey);
+          mockTicketRepo.find
+            .mockResolvedValueOnce([])
+            .mockResolvedValue([{ id: 't-winner', userId, stripePaymentIntentId: 'pi_disc' }]);
+
+          await succeed(intentWith({ discountPercent: '15' }));
+
+          expect(mockStripe.refunds.create).not.toHaveBeenCalled();
+        });
+
+        it('issues nothing and refunds the whole payment when a season pass covers a seat for this match', async () => {
+          mockSeatsService.resolveAvailabilityForSeats.mockResolvedValue(
+            new Map([
+              [seatA, SeatAvailability.AVAILABLE],
+              [seatB, SeatAvailability.SEASON_PASS],
+            ]),
+          );
+
+          await succeed(intentWith({ discountPercent: '15', paidPrices: '2833,4250' }));
+          jest.runAllTimers();
+          await Promise.resolve();
+          await Promise.resolve();
+
+          expect(mockDataSource.transaction).not.toHaveBeenCalled();
+          expect(created).toHaveLength(0);
+          expect(mockStripe.refunds.create).toHaveBeenCalledTimes(1);
+          expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+            { payment_intent: 'pi_disc' },
+            { idempotencyKey: 'refund_pi_disc' },
+          );
+          expect(mockEmailService.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+              context: expect.objectContaining({ wholePayment: true, passSeat: true }),
+            }),
+          );
+        });
+
+        it('sends the refund e-mail once even when the event is delivered again', async () => {
+          mockSeatsService.resolveAvailabilityForSeats.mockResolvedValue(
+            new Map([[seatB, SeatAvailability.SEASON_PASS]]),
+          );
+          mockRedis.set.mockResolvedValueOnce('OK').mockResolvedValueOnce('OK');
+          await succeed(intentWith({}));
+          // second delivery: the 'once' key is already there (SET NX answers null)
+          mockRedis.set.mockResolvedValueOnce('OK').mockResolvedValueOnce(null);
+          await succeed(intentWith({}));
+          jest.runAllTimers();
+          await Promise.resolve();
+          await Promise.resolve();
+
+          expect(mockEmailService.send).toHaveBeenCalledTimes(1);
+        });
+
+        it('tells the confirmation page the payment was refunded', async () => {
+          mockRedis.get.mockResolvedValue('taken');
+          mockStripe.paymentIntents.retrieve.mockResolvedValue({
+            id: 'pi_disc',
+            currency: 'huf',
+            metadata: { userId },
+          });
+          mockTicketRepo.find.mockResolvedValue([]);
+
+          const status = await service.getPaymentStatus('pi_disc', userId);
+
+          expect(status.status).toBe('refunded');
+          expect(status.ticketIds).toEqual([]);
+        });
+      });
     });
   });
 });

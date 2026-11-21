@@ -1,4 +1,5 @@
 import { LoyaltyTier } from '../../database/entities';
+import { validityWindow } from '../season-passes/season-pass-validity';
 import { TIER_DEFINITIONS, tierForPoints } from './loyalty.constants';
 
 /**
@@ -15,14 +16,33 @@ import { TIER_DEFINITIONS, tierForPoints } from './loyalty.constants';
  * - Only the season-end conversion can lower a tier, and only when the tier was neither earned
  *   during the season that is ending nor reached in it (see {@link tierAtSeasonEnd}).
  *
- * Seasons run 1 July to 30 June, as the season-end job does.
+ * Seasons run 1 July to 30 June, read in the STADIUM's time (Europe/Budapest), as the passes' validity
+ * window is: a season ends at the first instant of 1 July in Budapest, not at 00:00 UTC.
  */
 export const tierRank = (tier: LoyaltyTier): number =>
   TIER_DEFINITIONS.findIndex((t) => t.tier === tier);
 
-/** The calendar year in which the season that contains `at` ends (the 30 June after it). */
+/** The calendar year and month (1-12) of an instant on the Budapest wall clock. */
+export function budapestYearMonth(at: Date): { year: number; month: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Budapest',
+    year: 'numeric',
+    month: 'numeric',
+  }).formatToParts(at);
+  const get = (type: string): number => Number(parts.find((p) => p.type === type)?.value);
+  return { year: get('year'), month: get('month') };
+}
+
+/** The calendar year in which the season that contains `at` ends (the 30 June after it), in Budapest time. */
 export function seasonEndYear(at: Date): number {
-  return at.getUTCMonth() >= 6 ? at.getUTCFullYear() + 1 : at.getUTCFullYear();
+  const { year, month } = budapestYearMonth(at);
+  return month >= 7 ? year + 1 : year;
+}
+
+/** The last instant of the season that ends on 30 June of `year`: just before 1 July 00:00 in Budapest. */
+export function lastInstantOfSeason(year: number): Date {
+  const day = new Date(Date.UTC(year, 5, 30));
+  return new Date(validityWindow(day, day).endsBefore.getTime() - 1);
 }
 
 /**

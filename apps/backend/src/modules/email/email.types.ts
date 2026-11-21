@@ -105,6 +105,10 @@ export interface SeatRefundContext {
   matchTitle: string;
   matchKickoffLabel: string;
   takenSeatCount: number;
+  /** True when nothing was issued and the whole payment is refunded. */
+  wholePayment?: boolean;
+  /** True when the seat turned out to be a season-pass seat for this match. */
+  passSeat?: boolean;
   refundLabel: string;
 }
 

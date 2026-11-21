@@ -8,7 +8,7 @@ import { Match, Seat, SeasonPass, SeasonPassStatus, Ticket } from '../../databas
 import { isHomeMatch } from '../matches/match-home';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
 import { passCoversMatch } from '../season-passes/season-pass-validity';
-import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
+import { TAKEN_SEAT_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { MatchOccupancyDto, SectorOccupancyDto } from './dto/occupancy.dto';
 import { findSellableSeats } from './sellable-seats';
 
@@ -55,7 +55,7 @@ export class AdminOccupancyService {
     const seats = await findSellableSeats(this.seatRepository);
 
     const tickets = await this.ticketRepository.find({
-      where: { matchId, status: In([...OCCUPYING_TICKET_STATUSES]) },
+      where: { matchId, status: In([...TAKEN_SEAT_TICKET_STATUSES]) },
       select: ['seatId'],
     });
     const soldSeatIds = new Set(tickets.map((t) => t.seatId));

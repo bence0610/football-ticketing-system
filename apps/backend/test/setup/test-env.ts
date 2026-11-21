@@ -41,6 +41,11 @@ export const TEST_ENV: Readonly<Record<string, string>> = Object.freeze({
   BCRYPT_ROUNDS: '10',
 
   // The loyalty rules the suites assert on, pinned so a developer's .env cannot change them.
+  // The e2e fixtures scan tickets of matches up to two weeks ahead: open the gate that early here, and keep it open for three days after kickoff.
+  // (The window itself is tested in scan-window.e2e-spec.ts, with a match beyond it.)
+  GATE_OPENS_HOURS_BEFORE: '720',
+  GATE_CLOSES_HOURS_AFTER: '72',
+
   LOYALTY_REGISTRATION_POINTS: '100',
   LOYALTY_PROFILE_COMPLETION_POINTS: '50',
   LOYALTY_ATTENDANCE_POINTS: '50',

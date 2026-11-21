@@ -798,7 +798,13 @@ export class ProfilePageComponent implements OnInit {
     const before = new Date(pass.coversBefore).getTime();
     return matches.filter((m) => {
       const t = new Date(m.kickoffAt).getTime();
-      return m.isSeasonPassEligible && t > this.now && t < before && m.status !== 'cancelled';
+      return (
+        m.isSeasonPassEligible &&
+        t > this.now &&
+        t < before &&
+        m.status !== 'cancelled' &&
+        m.status !== 'postponed'
+      );
     }).length;
   });
 

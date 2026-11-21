@@ -252,16 +252,16 @@ export class LoyaltyService {
     return out;
   }
 
-  /** Distinct matches for which one of the user's tickets was scanned at the gate. */
+  /**
+   * The matches the user attended: their attendance rows in the ledger, one per match (the row's
+   * reference is `match:<match>:<user>`, unique). NOT their tickets: a pass entry ticket belongs to
+   * the pass BUYER while the attendance is the holder's, and a single ticket may be used by
+   * someone else. This is the number the points were paid for.
+   */
   private async countMatchesAttended(userId: string): Promise<number> {
-    const row = await this.dataSource
-      .getRepository(Ticket)
-      .createQueryBuilder('t')
-      .select('COUNT(DISTINCT t.match_id)', 'count')
-      .where('t.user_id = :userId', { userId })
-      .andWhere('t.scanned_at IS NOT NULL')
-      .getRawOne<{ count: string }>();
-    return Number(row?.count ?? 0);
+    return this.loyaltyRepository.count({
+      where: { userId, source: LoyaltyTransactionSource.ATTENDANCE },
+    });
   }
 
   getTierDefinitions(): readonly TierDefinition[] {

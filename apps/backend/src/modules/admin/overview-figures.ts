@@ -1,5 +1,5 @@
 import { MatchStatus, TicketSource, TicketStatus } from '../../database/entities';
-import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
+import { SOLD_TICKET_STATUSES, TAKEN_SEAT_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { OverviewMatchDto, OverviewMetricsDto } from './dto/overview.dto';
 
 /**
@@ -15,7 +15,8 @@ import { OverviewMatchDto, OverviewMetricsDto } from './dto/overview.dto';
  * `passCoversMatch`). On a friendly or a cup tie the holder has no entry, so the seat is empty
  * and not counted. `validPassSeats` below is already filtered that way.
  */
-const SOLD_STATUSES = [TicketStatus.PAID, TicketStatus.USED];
+// Sold = paid: an EXPIRED ticket (paid, never scanned) is sold too, and is not entered.
+const SOLD_STATUSES = SOLD_TICKET_STATUSES;
 
 export interface FigureMatch {
   id: string;
@@ -105,7 +106,7 @@ export function matchRows(input: RowInput): OverviewMatchDto[] {
         revenue += Number(r.amount);
         if (r.source === TicketSource.SINGLE) ticketCount += n;
       }
-      if (OCCUPYING_TICKET_STATUSES.includes(r.status)) {
+      if (TAKEN_SEAT_TICKET_STATUSES.includes(r.status)) {
         occupyingTickets += n;
       }
       // Pass holders who really came in: a scanned pass or loan entry.

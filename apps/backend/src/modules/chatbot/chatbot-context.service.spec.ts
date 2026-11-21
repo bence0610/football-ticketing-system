@@ -431,4 +431,56 @@ describe('ChatbotContextService', () => {
       expect(snap.rules.maxSeatsPerOrder).toBe(MAX_SEATS_PER_ORDER);
     });
   });
+
+  it('reports the same sold / free figure as the match list: the seats of the valid passes are taken (F6)', async () => {
+    matches[0] = {
+      ...matches[0],
+      isSeasonPassEligible: true,
+      kickoffAt: new Date(Date.now() + 48 * 3_600_000),
+    } as Match;
+    const qb = {
+      select: () => qb,
+      addSelect: () => qb,
+      where: () => qb,
+      andWhere: () => qb,
+      groupBy: () => qb,
+      getRawMany: async () => [{ matchId: 'm-home', soldCount: '2' }],
+    };
+    const passes = [
+      { seatId: 'p1', validFrom: new Date('2020-01-01'), validUntil: new Date('2099-12-31') },
+      { seatId: 'p2', validFrom: new Date('2020-01-01'), validUntil: new Date('2099-12-31') },
+    ];
+    const withPasses = new ChatbotContextService(
+      { find: jest.fn(async () => matches) } as never,
+      {
+        createQueryBuilder: () => qb,
+        find: jest.fn(async () => []),
+        manager: { getRepository: () => ({ find: jest.fn(async () => passes) }) },
+      } as never,
+      redis as never,
+      seatsService,
+      seasonPasses as never,
+      weather as never,
+      {
+        getOrThrow: (key: string) =>
+          key === 'app'
+            ? { homeTeamName: HOME }
+            : key === 'loyalty'
+              ? LOYALTY_CONFIG
+              : key === 'redis'
+                ? { seatLockTtlSeconds: 300 }
+                : key === 'cron'
+                  ? { loanInvitationTtlHours: 72 }
+                  : key === 'waitlist'
+                    ? { claimTtlSeconds: 600 }
+                    : { contextCacheTtlSeconds: 300 },
+      } as unknown as ConfigService,
+    );
+
+    const snapshot = await withPasses.getUpcomingMatchesSnapshot();
+    const home = snapshot.upcomingMatches.find((m) => m.id === 'm-home')!;
+    // capacity 6: 2 tickets + 2 pass seats without an entry ticket
+    expect(home.soldSeats).toBe(4);
+    expect(home.availableSeats).toBe(2);
+  });
 });

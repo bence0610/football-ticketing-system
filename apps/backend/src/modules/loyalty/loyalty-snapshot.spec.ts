@@ -39,7 +39,10 @@ describe('LoyaltyService.getSnapshot', () => {
     };
     const repo = {
       find: jest.fn().mockResolvedValue([]),
-      count: jest.fn().mockResolvedValue(ledgerSize),
+      // the attendance rows of the ledger are what "matches attended" counts; the rest is the ledger size
+      count: jest.fn(async ({ where }: { where: { source?: string } }) =>
+        where.source === 'attendance' ? attended : ledgerSize,
+      ),
     };
     const config = {
       getOrThrow: (key: string) =>
@@ -122,11 +125,19 @@ describe('LoyaltyService.getSnapshot', () => {
     expect(snapshot.pointsToKeepTier).toBeUndefined();
   });
 
-  it('counts only distinct matches with a scanned ticket', async () => {
-    const { service, queryBuilder } = build({ attended: 3 });
-    expect((await service.getSnapshot('u1')).matchesAttended).toBe(3);
-    expect(queryBuilder.select).toHaveBeenCalledWith('COUNT(DISTINCT t.match_id)', 'count');
-    expect(queryBuilder.andWhere).toHaveBeenCalledWith('t.scanned_at IS NOT NULL');
+  it("counts the user's attendance rows in the ledger, not tickets.user_id (F14)", async () => {
+    const { service, repo, queryBuilder } = build({ attended: 3, ledgerSize: 40 });
+    const snapshot = await service.getSnapshot('u1');
+    expect(snapshot.matchesAttended).toBe(3);
+    expect(snapshot.totalTransactions).toBe(40);
+    expect(repo.count).toHaveBeenCalledWith({ where: { userId: 'u1', source: 'attendance' } });
+    // the old ticket-based query is gone: a pass entry belongs to the buyer, the attendance to the holder
+    expect(queryBuilder.getRawOne).not.toHaveBeenCalled();
+  });
+
+  it('a pass holder who is not the buyer has attended the matches their entries earned points for', async () => {
+    const { service } = build({ attended: 2 }); // two attendance rows of the HOLDER's account
+    expect((await service.getSnapshot('u1')).matchesAttended).toBe(2);
   });
 
   it('reports the whole ledger size next to the newest page', async () => {

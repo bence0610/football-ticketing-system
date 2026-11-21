@@ -587,7 +587,9 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       .post(`/api/season-passes/${passId}/loans`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ matchId, borrowerEmail });
-    expect(createResp.status).toBe(201);
+    if (createResp.status !== 201) {
+      throw new Error(`createLoan -> ${createResp.status} ${JSON.stringify(createResp.body)}`);
+    }
     const loanId: string = createResp.body.id as string;
 
     const loanRow = await ctx.dataSource
@@ -646,7 +648,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('scenario 2 — full loan: owner lends, borrower accepts, borrower enters at gate', async () => {
-    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource, { seasonPassEligible: true });
     const owner = await registerFan('loan-owner-2');
     const borrower = await registerFan('loan-borrower-2');
     const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
@@ -727,7 +729,7 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it("scenario 4 — borrower's entry does not free the seat for sale", async () => {
-    const { match, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const { match, seatA } = await seedMinimalFixture(ctx.dataSource, { seasonPassEligible: true });
     const owner = await registerFan('seat-lock-owner-4');
     const borrower = await registerFan('seat-lock-borrower-4');
     const pass = await seedSeasonPass(ctx.dataSource, { userId: owner.userId, seatId: seatA.id });
@@ -895,7 +897,9 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
   });
 
   it('scenario 7 — loan on match A does not affect owner entry on match B', async () => {
-    const { match: matchA, seatA } = await seedMinimalFixture(ctx.dataSource);
+    const { match: matchA, seatA } = await seedMinimalFixture(ctx.dataSource, {
+      seasonPassEligible: true,
+    });
 
     // Create a second match independently
     const matchB = await ctx.dataSource.getRepository(Match).save(
@@ -1014,7 +1018,9 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       .post(`/api/season-passes/${pass.id}/loans`)
       .set('Authorization', `Bearer ${owner.accessToken}`)
       .send({ matchId: match.id, borrowerEmail: borrower.email });
-    expect(createResp.status).toBe(201);
+    if (createResp.status !== 201) {
+      throw new Error(`createLoan -> ${createResp.status} ${JSON.stringify(createResp.body)}`);
+    }
     const loanId: string = createResp.body.id as string;
 
     const loanRow = await ctx.dataSource

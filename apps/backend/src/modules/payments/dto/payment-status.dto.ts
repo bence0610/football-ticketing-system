@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export type PaymentStatusKind = 'issued' | 'processing' | 'failed';
+export type PaymentStatusKind = 'issued' | 'processing' | 'failed' | 'refunded';
 
 export class PaymentStatusSeatDto {
   @ApiProperty() section!: string;
@@ -19,9 +19,9 @@ export class PaymentStatusMatchDto {
 
 export class PaymentStatusResponseDto {
   @ApiProperty({
-    enum: ['issued', 'processing', 'failed'],
+    enum: ['issued', 'processing', 'failed', 'refunded'],
     description:
-      '`issued`: tickets exist. `processing`: Stripe has the payment (or is still working on it) but the tickets are not written yet. `failed`: the payment did not go through.',
+      '`issued`: tickets exist. `processing`: Stripe has the payment (or is still working on it) but the tickets are not written yet. `failed`: the payment did not go through. `refunded`: the payment went through but no ticket could be issued (a seat was taken, or a season pass covers it), so the whole amount was refunded.',
   })
   status!: PaymentStatusKind;
 

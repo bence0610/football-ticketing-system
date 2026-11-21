@@ -29,6 +29,20 @@ export function assertMatchNotCancelled(match: Pick<Match, 'status'>): void {
 }
 
 /**
+ * Throws 409 `match_postponed` when the match has been postponed: like a cancelled one it is neither
+ * sold nor admits anyone (the application never reopens the status; a new date is the club's decision).
+ */
+export function assertMatchNotPostponed(match: Pick<Match, 'status'>): void {
+  if (match.status === MatchStatus.POSTPONED) {
+    throw new ConflictException({
+      statusCode: 409,
+      message: 'Ez a mérkőzés el lett halasztva, ezért jegy nem vásárolható rá.',
+      code: 'match_postponed',
+    });
+  }
+}
+
+/**
  * Throws 409 `match_away` when the club is not the home side. Tickets are sold only for home
  * matches: an away match has no capacity, no prices and no seat map to sell from.
  */
@@ -54,6 +68,7 @@ export function assertMatchOpenForSale(
 ): void {
   assertMatchIsHome(match, homeTeamName);
   assertMatchNotCancelled(match);
+  assertMatchNotPostponed(match);
   assertMatchNotStarted(match, now);
 }
 

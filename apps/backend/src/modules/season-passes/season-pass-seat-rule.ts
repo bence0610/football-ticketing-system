@@ -21,9 +21,10 @@
  * - NO ticket exists for the seat for an UPCOMING match of this season. A pass
  *   holder gets a SEASON_PASS ticket per home match, and
  *   `uq_tickets_match_seat (match_id, seat_id)` lets only one ticket exist per
- *   (match, seat), so a seat already ticketed for a future match would cost the
- *   buyer that match. The check is therefore on the existence of ANY ticket row
- *   (whatever its status: a cancelled/refunded row still holds the unique slot),
+ *   (match, seat) that OCCUPIES it, so a seat already ticketed for a future match
+ *   would cost the buyer that match. The check is therefore on the existence of an
+ *   OCCUPYING ticket (pending payment, paid, used: ticket-occupancy.ts, the same
+ *   statuses the index counts; a cancelled/refunded/expired row leaves the seat free),
  *   for a match that is pass-eligible, not cancelled, kicks off after now and
  *   before the end of the season (the latest `valid_until` of the season's price
  *   rows, last day included). A ticket for a match already played does not
@@ -39,10 +40,11 @@ export const PASS_SEAT_FROM_SQL = 'FROM seats s LEFT JOIN sectors c ON c.code = 
 export const SEAT_TAKEN_BY_PASS_SQL =
   'EXISTS (SELECT 1 FROM season_passes sp WHERE sp.seat_id = s.id AND sp.season_label = ?)';
 
-/** A ticket (any status) exists for the seat for an upcoming match of the season. One `?`: the season label. */
+/** An OCCUPYING ticket (pending payment, paid, used) exists for the seat for an upcoming match of the season. One `?`: the season label. */
 export const SEAT_TICKETED_UPCOMING_SQL =
   'EXISTS (SELECT 1 FROM tickets t JOIN matches m ON m.id = t.match_id ' +
-  "WHERE t.seat_id = s.id AND m.is_season_pass_eligible = 1 AND m.status <> 'cancelled' " +
+  "WHERE t.seat_id = s.id AND t.status IN ('pending_payment','paid','used') " +
+  "AND m.is_season_pass_eligible = 1 AND m.status <> 'cancelled' " +
   'AND m.kickoff_at > NOW() AND m.kickoff_at < (SELECT DATE_ADD(MAX(spp.valid_until), INTERVAL 1 DAY) ' +
   'FROM season_pass_prices spp WHERE spp.season_label = ?))';
 

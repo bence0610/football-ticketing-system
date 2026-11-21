@@ -1,13 +1,13 @@
 {{#> layout preheader=(concat refundLabel " visszatérítés: " matchTitle ", " matchKickoffLabel ".")}}
 {{#> h1}}Visszatérítés folyamatban{{/h1}}
 {{#> p}}Szia <strong>{{recipientName}}</strong>,{{/p}}
-{{#> p}}Sajnáljuk, de {{article matchTitle}} <strong>{{matchTitle}}</strong> mérkőzésen {{takenSeatCount}} széket a fizetési folyamat alatt már elfoglalt egy másik vásárló.{{/p}}
+{{#if passSeat}}{{#> p}}Sajnáljuk, de {{article matchTitle}} <strong>{{matchTitle}}</strong> mérkőzésen a kiválasztott hely közben bérletes hely lett, ezért jegyet nem tudtunk kiállítani. A teljes kifizetett összeget visszatérítjük.{{/p}}{{else if wholePayment}}{{#> p}}Sajnáljuk, de {{article matchTitle}} <strong>{{matchTitle}}</strong> mérkőzésen a kiválasztott helyet a fizetési folyamat alatt már elfoglalta egy másik vásárló, ezért jegyet nem tudtunk kiállítani. A teljes kifizetett összeget visszatérítjük.{{/p}}{{else}}{{#> p}}Sajnáljuk, de {{article matchTitle}} <strong>{{matchTitle}}</strong> mérkőzésen {{takenSeatCount}} széket a fizetési folyamat alatt már elfoglalt egy másik vásárló.{{/p}}{{/if}}
 {{#> details}}
 {{> row label="Mérkőzés" value=matchTitle}}
 {{> row label="Időpont" value=matchKickoffLabel}}
 {{> row label="Elfoglalt székek" value=takenSeatCount}}
 {{> row label="Visszatérítés" value=refundLabel}}
 {{/details}}
-{{#> p}}Az érintett szék(ek) árát automatikusan visszatérítjük az eredeti fizetési módra. A visszatérítés általában 3–5 munkanapon belül megjelenik a számláján.{{/p}}
+{{#> p}}{{#if wholePayment}}A teljes összeget{{else}}Az érintett szék(ek) árát{{/if}} automatikusan visszatérítjük az eredeti fizetési módra. A visszatérítés általában 3–5 munkanapon belül megjelenik a számláján.{{/p}}
 {{#> p muted=true}}Ha kérdésed van, kérjük, lépj kapcsolatba az ügyfélszolgálatunkkal.{{/p}}
 {{/layout}}

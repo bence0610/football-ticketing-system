@@ -126,9 +126,14 @@ function harness(): Harness {
   const passFindOne = jest.fn(async () => null);
   const singleTicket: { value: Partial<Ticket> | null } = { value: null };
   const ticketRepo = {
-    findOne: jest.fn(async ({ where }: { where: { source?: TicketSource } }) =>
-      where.source === TicketSource.SINGLE ? singleTicket.value : null,
-    ),
+    findOne: jest.fn(async ({ where }: { where: { source?: TicketSource; status?: unknown } }) => {
+      if (where.source !== TicketSource.SINGLE || !singleTicket.value) return null;
+      // the service asks for OCCUPYING tickets only (status: In([...])): a void row is not found
+      const wanted = (where.status as { value?: string[] } | undefined)?.value;
+      return !wanted || wanted.includes(singleTicket.value.status as string)
+        ? singleTicket.value
+        : null;
+    }),
     create: (x: unknown) => x,
     save: jest.fn(async (x: unknown) => ({ id: 't-new', ...(x as object) })),
   };
@@ -177,6 +182,7 @@ function harness(): Harness {
     {
       findOne: async () => ({
         id: 'm1',
+        homeTeam: 'KTE FC',
         kickoffAt: new Date(Date.now() + 86400000),
         isSeasonPassEligible: true,
         status: 'on_sale',
@@ -507,14 +513,12 @@ describe('Season pass: the buyer chooses the seat', () => {
       });
     });
 
-    it('a void single ticket still blocks the slot: 409 seat_slot_blocked, the row is not deleted', async () => {
+    it('a void single ticket (refunded) no longer holds the seat: the pass entry is issued', async () => {
       const h = harness();
       h.passFindOne.mockResolvedValue(pass);
       h.singleTicket.value = { id: 't-single', status: TicketStatus.REFUNDED };
-      await expect(h.service.getMatchQr('pass-1', 'm1', 'u1')).rejects.toMatchObject({
-        status: 409,
-        response: { code: 'seat_slot_blocked' },
-      });
+      const qr = await h.service.getMatchQr('pass-1', 'm1', 'u1');
+      expect(qr.ticketId).toBe('t-new');
     });
 
     it('with no single ticket the SEASON_PASS ticket is materialised as before', async () => {

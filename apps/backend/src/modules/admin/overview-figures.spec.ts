@@ -218,3 +218,45 @@ describe('admin overview figures: the pass figure of a match', () => {
     expect(m.passesValid).toBeNull();
   });
 });
+
+describe('expired tickets: the money was received (F4)', () => {
+  // 100 scanned, 20 paid and never scanned then expired by the nightly job: 120 sold in all
+  const tickets = [
+    row('home', TicketSource.SINGLE, 100, 300_000, TicketStatus.USED),
+    row('home', TicketSource.SINGLE, 20, 60_000, TicketStatus.EXPIRED),
+  ];
+
+  it('counts them in revenue and tickets sold', () => {
+    const [m] = matchRows(input([homeMatch('home')], tickets));
+    expect(m.ticketCount).toBe(120);
+    expect(m.revenue).toBe(360_000);
+  });
+
+  it('counts their seats as taken in the occupancy', () => {
+    const [m] = matchRows(input([homeMatch('home')], tickets));
+    // 120 tickets + the 36 pass seats (held, no entry ticket)
+    expect(m.occupiedSeats).toBe(120 + PASS_COUNT);
+  });
+
+  it('counts them as sold but not entered in the redemption', () => {
+    const rows = matchRows(input([homeMatch('home')], tickets));
+    const metrics = overviewMetrics(rows, tickets);
+    expect(metrics.playedTickets).toBe(120);
+    expect(metrics.scannedTickets).toBe(100);
+    expect(metrics.redemptionPercent).toBe(83); // not 100: the 20 no-shows are in the denominator
+    expect(metrics.revenue).toBe(360_000);
+    expect(metrics.ticketsSold).toBe(120);
+  });
+
+  it('gives the same figures before and after the nightly expiry job', () => {
+    const before = [
+      row('home', TicketSource.SINGLE, 100, 300_000, TicketStatus.USED),
+      row('home', TicketSource.SINGLE, 20, 60_000, TicketStatus.PAID),
+    ];
+    const figures = (t: TicketAggregate[]) => {
+      const rows = matchRows(input([homeMatch('home')], t));
+      return { rows, metrics: overviewMetrics(rows, t) };
+    };
+    expect(figures(tickets)).toEqual(figures(before));
+  });
+});

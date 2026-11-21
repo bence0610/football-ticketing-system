@@ -49,7 +49,7 @@ import { EmailService } from '../email/email.service';
 import { matchSubject } from '../email/email-subject';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { isHomeMatch } from '../matches/match-home';
-import { occupiesSeat } from '../tickets/ticket-occupancy';
+import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
 import { QrService } from '../qr/qr.service';
 import { STRIPE_CLIENT } from '../payments/stripe.provider';
 import { aislesAfter, GridSeat, longestRun, sectorWidth } from '../seats/best-seats';
@@ -214,7 +214,10 @@ export class SeasonPassesService {
       this.loadPassesSoldBySector(ACTIVE_SEASON_LABEL),
     ]);
     const now = Date.now();
-    const upcoming = fixtures.filter((m) => m.kickoffAt.getTime() > now);
+    // A postponed match is listed but not counted: nobody can use the pass seat on it until it has a new date.
+    const upcoming = fixtures.filter(
+      (m) => m.kickoffAt.getTime() > now && m.status !== MatchStatus.POSTPONED,
+    );
 
     return prices.map((row) => {
       // The sellable sectors of this tier (the away section is in none).
@@ -1244,23 +1247,7 @@ export class SeasonPassesService {
       throw new NotFoundException('Match not found');
     }
 
-    // A cup tie or a friendly is not covered by the pass: no entry, so no pass ticket to
-    // materialise (its seat is sold like any other: see passCoversMatch).
-    if (!match.isSeasonPassEligible || match.status === MatchStatus.CANCELLED) {
-      throw new BadRequestException({
-        statusCode: 400,
-        message: 'Erre a mérkőzésre a bérlet nem érvényes.',
-        code: 'match_not_pass_eligible',
-      });
-    }
-
-    if (!isWithinValidity(match.kickoffAt, pass.validFrom, pass.validUntil)) {
-      throw new BadRequestException({
-        statusCode: 400,
-        message: 'Ez a mérkőzés nem esik a bérlet érvényességi idejébe.',
-        code: 'match_outside_validity',
-      });
-    }
+    this.assertPassCoversMatch(pass, match);
 
     const ticket = await this.materializeSeasonPassTicket(pass, matchId);
     const result = await this.qrService.generateForTicket(ticket.id, ticket.qrJti);
@@ -1270,6 +1257,38 @@ export class SeasonPassesService {
       token: result.token,
       holderName: pass.holderName,
     };
+  }
+
+  /**
+   * THE coverage check for anything that gives entry on a pass seat: the QR of the holder, a loan
+   * invitation and the acceptance of one. The match must be a home match the pass covers
+   * (eligible, not cancelled or postponed) and kick off inside the pass period; otherwise the
+   * holder has no right of entry to hand out (a friendly's seat is sold like any other; an away
+   * match has no tickets; another season's match is another pass).
+   */
+  private assertPassCoversMatch(
+    pass: Pick<SeasonPass, 'validFrom' | 'validUntil'>,
+    match: Match,
+  ): void {
+    if (
+      !isHomeMatch(match, this.homeTeamName) ||
+      !match.isSeasonPassEligible ||
+      match.status === MatchStatus.CANCELLED ||
+      match.status === MatchStatus.POSTPONED
+    ) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: 'Erre a mérkőzésre a bérlet nem érvényes.',
+        code: 'match_not_pass_eligible',
+      });
+    }
+    if (!isWithinValidity(match.kickoffAt, pass.validFrom, pass.validUntil)) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: 'Ez a mérkőzés nem esik a bérlet érvényességi idejébe.',
+        code: 'match_outside_validity',
+      });
+    }
   }
 
   /**
@@ -1358,15 +1377,10 @@ export class SeasonPassesService {
   /**
    * Season passes are sold without looking at single matches (see
    * season-pass-seat-rule.ts), so a pass seat can already carry a SINGLE
-   * ticket for some match, sold before the pass. `uq_tickets_match_seat
-   * (match_id, seat_id)` ignores status, so that row blocks the pass holder's
-   * SEASON_PASS ticket and any LOAN ticket for that one match:
-   *   - occupying ticket (pending_payment / paid / used): the match was sold to
-   *     someone else first; they keep it. 409 `seat_sold_for_match`.
-   *   - void ticket (cancelled / refunded / expired): nobody else has the
-   *     right, but the dead row still holds the unique slot. We do NOT delete
-   *     it (it is the record of a payment/refund); 409 `seat_slot_blocked`,
-   *     logged as an error for staff to clear.
+   * ticket for some match, sold before the pass. Such a ticket that OCCUPIES the seat
+   * (pending_payment / paid / used) means the match was sold to someone else first: they keep
+   * it, 409 `seat_sold_for_match`. A void ticket (cancelled / refunded / expired) no longer
+   * holds the seat (the unique index counts only occupying tickets), so it does not matter.
    * Every other match of the season is unaffected.
    */
   private async assertNoSingleMatchTicket(
@@ -1376,29 +1390,23 @@ export class SeasonPassesService {
     passId: string,
   ): Promise<void> {
     const single = await manager.getRepository(Ticket).findOne({
-      where: { matchId, seatId, source: TicketSource.SINGLE },
+      where: {
+        matchId,
+        seatId,
+        source: TicketSource.SINGLE,
+        status: In([...OCCUPYING_TICKET_STATUSES]),
+      },
       select: ['id', 'status'],
     });
     if (!single) return;
-    if (occupiesSeat(single.status)) {
-      this.logger.warn(
-        `[season-pass] pass=${passId} match=${matchId} seat=${seatId}: seat sold as single ticket ${single.id} for this match`,
-      );
-      throw new ConflictException({
-        statusCode: 409,
-        message:
-          'Erre a mérkőzésre a helyedet még a bérlet megvásárlása előtt egyedi jegyként eladták, ezért ezen a meccsen nem állítható ki rá belépő. Keresd az ügyfélszolgálatot.',
-        code: 'seat_sold_for_match',
-      });
-    }
-    this.logger.error(
-      `[season-pass] pass=${passId} match=${matchId} seat=${seatId}: void single ticket ${single.id} (${single.status}) blocks uq_tickets_match_seat; manual action required`,
+    this.logger.warn(
+      `[season-pass] pass=${passId} match=${matchId} seat=${seatId}: seat sold as single ticket ${single.id} for this match`,
     );
     throw new ConflictException({
       statusCode: 409,
       message:
-        'Erre a mérkőzésre a helyedhez egy korábbi, érvénytelen jegy tartozik, ezért a belépő most nem állítható ki. Keresd az ügyfélszolgálatot.',
-      code: 'seat_slot_blocked',
+        'Erre a mérkőzésre a helyedet még a bérlet megvásárlása előtt egyedi jegyként eladták, ezért ezen a meccsen nem állítható ki rá belépő. Keresd az ügyfélszolgálatot.',
+      code: 'seat_sold_for_match',
     });
   }
 
@@ -1432,6 +1440,10 @@ export class SeasonPassesService {
     if (match.kickoffAt.getTime() < Date.now()) {
       throw new BadRequestException('Cannot create a loan for a match that has already started');
     }
+    // The pass must cover the match: nothing to lend otherwise (same check as the holder's QR).
+    // Whether the holder has already entered is NOT checked here: such a loan can be created, and
+    // it is refused when the borrower tries to accept it (OWNER_ENTERED).
+    this.assertPassCoversMatch(pass, match);
     // Nothing to lend for a match whose seat went to a single-match ticket.
     if (pass.seatId) {
       await this.assertNoSingleMatchTicket(
@@ -1569,6 +1581,16 @@ export class SeasonPassesService {
       if (!borrower) {
         throw new NotFoundException('Borrower user not found');
       }
+      // An entry cannot be handed over for a match that has started, nor for one the pass does
+      // not (or no longer) cover.
+      if (loan.match!.kickoffAt.getTime() <= Date.now()) {
+        throw new BadRequestException({
+          statusCode: 400,
+          message: 'A mérkőzés már elkezdődött, ezért a meghívó nem fogadható el.',
+          code: 'match_started',
+        });
+      }
+      this.assertPassCoversMatch(loan.seasonPass!, loan.match!);
       if (borrower.email.toLowerCase() !== loan.borrowerEmail.toLowerCase()) {
         throw new ForbiddenException('Invitation was issued to a different email address');
       }

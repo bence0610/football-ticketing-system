@@ -14,7 +14,7 @@ import { AppConfig } from '../../config';
 import { assertMatchIsHome, hasKickedOff } from '../matches/match-sale';
 import { Match, MatchStatus, Ticket, Waitlist, WaitlistStatus } from '../../database/entities';
 import { REDIS_CLIENT, RedisKeys } from '../../redis/redis.constants';
-import { OCCUPYING_TICKET_STATUSES } from '../tickets/ticket-occupancy';
+import { seatsTakenByMatch } from '../matches/match-seats-taken';
 import { JoinWaitlistDto, WaitlistEntryDto } from './dto';
 
 const ACTIVE_WAITLIST_STATUSES: WaitlistStatus[] = [WaitlistStatus.ACTIVE, WaitlistStatus.NOTIFIED];
@@ -66,12 +66,13 @@ export class WaitlistService {
     if (
       match.status === MatchStatus.FINISHED ||
       match.status === MatchStatus.CANCELLED ||
+      match.status === MatchStatus.POSTPONED ||
       hasKickedOff(match)
     ) {
       throw new BadRequestException('A meccs már lezárult, nem lehet várólistára kerülni.');
     }
 
-    const totalActive = await this.getActiveTicketCount(dto.matchId);
+    const totalActive = await this.getActiveTicketCount(match);
     if (match.capacity > 0 && totalActive < match.capacity) {
       throw new BadRequestException('A meccsen még van szabad hely, nincs szükség várólistára.');
     }
@@ -249,12 +250,15 @@ export class WaitlistService {
    * (PENDING_PAYMENT, PAID, USED). USED is included because a scanned ticket
    * means the holder is in the stadium — the seat is not available again.
    */
-  async getActiveTicketCount(matchId: string): Promise<number> {
-    return this.ticketRepository
-      .createQueryBuilder('t')
-      .where('t.matchId = :matchId', { matchId })
-      .andWhere('t.status IN (:...statuses)', { statuses: [...OCCUPYING_TICKET_STATUSES] })
-      .getCount();
+  /**
+   * The seats taken for the match: the same figure the match list shows (tickets plus the seats of
+   * the passes valid for it), so a match is "sold out" for the waitlist exactly when the list says
+   * no seat is left.
+   */
+  async getActiveTicketCount(
+    match: Pick<Match, 'id' | 'kickoffAt' | 'isSeasonPassEligible' | 'status'>,
+  ): Promise<number> {
+    return (await seatsTakenByMatch(this.ticketRepository, [match])).get(match.id) ?? 0;
   }
 
   /**
@@ -270,7 +274,7 @@ export class WaitlistService {
     if (match.capacity <= 0) {
       return true;
     }
-    const active = await this.getActiveTicketCount(matchId);
+    const active = await this.getActiveTicketCount(match);
     return active < match.capacity;
   }
 

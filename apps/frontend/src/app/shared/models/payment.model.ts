@@ -42,7 +42,7 @@ export interface ConfirmPaymentResponse {
   readonly ticketIds: readonly string[];
 }
 
-export type PaymentStatusKind = 'issued' | 'processing' | 'failed';
+export type PaymentStatusKind = 'issued' | 'processing' | 'failed' | 'refunded';
 
 /** GET /payments/:paymentIntentId/status - amount and points come from the server's records. */
 export interface PaymentStatusResponse {

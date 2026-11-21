@@ -32,7 +32,7 @@ describe('TicketsService.scanTicket payloads', () => {
         homeTeam: 'KTE',
         awayTeam: 'Újpest',
         venue: 'Széktói',
-        kickoffAt: new Date('2026-11-09T18:00:00Z'),
+        kickoffAt: new Date(Date.now() + 3_600_000), // in an hour: inside the scan window
       },
       seat: { id: 's1', section: 'B', row: '5', number: 12, category: 'standard' },
     } as unknown as Ticket;

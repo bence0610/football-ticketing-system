@@ -17,6 +17,8 @@ export type VerdictKind =
   | 'expired'
   | 'other_match'
   | 'match_cancelled'
+  | 'match_postponed'
+  | 'not_today'
   | 'offline'
   | 'server'
   | 'denied';
@@ -120,6 +122,38 @@ export function verdictFromResponse(res: TicketScanResponse): Verdict {
         title: 'ELMARADT A MÉRKŐZÉS',
         instruction: 'A jegy valódi, de a mérkőzés elmarad. Nem léphet be. Küldd az ügyfélszolgálati pulthoz.',
       };
+    case 'match_postponed':
+      return {
+        ...common,
+        kind: 'match_postponed',
+        tone: 'bad',
+        glyph: 'event_busy',
+        title: 'ELHALASZTVA',
+        instruction: 'A jegy valódi, de a mérkőzés el lett halasztva. Nem léphet be. Küldd az ügyfélszolgálati pulthoz.',
+      };
+    case 'not_today': {
+      const when = res.match?.kickoffAt
+        ? new Date(res.match.kickoffAt).toLocaleString('hu-HU', {
+            timeZone: 'Europe/Budapest',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : undefined;
+      const which = res.message === 'too_late' ? 'már lejátszott' : 'még nem kezdődő';
+      return {
+        ...common,
+        kind: 'not_today',
+        tone: 'warn',
+        glyph: 'event',
+        title: 'NEM MA SZÓL',
+        instruction:
+          `Ez a jegy egy ${which} mérkőzésre szól` +
+          (common.fixture ? ` (${common.fixture}${when ? `, ${when}` : ''})` : '') +
+          '. Nem léphet be, a jegy érintetlen marad.',
+      };
+    }
     case 'wrong_match':
       return {
         ...common,

@@ -76,8 +76,9 @@ const STATUS_LABEL: Readonly<Record<WaitlistEntry['status'], string>> = {
         @if (entry.status === 'notified') {
           <div class="kte-waitlist-card__notified">
             <p>
-              Felszabadult egy hely - <strong>{{ countdownLabel() }}</strong> alatt
-              tudod megerősíteni a vásárlást.
+              Felszabadult egy hely. A hely <strong>nincs lefoglalva neked</strong>: aki előbb megveszi,
+              azé lesz. Ha <strong>{{ countdownLabel() }}</strong> alatt nem veszel jegyet, a várólista
+              következő tagjának is szólunk.
             </p>
             @if (totalSeconds() > 0 && initialSeconds() > 0) {
               <mat-progress-bar
@@ -99,7 +100,7 @@ const STATUS_LABEL: Readonly<Record<WaitlistEntry['status'], string>> = {
                   Megerősítés…
                 } @else {
                   <mat-icon>check_circle</mat-icon>
-                  Megerősítés és vásárlás
+                  Tovább a jegyvásárláshoz
                 }
               </button>
             </div>
@@ -237,7 +238,7 @@ export class WaitlistCardComponent implements OnInit {
   protected async confirm(): Promise<void> {
     if (this.totalSeconds() <= 0) {
       this.snackBar.open(
-        'A foglalási lehetőség lejárt. Várj az új értesítésre.',
+        'Az értesítési időszak lejárt, a következőnek is szóltunk. Ha van még szabad hely, megveheted.',
         'Bezárás',
         { duration: 5000 },
       );
@@ -248,7 +249,7 @@ export class WaitlistCardComponent implements OnInit {
     try {
       await firstValueFrom(this.api.claim(this.entry.matchId));
       this.snackBar.open(
-        'Megerősítve. Most kiválaszthatod a helyedet a stadiontérképen.',
+        'Válaszd ki a helyedet a stadiontérképen. A hely nincs lefoglalva: aki előbb megveszi, azé.',
         'Jegyvásárlás',
         { duration: 6000 },
       );
