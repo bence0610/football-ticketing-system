@@ -202,6 +202,16 @@ export function buildFixtures(qrDataUrl: string): EmailFixture[] {
       },
     },
     {
+      template: 'email-verification',
+      variant: 'to a new account',
+      subject: 'Erősítsd meg az e-mail-címed - KTE Jegyportál',
+      context: {
+        recipientName: borrower.firstName,
+        verifyUrl: `${BASE_URL}/verify-email/TOKEN-0123456789abcdef`,
+        validForLabel: '48 óra',
+      },
+    },
+    {
       template: 'email-change-requested',
       variant: 'to the current address',
       subject: 'E-mail-cím módosítását kérték - KTE Jegyportál',

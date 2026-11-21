@@ -20,6 +20,7 @@ import {
   Ticket,
   TicketSource,
   TicketStatus,
+  User,
 } from '../src/database/entities';
 import { ChatbotContextService } from '../src/modules/chatbot/chatbot-context.service';
 import { closeTestApp, createTestApp, TestContext } from './helpers/app.helper';
@@ -88,6 +89,11 @@ describe('Purchase → Ticket → Entry (E2E)', () => {
       lastName: name.lastName,
     });
     expect(response.status).toBe(201);
+    // Loans and pass holders need a verified address (F9); these suites are about the flows
+    // themselves, so the fan's address is verified straight away (the link flow has its own suite).
+    await ctx.dataSource
+      .getRepository(User)
+      .update({ id: response.body.user.id }, { emailVerified: true });
     return {
       userId: response.body.user.id,
       email,

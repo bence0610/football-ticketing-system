@@ -39,6 +39,10 @@ function match(over: Partial<Match> = {}): Match {
 
 describe('loans need a match the pass covers', () => {
   const savedLoans: unknown[] = [];
+  let borrowerVerified = true;
+  beforeEach(() => {
+    borrowerVerified = true;
+  });
 
   function service(m: Match, loanRow?: Partial<PassLoan>): SeasonPassesService {
     const lender = { id: 'buyer', email: 'holder@x.hu' };
@@ -61,7 +65,13 @@ describe('loans need a match the pass covers', () => {
         if (entity === PassLoan) return loanRepo;
         if (entity === Ticket) return ticketRepo;
         if (entity === User)
-          return { findOne: async () => ({ id: 'friend', email: 'friend@x.hu' }) };
+          return {
+            findOne: async () => ({
+              id: 'friend',
+              email: 'friend@x.hu',
+              emailVerified: borrowerVerified,
+            }),
+          };
         throw new Error('unexpected repo');
       },
     };
@@ -97,6 +107,7 @@ describe('loans need a match the pass covers', () => {
       {} as never,
       { matchSummary: () => ({}), formatSeat: () => '' } as never,
       {} as never,
+      {} as never, // ActiveSeasonService: not used by the loan checks
     );
   }
 
@@ -147,6 +158,14 @@ describe('loans need a match the pass covers', () => {
       const started = match({ kickoffAt: new Date(Date.now() - 60_000) });
       await expect(accept(started)).rejects.toBeInstanceOf(BadRequestException);
       await expect(accept(started)).rejects.toMatchObject({ response: { code: 'match_started' } });
+    });
+
+    it('refuses an account whose address is not verified, before anything is changed', async () => {
+      borrowerVerified = false;
+      await expect(accept(match())).rejects.toMatchObject({
+        status: 403,
+        response: { code: 'email_not_verified' },
+      });
     });
 
     it('refuses a match the pass does not cover (it stopped being eligible since the invitation)', async () => {

@@ -9,6 +9,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { LoyaltyTransaction, User } from './database/entities';
 import { AdminService } from './modules/admin/admin.service';
 import { AuthService } from './modules/auth/auth.service';
+import { EmailVerificationService } from './modules/auth/email-verification.service';
 import { RefreshTokenStore } from './modules/auth/refresh-token.store';
 
 describe('Module placeholders', () => {
@@ -16,6 +17,7 @@ describe('Module placeholders', () => {
     const ref = await Test.createTestingModule({
       providers: [
         AuthService,
+        { provide: EmailVerificationService, useValue: { sendAtRegistration: jest.fn() } },
         { provide: getRepositoryToken(User), useValue: { manager: { transaction: jest.fn() } } },
         { provide: getRepositoryToken(LoyaltyTransaction), useValue: {} },
         {

@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { apiErrorMessage } from '../../shared/utils/api-error';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -94,6 +95,25 @@ export function untilLabel(kickoffIso: string, now: number): string {
         </div>
       } @else {
         @if (profile(); as user) {
+        @if (!user.emailVerified) {
+          <section class="verify-notice" role="status" data-testid="verify-notice">
+            <div>
+              <strong>Erősítsd meg az e-mail-címed.</strong>
+              Amíg nem teszed, nem látod és nem fogadhatod el a bérletkölcsön-meghívókat, és bérlet
+              birtokosának sem nevezhetnek meg. A megerősítő linket a regisztrációkor küldtük erre a címre:
+              <strong>{{ user.email }}</strong>.
+            </div>
+            <button
+              type="button"
+              mat-stroked-button
+              data-testid="verify-resend"
+              [disabled]="verifySending()"
+              (click)="resendVerification()"
+            >
+              Új levelet kérek
+            </button>
+          </section>
+        }
         <kte-loan-invitation-banner class="invitations" [invitations]="incomingLoans()" />
         <div class="layout">
           <div class="main">
@@ -422,6 +442,24 @@ export function untilLabel(kickoffIso: string, now: number): string {
       .loader--sm { padding: 16px; }
 
       .invitations { margin-bottom: 20px; }
+
+      .verify-notice {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        padding: 14px 18px;
+        border: 1px solid var(--kte-amber, #d98e04);
+        border-radius: 12px;
+        background: var(--kte-amber-bg, #fff6e0);
+        color: var(--kte-text, #14121a);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      @media (max-width: 640px) {
+        .verify-notice { flex-direction: column; align-items: stretch; }
+      }
 
       .layout {
         display: grid;
@@ -809,6 +847,29 @@ export class ProfilePageComponent implements OnInit {
   });
 
   private pollSub: Subscription | null = null;
+
+  protected readonly verifySending = signal(false);
+
+  /** Asks for a fresh verification link (the earlier ones stop working). */
+  protected resendVerification(): void {
+    if (this.verifySending()) return;
+    this.verifySending.set(true);
+    this.api.resendVerification().subscribe({
+      next: (res) => {
+        this.verifySending.set(false);
+        if (res.alreadyVerified) {
+          this.profile.update((p) => (p ? { ...p, emailVerified: true } : p));
+        }
+        this.snack.open(res.message, 'Bezárás', { duration: 5000 });
+      },
+      error: (err: unknown) => {
+        this.verifySending.set(false);
+        this.snack.open(apiErrorMessage(err) ?? 'Nem sikerült elküldeni a levelet. Próbáld újra.', 'Bezárás', {
+          duration: 6000,
+        });
+      },
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     try {

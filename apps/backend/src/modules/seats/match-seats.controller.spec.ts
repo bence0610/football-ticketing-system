@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MatchSeatsController } from './match-seats.controller';
@@ -19,7 +19,10 @@ import {
 } from '../../database/entities';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
 import { ConfigService } from '@nestjs/config';
-import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RateLimitGuard } from '../../common/rate-limit/rate-limit.guard';
+import { seatLimitReached } from '../../redis/seat-lock.service';
+import { MAX_SEATS_PER_ORDER } from '../payments/dto/create-payment-intent.dto';
 
 // Bootstrapping a Nest TestingModule + supertest server per test can exceed
 // the 5 s default on slower CI hosts; bump the timeout for this suite only.
@@ -215,7 +218,7 @@ describe('MatchSeatsController – integration', () => {
             release: seatLockRelease,
             isLocked: seatLockIsLocked,
             getRemainingTtl: seatLockGetRemainingTtl,
-            extend: seatLockExtend,
+            extendWithinLimit: seatLockExtend,
           },
         },
         {
@@ -228,7 +231,14 @@ describe('MatchSeatsController – integration', () => {
         },
       ],
     })
-      .overrideGuard(OptionalJwtAuthGuard)
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          context.switchToHttp().getRequest().user = { id: 'user-1' };
+          return true;
+        },
+      })
+      .overrideGuard(RateLimitGuard)
       .useValue({ canActivate: () => true })
       .compile();
 
@@ -265,7 +275,7 @@ describe('MatchSeatsController – integration', () => {
     seatLockRelease.mockResolvedValue(true);
     seatLockIsLocked.mockResolvedValue(false);
     seatLockGetRemainingTtl.mockResolvedValue(300);
-    seatLockExtend.mockResolvedValue(true);
+    seatLockExtend.mockResolvedValue('extended');
   });
 
   /**
@@ -766,6 +776,29 @@ describe('MatchSeatsController – integration', () => {
       );
     });
 
+    it('locks for the signed-in user and caps what one user may hold at MAX_SEATS_PER_ORDER', async () => {
+      setData(makeMatch(), [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], []);
+
+      await request(app.getHttpServer())
+        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
+        .expect(201);
+
+      expect(seatLockAcquire).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1', maxHeldSeats: MAX_SEATS_PER_ORDER }),
+      );
+    });
+
+    it('answers 409 seat_limit_reached when the lock service says the user holds too many', async () => {
+      setData(makeMatch(), [makeSeat(SEAT_ID_FREE, 'A', '1', 1)], []);
+      seatLockAcquire.mockRejectedValue(seatLimitReached(MAX_SEATS_PER_ORDER));
+
+      const res = await request(app.getHttpServer())
+        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock`)
+        .expect(409);
+
+      expect(res.body.code).toBe('seat_limit_reached');
+    });
+
     it('should return 409 when trying to lock a sold seat', async () => {
       const tickets = [makeTicket(MATCH_ID, SEAT_ID_SOLD, TicketStatus.PAID)];
       setData(makeMatch(), [makeSeat(SEAT_ID_SOLD, 'A', '1', 2)], tickets);
@@ -916,6 +949,26 @@ describe('MatchSeatsController – integration', () => {
         .expect(200);
 
       expect(res.body.ttlSeconds).toBe(300);
+    });
+
+    it('answers 409 hold_limit_reached when the hold is already at the maximum', async () => {
+      setData(makeMatch());
+      seatLockExtend.mockResolvedValue('at_limit');
+
+      const res = await request(app.getHttpServer())
+        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock/extend?ownerToken=${OWNER_TOKEN}`)
+        .expect(409);
+
+      expect(res.body.code).toBe('hold_limit_reached');
+    });
+
+    it('answers 409 when the lock has lapsed or is somebody else’s', async () => {
+      setData(makeMatch());
+      seatLockExtend.mockResolvedValue('lost');
+
+      await request(app.getHttpServer())
+        .post(`/matches/${MATCH_ID}/seats/${SEAT_ID_FREE}/lock/extend?ownerToken=${OWNER_TOKEN}`)
+        .expect(409);
     });
   });
 });

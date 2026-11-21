@@ -15,6 +15,7 @@ import {
   UserRole,
 } from '../../database/entities';
 import { AuthResponseDto, AuthUserDto, LoginDto, RegisterDto } from './dto';
+import { EmailVerificationService } from './email-verification.service';
 import { RefreshTokenStore } from './refresh-token.store';
 import { JwtPayload } from './strategies/jwt.strategy';
 
@@ -36,6 +37,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly refreshStore: RefreshTokenStore,
+    private readonly emailVerification: EmailVerificationService,
   ) {
     this.jwtConfig = this.configService.getOrThrow<JwtConfig>('jwt');
     this.accessTtlSeconds = parseDurationToSeconds(this.jwtConfig.accessExpiresIn);
@@ -80,6 +82,9 @@ export class AuthService {
     });
 
     this.logger.log(`Registered user ${user.id} (${user.email})`);
+    // Proof that the address is theirs: the link in this mail verifies it. Best effort (a failed
+    // mail is logged; the person can ask for another from the profile page).
+    this.emailVerification.sendAtRegistration(user);
     return this.issueSession(user);
   }
 
@@ -152,6 +157,7 @@ export class AuthService {
       role: user.role,
       loyaltyTier: user.loyaltyTier,
       loyaltyPoints: user.loyaltyPoints,
+      emailVerified: user.emailVerified,
     };
   }
 

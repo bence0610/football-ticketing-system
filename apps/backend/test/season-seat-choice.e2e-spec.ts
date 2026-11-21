@@ -89,6 +89,10 @@ describe('Season-pass seat choice (E2E)', () => {
       .post('/api/auth/register')
       .send({ email, password: PASSWORD, firstName: name.firstName, lastName: name.lastName });
     expect(res.status).toBe(201);
+    // A pass holder named by e-mail must have a verified address (F9); the link flow has its own suite.
+    await ctx.dataSource
+      .getRepository(User)
+      .update({ id: res.body.user.id }, { emailVerified: true });
     return { userId: res.body.user.id, email, accessToken: res.body.accessToken };
   }
 

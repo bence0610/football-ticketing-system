@@ -11,3 +11,4 @@ export * from './loyalty-transaction.entity';
 export * from './waitlist.entity';
 export * from './password-reset-token.entity';
 export * from './email-change-token.entity';
+export * from './email-verification-token.entity';

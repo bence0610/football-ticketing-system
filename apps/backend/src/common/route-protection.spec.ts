@@ -6,6 +6,7 @@ import { RequestMethod, type Type } from '@nestjs/common';
 import { UserRole } from '../database/entities';
 import { AdminController } from '../modules/admin/admin.controller';
 import { AuthController } from '../modules/auth/auth.controller';
+import { EmailVerificationController } from '../modules/auth/email-verification.controller';
 import { PasswordResetController } from '../modules/auth/password-reset.controller';
 import { ROLES_KEY } from '../modules/auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
@@ -43,6 +44,7 @@ const CONTROLLERS: Type<unknown>[] = [
   AdminController,
   AuthController,
   PasswordResetController,
+  EmailVerificationController,
   ChatbotController,
   HealthController,
   LoyaltyController,
@@ -71,6 +73,8 @@ const PUBLIC_ROUTES: Record<string, string> = {
     'sets the new password; authorised by the secret one-time token from the email',
   'POST auth/confirm-email-change':
     'confirms a new e-mail address from that mailbox, possibly in another browser; authorised by the secret one-time token from the email, rate limited per IP',
+  'POST auth/verify-email/confirm':
+    'verifies a new account address from that mailbox, possibly in another browser; authorised by the secret one-time token from the email, rate limited per IP',
   'POST chatbot/message':
     'guests may chat; OptionalJwtAuthGuard binds the conversation to the identity',
   'GET health': 'liveness probe, returns only up/down',
@@ -79,11 +83,8 @@ const PUBLIC_ROUTES: Record<string, string> = {
   'GET matches/upcoming': 'public fixture list',
   'GET matches/:id': 'public fixture detail',
   'GET matches/:matchId/seats': 'public seat map (free/sold only, no buyer data)',
-  'POST matches/:matchId/seats/:seatId/lock': 'guest carts; proves ownership with ownerToken',
-  'POST matches/:matchId/seats/:seatId/lock/extend': 'guest carts; requires the ownerToken',
-  'DELETE matches/:matchId/seats/:seatId/lock': 'guest carts; releases only with the ownerToken',
-  'POST matches/:matchId/seats/best':
-    'guest carts like the single-seat lock; it only locks, and the ownerToken it returns is the proof of ownership',
+  'DELETE matches/:matchId/seats/:seatId/lock':
+    'releases only with the ownerToken (the lock itself needs a signed-in user)',
   'GET seats': 'static seat catalogue',
   'POST webhooks/stripe': 'authenticated by the Stripe signature, not a JWT',
   'GET season-passes/prices': 'public price list',

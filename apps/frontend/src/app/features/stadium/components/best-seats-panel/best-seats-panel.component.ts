@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../../../../core/auth/auth.service';
 import { CartFacade } from '../../../../core/cart/cart.facade';
+import { SIGN_IN_TO_LOCK_MESSAGE, lockErrorMessage } from '../../../../shared/utils/lock-error';
 import { MAX_CART_ITEMS } from '../../../../shared/models/cart.model';
 import { BestSeatsRefusal, BestSeatsResponse, SeatStatus } from '../../../../shared/models/seat.model';
 import { SeatsApiService } from '../../../../shared/services/seats.api.service';
@@ -213,6 +215,7 @@ type Outcome =
 export class BestSeatsPanelComponent {
   private readonly api = inject(SeatsApiService);
   private readonly cart = inject(CartFacade);
+  private readonly auth = inject(AuthService);
 
   protected readonly max = MAX_CART_ITEMS;
   @Input({ required: true }) section!: string;
@@ -242,6 +245,10 @@ export class BestSeatsPanelComponent {
     if (this.working()) return;
     const count = Math.min(this.count(), this.limit());
     if (count < 1) return;
+    if (!this.auth.isAuthenticated()) {
+      this.outcome.set({ kind: 'error', message: SIGN_IN_TO_LOCK_MESSAGE });
+      return;
+    }
     this.working.set(true);
     try {
       const response = await firstValueFrom(
@@ -263,6 +270,18 @@ export class BestSeatsPanelComponent {
   }
 
   private explain(error: unknown, count: number): Outcome {
+    if (error instanceof HttpErrorResponse && error.status === 401) {
+      return { kind: 'error', message: SIGN_IN_TO_LOCK_MESSAGE };
+    }
+    if (
+      error instanceof HttpErrorResponse &&
+      (error.status === 429 ||
+        (error.status === 409 &&
+          ['seat_limit_reached', 'hold_limit_reached'].includes(error.error?.code)))
+    ) {
+      // The server's own words: too many seats held, or too many requests.
+      return { kind: 'error', message: lockErrorMessage(error) };
+    }
     if (error instanceof HttpErrorResponse && error.status === 409 && error.error?.code) {
       return { kind: 'refused', refusal: error.error as BestSeatsRefusal, count };
     }

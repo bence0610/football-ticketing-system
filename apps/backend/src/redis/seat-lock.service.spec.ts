@@ -40,22 +40,20 @@ class InMemoryRedisMock {
     return entry.ttl;
   }
 
-  async eval(
-    _script: string,
-    _numKeys: number,
-    key: string,
-    expectedValue: string,
-    newTtl?: string,
-  ): Promise<number> {
-    const entry = this.store.get(key);
-    if (!entry || entry.value !== expectedValue) return 0;
-
-    if (newTtl !== undefined) {
-      // EXTEND_LOCK_LUA path — update ttl
-      this.store.set(key, { value: entry.value, ttl: parseInt(newTtl, 10) });
+  async eval(script: string, _numKeys: number, ...args: string[]): Promise<number> {
+    if (script.includes('PEXPIRE')) {
+      // EXTEND_LOCK_LUA: KEYS = lock, anchor; ARGV = token, ttl s, max hold s, now ms. The maximum
+      // hold itself is exercised against a real Redis (test/seat-hold-limits.e2e-spec.ts).
+      const [key, , token, ttl] = args;
+      const entry = this.store.get(key);
+      if (!entry || entry.value !== token) return -1;
+      this.store.set(key, { value: entry.value, ttl: parseInt(ttl, 10) });
       return 1;
     }
-    // RELEASE_LOCK_LUA path — delete
+    // RELEASE_LOCK_LUA: delete when the value matches
+    const [key, expectedValue] = args;
+    const entry = this.store.get(key);
+    if (!entry || entry.value !== expectedValue) return 0;
     this.store.delete(key);
     return 1;
   }

@@ -5,6 +5,8 @@ import {
   AuthResponse,
   ChangePasswordPayload,
   EmailChangeConfirmed,
+  EmailVerified,
+  VerificationResent,
   EmailChangePayload,
   EmailChangeRequested,
   LoginPayload,
@@ -113,6 +115,18 @@ export class AuthApiService {
       ...WITH_CREDENTIALS,
       context: FORM_CONTEXT,
     });
+  }
+
+  /** Public: the link mailed at registration works in any browser, signed in or not. */
+  verifyEmail(token: string): Observable<EmailVerified> {
+    return this.http.post<EmailVerified>('/auth/verify-email/confirm', { token }, {
+      context: FORM_CONTEXT,
+    });
+  }
+
+  /** Signed in: a fresh verification link (the earlier ones stop working). */
+  resendVerification(): Observable<VerificationResent> {
+    return this.http.post<VerificationResent>('/auth/verify-email/resend', {}, WITH_CREDENTIALS);
   }
 
   /** Public: the emailed link works in any browser, signed in or not. */

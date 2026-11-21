@@ -207,6 +207,7 @@ function harness(): Harness {
     { award } as never,
     { formatSeat: () => 'x' } as never,
     holds as never,
+    { label: async () => '2026/2027', current: async () => null } as never, // ActiveSeasonService
   );
   return {
     service,

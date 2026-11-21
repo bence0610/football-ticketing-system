@@ -139,7 +139,7 @@ describe('ChatbotContextService', () => {
           : key === 'loyalty'
             ? LOYALTY_CONFIG
             : key === 'redis'
-              ? { seatLockTtlSeconds: 300 }
+              ? { seatLockTtlSeconds: 300, seatLockMaxHoldSeconds: 1200 }
               : key === 'cron'
                 ? { loanInvitationTtlHours: 72 }
                 : key === 'waitlist'
@@ -375,6 +375,7 @@ describe('ChatbotContextService', () => {
       const { rules } = await service.getUpcomingMatchesSnapshot();
       expect(rules).toEqual({
         seatHoldMinutes: 5,
+        seatMaxHoldMinutes: 20,
         maxSeatsPerOrder: MAX_SEATS_PER_ORDER,
         loanInvitationTtlHours: 72,
         waitlistClaimMinutes: 10,
@@ -468,7 +469,7 @@ describe('ChatbotContextService', () => {
             : key === 'loyalty'
               ? LOYALTY_CONFIG
               : key === 'redis'
-                ? { seatLockTtlSeconds: 300 }
+                ? { seatLockTtlSeconds: 300, seatLockMaxHoldSeconds: 1200 }
                 : key === 'cron'
                   ? { loanInvitationTtlHours: 72 }
                   : key === 'waitlist'

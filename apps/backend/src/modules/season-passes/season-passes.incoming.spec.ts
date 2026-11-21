@@ -34,6 +34,7 @@ describe('SeasonPassesService.listIncomingLoans', () => {
       {} as never,
       {} as never,
       {} as never, // SeasonPassHoldService: not used here
+      {} as never, // ActiveSeasonService: not used here
     );
   }
 
@@ -48,7 +49,7 @@ describe('SeasonPassesService.listIncomingLoans', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    findUser.mockResolvedValue({ id: 'u1', email: 'Friend@Test.hu' });
+    findUser.mockResolvedValue({ id: 'u1', email: 'Friend@Test.hu', emailVerified: true });
   });
 
   it('asks for pending, unexpired invitations by email (lower-cased) or by account', async () => {
@@ -63,6 +64,13 @@ describe('SeasonPassesService.listIncomingLoans', () => {
     expect(where[0]['borrowerEmail']).toBe('friend@test.hu');
     expect(where[1]['borrowerUserId']).toBe('u1');
     expect(find.mock.calls[0][0].order).toEqual({ expiresAt: 'ASC' });
+  });
+
+  it('shows nothing to an account whose address is not verified (not even a lookup)', async () => {
+    findUser.mockResolvedValue({ id: 'u1', email: 'Friend@Test.hu', emailVerified: false });
+    find.mockResolvedValue([loan('tok-1')]);
+    expect(await service().listIncomingLoans('u1')).toEqual([]);
+    expect(find).not.toHaveBeenCalled();
   });
 
   it('returns what the banner shows: lender, fixture, seat, deadline and the link token', async () => {

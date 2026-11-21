@@ -44,6 +44,8 @@ export const envValidationSchema = Joi.object({
 
   // Seat lock
   SEAT_LOCK_TTL_SECONDS: Joi.number().integer().min(30).default(300),
+  // The longest a seat stays held from its first lock, however often it is extended (20 minutes)
+  SEAT_LOCK_MAX_HOLD_SECONDS: Joi.number().integer().min(60).default(1200),
   // Season-pass seat hold while the buyer pays (3DS can take minutes)
   SEASON_PASS_HOLD_TTL_SECONDS: Joi.number().integer().min(60).default(900),
 
@@ -53,6 +55,8 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().min(16).required(),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
   PASSWORD_RESET_TTL_MINUTES: Joi.number().integer().min(5).max(1440).default(60),
+  // How long the e-mail verification link sent at registration stays valid
+  EMAIL_VERIFICATION_TTL_HOURS: Joi.number().integer().min(1).max(168).default(48),
   EMAIL_CHANGE_TTL_MINUTES: Joi.number().integer().min(5).max(1440).default(60),
   SUPPORT_EMAIL: Joi.string().email().default('jegy@kte.hu'),
 

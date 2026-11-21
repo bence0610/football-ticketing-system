@@ -29,8 +29,11 @@ describe('PaymentsService', () => {
   const mockSeatRepo = { find: jest.fn() };
   const mockRedis = {
     del: jest.fn(),
-    set: jest.fn(),
+    // the per-buyer discount lock (SET NX PX) is granted; its release is a compare-and-delete eval
+    set: jest.fn().mockResolvedValue('OK'),
+    eval: jest.fn().mockResolvedValue(1),
     get: jest.fn(),
+    hget: jest.fn().mockResolvedValue(null),
     hgetall: jest.fn().mockResolvedValue({}),
     hset: jest.fn(),
     hdel: jest.fn().mockResolvedValue(1),

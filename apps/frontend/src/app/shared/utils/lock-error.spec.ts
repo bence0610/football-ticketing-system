@@ -1,6 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { NETWORK_ERROR_MESSAGE } from './api-error';
-import { SEAT_TAKEN_MESSAGE, isSeatTaken, lockErrorMessage } from './lock-error';
+import {
+  SEAT_TAKEN_MESSAGE,
+  SIGN_IN_TO_LOCK_MESSAGE,
+  isSeatTaken,
+  lockErrorMessage,
+} from './lock-error';
 
 describe('lockErrorMessage', () => {
   const http = (status: number, body?: unknown) => new HttpErrorResponse({ status, error: body });
@@ -21,5 +26,24 @@ describe('lockErrorMessage', () => {
     expect(lockErrorMessage(new Error('Egy kosárba legfeljebb 6 jegy vehető fel.'))).toBe(
       'Egy kosárba legfeljebb 6 jegy vehető fel.',
     );
+  });
+
+  it('asks a guest to sign in (the server refuses an unauthenticated lock with 401)', () => {
+    expect(lockErrorMessage(http(401, { message: 'Unauthorized' }))).toBe(SIGN_IN_TO_LOCK_MESSAGE);
+    expect(SIGN_IN_TO_LOCK_MESSAGE).toContain('jelentkezz be');
+  });
+
+  it('gives the server wording, not "seat taken", when the buyer holds too many seats or a hold is at its maximum', () => {
+    for (const code of ['seat_limit_reached', 'hold_limit_reached']) {
+      const e = http(409, { code, message: 'A szerver szövege.' });
+      expect(isSeatTaken(e)).toBeFalse();
+      expect(lockErrorMessage(e)).toBe('A szerver szövege.');
+    }
+  });
+
+  it('gives the server wording for a rate-limited request (429)', () => {
+    expect(
+      lockErrorMessage(http(429, { code: 'rate_limited', message: 'Túl sok kérés érkezett.' })),
+    ).toBe('Túl sok kérés érkezett.');
   });
 });

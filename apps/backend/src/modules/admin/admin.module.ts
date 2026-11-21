@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Match, Seat, SeasonPass, SeasonPassPrice, Sector, Ticket } from '../../database/entities';
 import { AuthModule } from '../auth/auth.module';
 import { MatchesModule } from '../matches/matches.module';
+import { SeasonPassesModule } from '../season-passes/season-passes.module';
 import { AdminController } from './admin.controller';
 import { AdminOccupancyService } from './admin-occupancy.service';
 import { AdminOverviewService } from './admin-overview.service';
@@ -14,6 +15,7 @@ import { AdminService } from './admin.service';
     TypeOrmModule.forFeature([Match, Seat, SeasonPass, SeasonPassPrice, Sector, Ticket]),
     AuthModule,
     MatchesModule,
+    SeasonPassesModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, AdminRevenueService, AdminOccupancyService, AdminOverviewService],

@@ -75,3 +75,57 @@ describe('ProfilePageComponent (account links)', () => {
     expect(nav.compareDocumentPosition(logout) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+describe('ProfilePageComponent (e-mail verification notice)', () => {
+  async function open(profile: UserProfile, resend = () => of({ message: 'Új megerősítő levelet küldtünk.', alreadyVerified: false })) {
+    const api = { me: () => of(profile), resendVerification: jasmine.createSpy('resend').and.callFake(resend) };
+    await TestBed.configureTestingModule({
+      imports: [ProfilePageComponent],
+      providers: [
+        provideRouter([]),
+        provideNoopAnimations(),
+        { provide: AuthApiService, useValue: api },
+        { provide: AuthService, useValue: { logout: () => of(undefined) } },
+        { provide: TicketsService, useValue: { listMine: () => of([]) } },
+        {
+          provide: SeasonPassesService,
+          useValue: { listMine: () => of([]), listIncomingLoans: () => of([]) },
+        },
+        { provide: LoyaltyService, useValue: { getSnapshot: () => of(null) } },
+        { provide: MatchesService, useValue: { listUpcoming: () => of([]) } },
+        { provide: WaitlistApiService, useValue: { listMine: () => of([]) } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(ProfilePageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return { fixture, api, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('says which address is unverified, what that costs, and offers a new link', async () => {
+    const { el, api, fixture } = await open({ ...PROFILE, emailVerified: false });
+    const notice = el.querySelector<HTMLElement>('[data-testid="verify-notice"]')!;
+    expect(notice).not.toBeNull();
+    expect(notice.textContent).toContain('bela@kte.hu');
+    expect(notice.textContent).toContain('bérletkölcsön-meghívókat');
+    el.querySelector<HTMLButtonElement>('[data-testid="verify-resend"]')!.click();
+    await fixture.whenStable();
+    expect(api.resendVerification).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows nothing for a verified address', async () => {
+    const { el } = await open({ ...PROFILE, emailVerified: true });
+    expect(el.querySelector('[data-testid="verify-notice"]')).toBeNull();
+  });
+
+  it('drops the notice when the server says the address is already verified', async () => {
+    const { el, fixture } = await open({ ...PROFILE, emailVerified: false }, () =>
+      of({ message: 'Már meg van erősítve.', alreadyVerified: true }),
+    );
+    el.querySelector<HTMLButtonElement>('[data-testid="verify-resend"]')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="verify-notice"]')).toBeNull();
+  });
+});

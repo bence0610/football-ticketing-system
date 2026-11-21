@@ -7,11 +7,11 @@ import {
   MatchStatus,
   Seat,
   SeasonPass,
-  SeasonPassPrice,
   SeasonPassStatus,
   Sector,
   Ticket,
 } from '../../database/entities';
+import { ActiveSeasonService } from '../season-passes/active-season.service';
 import { AppConfig } from '../../config';
 import { isHomeMatch } from '../matches/match-home';
 import { passCoversMatch } from '../season-passes/season-pass-validity';
@@ -52,8 +52,7 @@ export class AdminOverviewService {
     @InjectRepository(Seat) private readonly seatRepository: Repository<Seat>,
     @InjectRepository(Ticket) private readonly ticketRepository: Repository<Ticket>,
     @InjectRepository(SeasonPass) private readonly passRepository: Repository<SeasonPass>,
-    @InjectRepository(SeasonPassPrice)
-    private readonly priceRepository: Repository<SeasonPassPrice>,
+    private readonly activeSeason: ActiveSeasonService,
     @InjectRepository(Sector) private readonly sectorRepository: Repository<Sector>,
     configService: ConfigService,
   ) {
@@ -66,15 +65,15 @@ export class AdminOverviewService {
     return isHomeMatch(match, this.homeTeamName);
   }
 
-  /** The active season, from the price list the pass purchase uses. */
+  /** The active season: the one the pass page sells and the purchase uses (one rule). */
   async currentSeason(): Promise<Season | null> {
-    const rows = await this.priceRepository.find({ where: { isActive: true } });
-    if (rows.length === 0) return null;
-    const row = rows.reduce((a, b) => (b.validUntil > a.validUntil ? b : a));
-    const from = new Date(row.validFrom);
-    const until = new Date(row.validUntil);
+    // The same rule as the public pass page and the purchase (ActiveSeasonService): one definition.
+    const active = await this.activeSeason.current();
+    if (!active) return null;
+    const from = new Date(active.validFrom);
+    const until = new Date(active.validUntil);
     return {
-      label: row.seasonLabel,
+      label: active.label,
       validFrom: dateOnly(from),
       validUntil: dateOnly(until),
       from,

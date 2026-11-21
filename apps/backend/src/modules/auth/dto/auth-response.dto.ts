@@ -22,6 +22,12 @@ export class AuthUserDto {
 
   @ApiProperty({ example: 100 })
   loyaltyPoints!: number;
+
+  @ApiProperty({
+    description:
+      'Az e-mail-cím meg van-e erősítve. Megerősítés nélkül a fiók nem lát és nem fogad el bérletkölcsön-meghívót, és nem nevezhető meg bérlet birtokosaként.',
+  })
+  emailVerified!: boolean;
 }
 
 export class AuthResponseDto {

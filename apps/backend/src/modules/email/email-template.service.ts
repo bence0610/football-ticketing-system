@@ -43,6 +43,7 @@ export class EmailTemplateService implements OnModuleInit {
     'email-change-confirm': 'email-change-confirm.hbs',
     'email-change-requested': 'email-change-requested.hbs',
     'email-changed': 'email-changed.hbs',
+    'email-verification': 'email-verification.hbs',
   };
 
   async onModuleInit(): Promise<void> {

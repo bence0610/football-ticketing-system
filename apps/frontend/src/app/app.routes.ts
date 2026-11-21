@@ -86,6 +86,13 @@ export const APP_ROUTES: Routes = [
         title: 'Új jelszó beállítása',
       },
       {
+        // Public like reset-password: the link mailed at registration may be opened in any browser.
+        path: 'verify-email/:token',
+        loadComponent: () =>
+          import('./features/auth/verify-email.page').then((m) => m.VerifyEmailPageComponent),
+        title: 'E-mail-cím megerősítése',
+      },
+      {
         // Public like reset-password: the link mailed to the new address may be opened
         // in any browser, signed in (to any account) or not.
         path: 'confirm-email/:token',

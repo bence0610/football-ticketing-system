@@ -107,14 +107,11 @@ describe('the admin overview', () => {
           })),
       } as any,
       {
-        find: async () => [
-          {
-            seasonLabel: '2026/2027',
-            validFrom: new Date('2026-07-01'),
-            validUntil: new Date('2027-06-30'),
-            isActive: true,
-          },
-        ],
+        current: async () => ({
+          label: '2026/2027',
+          validFrom: new Date('2026-07-01'),
+          validUntil: new Date('2027-06-30'),
+        }),
       } as any,
       {} as any,
       config,
@@ -169,7 +166,7 @@ describe('the seat heatmap', () => {
       { find: async () => [] } as any,
       { find: async () => [] } as any,
       { find: async () => [] } as any,
-      { find: async () => [] } as any,
+      { current: async () => null } as any,
       { find: async () => [] } as any,
       config,
     );

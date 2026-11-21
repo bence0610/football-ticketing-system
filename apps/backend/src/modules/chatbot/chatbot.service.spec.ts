@@ -30,6 +30,7 @@ const SNAPSHOT: ChatbotContextSnapshot = {
   },
   rules: {
     seatHoldMinutes: 5,
+    seatMaxHoldMinutes: 20,
     maxSeatsPerOrder: 6,
     loanInvitationTtlHours: 72,
     waitlistClaimMinutes: 10,

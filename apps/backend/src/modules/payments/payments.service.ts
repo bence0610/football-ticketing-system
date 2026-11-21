@@ -7,6 +7,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -49,6 +50,10 @@ import {
 } from './dto';
 import { PaymentStatusResponseDto } from './dto/payment-status.dto';
 import { STRIPE_CLIENT } from './stripe.provider';
+
+/** How long one payment may hold the per-buyer discount lock, and how long another waits for it. */
+const DISCOUNT_MUTEX_HOLD_MS = 10_000;
+const DISCOUNT_MUTEX_WAIT_MS = 8_000;
 
 function isDuplicateKeyError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -122,17 +127,37 @@ export class PaymentsService {
     // bought for it (and the discounted tickets of payments still open): the rest is full price.
     const ownerTokenDigest = this.digestOf(dto);
     const discountLimit = this.loyaltyConfig.discountTicketLimit;
-    const placesLeft =
-      discountPercent > 0
-        ? await this.discountedPlacesLeft(userId, dto.matchId, ownerTokenDigest, discountLimit)
-        : 0;
-    const allocation = allocateLimitedDiscount(
-      lines.map((line) => line.price),
-      discountPercent,
-      placesLeft,
+    // Count the places left AND reserve this payment's share in one critical section per
+    // (buyer, match). Counting first and reserving after the payment exists let two payments
+    // opened at the same moment both read "none used", both be discounted, and exceed the limit.
+    // The reservation is taken BEFORE Stripe is called and given back if that fails.
+    const { allocation, previousReservation } = await this.withDiscountMutex(
+      userId,
+      dto.matchId,
+      async () => {
+        const placesLeft =
+          discountPercent > 0
+            ? await this.discountedPlacesLeft(userId, dto.matchId, ownerTokenDigest, discountLimit)
+            : 0;
+        const allocated = allocateLimitedDiscount(
+          lines.map((line) => line.price),
+          discountPercent,
+          placesLeft,
+        );
+        const previous = await this.reserveDiscountedPlaces(
+          userId,
+          dto.matchId,
+          ownerTokenDigest,
+          allocated.discounted.filter(Boolean).length,
+        );
+        return { allocation: allocated, previousReservation: previous };
+      },
     );
+    const giveBackReservation = (): Promise<void> =>
+      this.restoreDiscountedPlaces(userId, dto.matchId, ownerTokenDigest, previousReservation);
     const totalAmount = allocation.total;
     if (totalAmount <= 0) {
+      await giveBackReservation();
       throw new BadRequestException('Érvénytelen összeg.');
     }
 
@@ -152,36 +177,42 @@ export class PaymentsService {
       `Creating PaymentIntent amount=${stripeAmount} currency=${this.currency} user=${userId} match=${dto.matchId}`,
     );
 
-    const intent = await this.stripe.paymentIntents.create(
-      {
-        amount: stripeAmount,
-        currency: this.currency,
-        automatic_payment_methods: { enabled: true },
-        metadata: {
-          userId,
-          matchId: dto.matchId,
-          seatIds: dto.seats.map((s) => s.seatId).join(','),
-          ownerTokens: dto.seats.map((s) => s.ownerToken).join(','),
-          discountPercent: String(discountPercent),
-          // The per-seat amounts actually charged, in seatIds order. Finalization
-          // records exactly these, so a price change between payment creation and
-          // confirmation can never make the ticket disagree with the charge.
-          paidPrices: allocation.discounts.join(','),
-          discountedCount: String(discountedCount),
-          discountDigest: ownerTokenDigest,
+    let intent: Stripe.PaymentIntent;
+    try {
+      intent = await this.stripe.paymentIntents.create(
+        {
+          amount: stripeAmount,
+          currency: this.currency,
+          automatic_payment_methods: { enabled: true },
+          metadata: {
+            userId,
+            matchId: dto.matchId,
+            seatIds: dto.seats.map((s) => s.seatId).join(','),
+            ownerTokens: dto.seats.map((s) => s.ownerToken).join(','),
+            discountPercent: String(discountPercent),
+            // The per-seat amounts actually charged, in seatIds order. Finalization
+            // records exactly these, so a price change between payment creation and
+            // confirmation can never make the ticket disagree with the charge.
+            paidPrices: allocation.discounts.join(','),
+            discountedCount: String(discountedCount),
+            discountDigest: ownerTokenDigest,
+          },
+          description: `KTE Jegyportál — ${match.homeTeam} vs ${match.awayTeam}`,
         },
-        description: `KTE Jegyportál — ${match.homeTeam} vs ${match.awayTeam}`,
-      },
-      { idempotencyKey },
-    );
-
-    if (!intent.client_secret) {
-      throw new ConflictException('A fizetési szándék nem hozott létre client_secret-et.');
+        { idempotencyKey },
+      );
+    } catch (error) {
+      // No payment exists: the discounted places reserved for it are free again.
+      await giveBackReservation();
+      throw error;
     }
 
-    // Reserve the discounted places of this open payment, so a second payment opened before this
-    // one is paid cannot use them again. Released when the tickets exist (finalization).
-    await this.reserveDiscountedPlaces(userId, dto.matchId, ownerTokenDigest, discountedCount);
+    if (!intent.client_secret) {
+      await giveBackReservation();
+      throw new ConflictException('A fizetési szándék nem hozott létre client_secret-et.');
+    }
+    // The discounted places of this open payment stay reserved (taken above, before Stripe was
+    // called) until the tickets exist (finalization) or the reservation lapses.
 
     const lineItems: PaymentIntentSeatLineDto[] = lines.map(({ seat, price }, i) => ({
       seatId: seat.id,
@@ -254,24 +285,99 @@ export class PaymentsService {
     return Math.max(0, limit - bought - inFlight);
   }
 
+  /** Reserves the places (or clears this payment's entry for 0) and returns what the entry held before. */
   private async reserveDiscountedPlaces(
     userId: string,
     matchId: string,
     digest: string,
     count: number,
-  ): Promise<void> {
+  ): Promise<string | null> {
     const key = RedisKeys.discountInFlight(matchId, userId);
     try {
+      const previous = await this.redis.hget(key, digest);
       if (count > 0) {
         await this.redis.hset(key, digest, String(count));
         await this.redis.expire(key, 3600);
       } else {
         await this.redis.hdel(key, digest);
       }
+      return previous;
     } catch (error) {
       this.logger.warn(
         `Could not reserve discounted places: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return null;
+    }
+  }
+
+  /** Puts this payment's reservation back to what it was before it was taken. */
+  private async restoreDiscountedPlaces(
+    userId: string,
+    matchId: string,
+    digest: string,
+    previous: string | null,
+  ): Promise<void> {
+    const key = RedisKeys.discountInFlight(matchId, userId);
+    try {
+      if (previous !== null && Number(previous) > 0) {
+        await this.redis.hset(key, digest, previous);
+      } else {
+        await this.redis.hdel(key, digest);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not release discounted places: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Runs `work` as the only one for this (buyer, match): a Redis lock (`SET NX PX`, released by
+   * compare-and-delete) so that counting and reserving the discounted places cannot interleave
+   * with another payment of the same buyer. The lock lapses on its own after a few seconds if the
+   * process dies. If it cannot be had within the wait, the buyer is asked to try again rather
+   * than risk the limit.
+   */
+  private async withDiscountMutex<T>(
+    userId: string,
+    matchId: string,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    const key = RedisKeys.discountMutex(matchId, userId);
+    const token = randomUUID();
+    const deadline = Date.now() + DISCOUNT_MUTEX_WAIT_MS;
+    let acquired = false;
+    for (;;) {
+      try {
+        acquired = (await this.redis.set(key, token, 'PX', DISCOUNT_MUTEX_HOLD_MS, 'NX')) === 'OK';
+      } catch (error) {
+        // Redis is down: the reservation could not be kept either way; carry on as before.
+        this.logger.warn(
+          `Discount lock unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return work();
+      }
+      if (acquired) break;
+      if (Date.now() >= deadline) {
+        throw new ServiceUnavailableException({
+          statusCode: 503,
+          message: 'Egy másik fizetésed még folyamatban van. Próbáld újra egy pillanat múlva.',
+          code: 'payment_busy',
+        });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    try {
+      return await work();
+    } finally {
+      await this.redis
+        .eval(
+          "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
+          1,
+          key,
+          token,
+        )
+        .catch(() => undefined);
     }
   }
 

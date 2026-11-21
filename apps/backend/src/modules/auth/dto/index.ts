@@ -7,3 +7,4 @@ export * from './request-password-reset.dto';
 export * from './reset-password.dto';
 export * from './change-password.dto';
 export * from './confirm-email-change.dto';
+export * from './email-verification.dto';

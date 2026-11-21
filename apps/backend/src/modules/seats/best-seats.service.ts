@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SeatLockService } from '../../redis/seat-lock.service';
+import { MAX_SEATS_PER_ORDER } from '../payments/dto/create-payment-intent.dto';
 import { bestSplit, findRuns, groupRows, GridSeat, rankWindows, Window } from './best-seats';
 import { BestSeatsResponseDto, SeatAvailability, SeatRunDto } from './dto';
 import { SeatsService } from './seats.service';
@@ -85,7 +86,7 @@ export class BestSeatsService {
       const locked = await this.seatLockService.acquireFirstFreeGroup(
         matchId,
         candidates.map((group) => group.flatMap((w) => w.seats.map((s) => s.id))),
-        { userId },
+        { userId, maxHeldSeats: MAX_SEATS_PER_ORDER },
       );
       if (!locked) {
         this.logger.debug(

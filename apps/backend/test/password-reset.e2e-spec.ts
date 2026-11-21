@@ -102,7 +102,8 @@ describe('Password reset', () => {
       expect(res.status).toBe(other.status);
       expect(res.body).toEqual(other.body);
       await new Promise((r) => setTimeout(r, 200));
-      expect(ctx.sentEmails).toHaveLength(0);
+      // (registration itself mails a verification link; only the reset mails are in question)
+      expect(ctx.sentEmails.filter((m) => m.template === 'password-reset')).toHaveLength(0);
     });
 
     it('stores only a hash of the token, never the token', async () => {
@@ -155,7 +156,9 @@ describe('Password reset', () => {
       expect(new Set(bodies.map((b) => JSON.stringify(b))).size).toBe(1);
       await emailedToken(fan.email, 3);
       await new Promise((r) => setTimeout(r, 300));
-      expect(ctx.sentEmails.filter((m) => m.to === fan.email)).toHaveLength(3);
+      expect(
+        ctx.sentEmails.filter((m) => m.template === 'password-reset' && m.to === fan.email),
+      ).toHaveLength(3);
 
       // per client address: the 11th request in the hour is refused
       await ctx.redis.flushdb();

@@ -44,7 +44,8 @@ import { ColorLegendComponent } from './components/color-legend/color-legend.com
 import { BestSeatsPanelComponent, BestSeatsPlaced } from './components/best-seats-panel/best-seats-panel.component';
 import { SeatSummaryComponent } from './components/seat-summary/seat-summary.component';
 import { WaitlistJoinButtonComponent } from './components/waitlist-join-button/waitlist-join-button.component';
-import { lockErrorMessage } from '../../shared/utils/lock-error';
+import { AuthService } from '../../core/auth/auth.service';
+import { SIGN_IN_TO_LOCK_MESSAGE, lockErrorMessage } from '../../shared/utils/lock-error';
 import { hasKickedOff, isAway, isCancelled, isPostponed, purchasableMatches } from '../../shared/utils/match-sale';
 
 @Component({
@@ -402,6 +403,7 @@ export class StadiumPageComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
   private readonly cart = inject(CartFacade);
+  private readonly auth = inject(AuthService);
 
   /**
    * Only the matches still to be played: a match that has kicked off is not
@@ -565,6 +567,17 @@ export class StadiumPageComponent implements OnInit {
     }
     if (this.cart.isFull()) {
       this.snackBar.open('Egy kosárba legfeljebb 6 jegy vehető fel.', 'Bezárás', { duration: 4000 });
+      return;
+    }
+    // Holding a seat needs an account (the server refuses a guest): ask to sign in instead of
+    // letting the tap fail.
+    if (!this.auth.isAuthenticated()) {
+      this.snackBar
+        .open(SIGN_IN_TO_LOCK_MESSAGE, 'Bejelentkezés', { duration: 8000 })
+        .onAction()
+        .subscribe(() => {
+          void this.router.navigate(['/login'], { queryParams: { returnUrl: this.router.url } });
+        });
       return;
     }
     this.markBusy(seat.id, true);

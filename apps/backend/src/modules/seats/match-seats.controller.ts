@@ -22,9 +22,13 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RateLimit, RateLimitGuard } from '../../common/rate-limit/rate-limit.guard';
+import { MAX_SEATS_PER_ORDER } from '../payments/dto/create-payment-intent.dto';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import { SeatsService } from './seats.service';
@@ -61,8 +65,11 @@ export class MatchSeatsController {
   }
 
   @Post('best')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ scope: 'seats:best', limit: 20, windowSeconds: 60, by: 'user' })
   @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Helyfoglaláshoz bejelentkezés szükséges.' })
+  @ApiTooManyRequestsResponse({ description: 'rate_limited' })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'A legjobb egymás melletti szabad székek megkeresése és zárolása',
@@ -76,25 +83,28 @@ export class MatchSeatsController {
   findBestSeats(
     @Param('matchId', new ParseUUIDPipe()) matchId: string,
     @Body() body: BestSeatsRequestDto,
-    @CurrentUser() user: AuthenticatedUser | undefined,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<BestSeatsResponseDto> {
     return this.bestSeatsService.findAndLock({
       matchId,
       section: body.section,
       count: body.count,
       allowSplit: body.allowSplit ?? false,
-      userId: user?.id,
+      userId: user.id,
     });
   }
 
   @Post(':seatId/lock')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ scope: 'seats:lock', limit: 30, windowSeconds: 60, by: 'user' })
   @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Helyfoglaláshoz bejelentkezés szükséges.' })
+  @ApiTooManyRequestsResponse({ description: 'rate_limited' })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Szék zárolása vásárláshoz',
     description:
-      'Atomi `SET NX EX` művelettel zárolja a széket Redis-ben (alapértelmezett TTL 300 mp). Sikeres zárolás esetén egy ownerToken-t kap a hívó. Bejelentkezett és vendég felhasználó is használhatja: ha JWT érkezik, a `userId` a lock metaadatába kerül.',
+      'Bejelentkezés szükséges. Atomi művelettel zárolja a széket Redis-ben (alapértelmezett TTL 300 mp), és egy ownerToken-t ad a hívónak. Egy felhasználó egy mérkőzésre egyszerre legfeljebb 6 helyet tarthat lefoglalva (409 `seat_limit_reached`). Felhasználónként 30 hívás / perc.',
   })
   @ApiOkResponse({ type: LockSeatResponseDto })
   @ApiConflictResponse({
@@ -103,7 +113,7 @@ export class MatchSeatsController {
   async lockSeat(
     @Param('matchId', new ParseUUIDPipe()) matchId: string,
     @Param('seatId', new ParseUUIDPipe()) seatId: string,
-    @CurrentUser() user: AuthenticatedUser | undefined,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<LockSeatResponseDto> {
     // A match that has kicked off cannot be bought, whatever the client showed.
     await this.seatsService.assertMatchOpenForSale(matchId);
@@ -130,7 +140,8 @@ export class MatchSeatsController {
     const lock = await this.seatLockService.acquire({
       matchId,
       seatId,
-      userId: user?.id,
+      userId: user.id,
+      maxHeldSeats: MAX_SEATS_PER_ORDER,
     });
     if (!lock) {
       throw new ConflictException(
@@ -148,13 +159,16 @@ export class MatchSeatsController {
   }
 
   @Post(':seatId/lock/extend')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ scope: 'seats:extend', limit: 20, windowSeconds: 60, by: 'user' })
   @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Bejelentkezés szükséges.' })
+  @ApiTooManyRequestsResponse({ description: 'rate_limited' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Szék zárolásának meghosszabbítása',
     description:
-      'A meglévő TTL-t újraindítja a beállított foglalási időre (SEAT_LOCK_TTL_SECONDS), ha az ownerToken egyezik. A hossz szerveroldali beállítás, a kliens nem adhat meg sajátot. Fizetési hiba utáni retry forgatókönyvhöz használjuk.',
+      'Bejelentkezés szükséges. A meglévő TTL-t újraindítja a beállított foglalási időre (SEAT_LOCK_TTL_SECONDS), ha az ownerToken egyezik, de a teljes tartás az első zárolástól számítva sem lehet hosszabb, mint SEAT_LOCK_MAX_HOLD_SECONDS (alapértelmezés 20 perc): ha már elérte, 409 `hold_limit_reached`. A hossz szerveroldali beállítás, a kliens nem adhat meg sajátot. Felhasználónként 20 hívás / perc.',
   })
   @ApiOkResponse({ type: LockSeatResponseDto })
   async extendLock(
@@ -166,9 +180,18 @@ export class MatchSeatsController {
       throw new NotFoundException('ownerToken query paraméter kötelező.');
     }
     // The hold length is the configured one (SeatLockService default); never client-chosen.
-    const ok = await this.seatLockService.extend(matchId, seatId, ownerToken);
-    if (!ok) {
+    const outcome = await this.seatLockService.extendWithinLimit(matchId, seatId, ownerToken);
+    if (outcome === 'lost') {
       throw new ConflictException('A zárolás már lejárt vagy másé.');
+    }
+    if (outcome === 'at_limit') {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'hold_limit_reached',
+        message:
+          'A foglalás elérte a legnagyobb tartási időt, tovább nem hosszabbítható. Fizess most, vagy válassz újra helyet.',
+      });
     }
     const remaining = await this.seatLockService.getRemainingTtl(matchId, seatId);
     const expiresAt = new Date(Date.now() + Math.max(remaining, 0) * 1000).toISOString();

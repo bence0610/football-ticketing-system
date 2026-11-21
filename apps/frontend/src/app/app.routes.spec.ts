@@ -34,11 +34,20 @@ describe('APP_ROUTES (account pages)', () => {
     expect(loaded.name).toBe('ConfirmEmailPageComponent');
   });
 
+  it('verify-email/:token is lazy and public (no guard): the link may be opened in any browser', async () => {
+    const route = shellRoute('verify-email/:token');
+    expect(route).toBeDefined();
+    expect(route!.canActivate).toBeUndefined();
+    expect(route!.title).toBe('E-mail-cím megerősítése');
+    const loaded = (await route!.loadComponent!()) as { name: string };
+    expect(loaded.name).toBe('VerifyEmailPageComponent');
+  });
+
   it('the account pages come before the wildcard', () => {
     const shell = APP_ROUTES.find((r) => r.path === '' && r.children)!;
     const paths = shell.children!.map((r) => r.path);
     const wildcard = paths.indexOf('**');
-    for (const p of ['profile/details', 'profile/password', 'confirm-email/:token']) {
+    for (const p of ['profile/details', 'profile/password', 'confirm-email/:token', 'verify-email/:token']) {
       expect(paths.indexOf(p)).toBeGreaterThan(-1);
       expect(paths.indexOf(p)).toBeLessThan(wildcard);
     }

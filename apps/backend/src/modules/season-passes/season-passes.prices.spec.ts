@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { SeasonPassesService } from './season-passes.service';
 import { STRIPE_CLIENT } from '../payments/stripe.provider';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
+import { ActiveSeasonService } from './active-season.service';
 import { SeasonPassHoldService } from '../../redis/season-pass-hold.service';
 import { EmailService } from '../email/email.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
@@ -68,6 +69,7 @@ describe('SeasonPassesService – price list and season overview', () => {
         { provide: STRIPE_CLIENT, useValue: {} },
         { provide: REDIS_CLIENT, useValue: {} },
         { provide: EmailService, useValue: {} },
+        { provide: ActiveSeasonService, useValue: { label: async () => '2026/2027' } },
         { provide: SeasonPassHoldService, useValue: holds },
         { provide: LoyaltyService, useValue: {} },
         { provide: QrService, useValue: {} },

@@ -9,6 +9,8 @@ export interface AuthUser {
   readonly role: UserRole;
   readonly loyaltyTier: LoyaltyTier;
   readonly loyaltyPoints: number;
+  /** Undefined for sessions stored before verification existed: treated as verified. */
+  readonly emailVerified?: boolean;
 }
 
 export interface AuthResponse {
@@ -76,6 +78,16 @@ export interface EmailChangeRequested {
 }
 
 /** 200 of POST /auth/confirm-email-change. */
+export interface EmailVerified {
+  readonly message: string;
+  readonly email: string;
+}
+
+export interface VerificationResent {
+  readonly message: string;
+  readonly alreadyVerified: boolean;
+}
+
 export interface EmailChangeConfirmed {
   readonly message: string;
   readonly email: string;

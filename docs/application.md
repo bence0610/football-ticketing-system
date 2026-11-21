@@ -39,7 +39,7 @@ Belépés a kapunál csak a mérkőzés körül lehetséges: a kezdés előtt GA
 E-mailes regisztráció és bejelentkezés (JWT alapú, opcionális 2FA),
 Saját profil: aktív jegyek, bérletek, vásárlási előzmények,
 Loyalty pontegyenleg és szint megtekintése,
-Fiókműveletek: profiladatok (név, telefonszám, születési dátum) módosítása, jelszócsere bejelentkezve (a jelenlegi jelszóval), e-mail-cím módosítása az új címre küldött link megerősítésével (a cím csak a megerősítés után változik),
+Fiókműveletek: profiladatok (név, telefonszám, születési dátum) módosítása, jelszócsere bejelentkezve (a jelenlegi jelszóval), e-mail-cím módosítása az új címre küldött link megerősítésével (a cím csak a megerősítés után változik); a regisztrációkor megadott cím megerősítése a levélben kapott linkkel (megerősítés nélkül a fiók nem lát és nem fogad el bérletkölcsön-meghívót, és nem nevezhető meg bérlet birtokosaként),
 Biztonságos kijelentkezés és session kezelés.
 
 

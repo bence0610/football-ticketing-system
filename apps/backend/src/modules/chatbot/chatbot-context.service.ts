@@ -94,6 +94,8 @@ export interface ChatbotSeasonPassSnapshot {
  */
 export interface ChatbotRulesSnapshot {
   seatHoldMinutes: number;
+  /** The longest a seat stays held from its first lock, however often the hold is extended. */
+  seatMaxHoldMinutes: number;
   maxSeatsPerOrder: number;
   loanInvitationTtlHours: number;
   waitlistClaimMinutes: number;
@@ -157,6 +159,9 @@ export class ChatbotContextService {
     this.rules = {
       seatHoldMinutes: Math.round(
         configService.getOrThrow<RedisConfig>('redis').seatLockTtlSeconds / 60,
+      ),
+      seatMaxHoldMinutes: Math.round(
+        configService.getOrThrow<RedisConfig>('redis').seatLockMaxHoldSeconds / 60,
       ),
       maxSeatsPerOrder: MAX_SEATS_PER_ORDER,
       loanInvitationTtlHours: configService.getOrThrow<CronConfig>('cron').loanInvitationTtlHours,

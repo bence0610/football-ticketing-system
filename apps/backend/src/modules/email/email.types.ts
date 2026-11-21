@@ -15,7 +15,8 @@ export type EmailTemplateName =
   | 'password-changed'
   | 'email-change-confirm'
   | 'email-change-requested'
-  | 'email-changed';
+  | 'email-changed'
+  | 'email-verification';
 
 export interface TicketConfirmationContext {
   recipientName: string;
@@ -158,6 +159,14 @@ export interface EmailChangedContext {
   supportEmail: string;
 }
 
+/** Sent to a new account's address: the link that proves it is theirs. */
+export interface EmailVerificationContext {
+  recipientName: string;
+  verifyUrl: string;
+  /** "2 nap" / "48 óra". */
+  validForLabel: string;
+}
+
 export type EmailContextMap = {
   'ticket-confirmation': TicketConfirmationContext;
   'loan-invitation': LoanInvitationContext;
@@ -171,6 +180,7 @@ export type EmailContextMap = {
   'email-change-confirm': EmailChangeConfirmContext;
   'email-change-requested': EmailChangeRequestedContext;
   'email-changed': EmailChangedContext;
+  'email-verification': EmailVerificationContext;
 };
 
 export interface SendEmailRequest<T extends EmailTemplateName = EmailTemplateName> {

@@ -4,6 +4,7 @@ import { Match, PassLoan, SeasonPass, SeasonPassPrice, User } from '../../databa
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { stripeProvider } from '../payments/stripe.provider';
 import { TicketsModule } from '../tickets/tickets.module';
+import { ActiveSeasonService } from './active-season.service';
 import { SeasonPassesController } from './season-passes.controller';
 import { SeasonPassesService } from './season-passes.service';
 import { LoanReleaseJob } from './jobs/loan-release.job';
@@ -15,7 +16,7 @@ import { LoanReleaseJob } from './jobs/loan-release.job';
     TicketsModule,
   ],
   controllers: [SeasonPassesController],
-  providers: [SeasonPassesService, LoanReleaseJob, stripeProvider],
-  exports: [SeasonPassesService],
+  providers: [SeasonPassesService, ActiveSeasonService, LoanReleaseJob, stripeProvider],
+  exports: [SeasonPassesService, ActiveSeasonService],
 })
 export class SeasonPassesModule {}

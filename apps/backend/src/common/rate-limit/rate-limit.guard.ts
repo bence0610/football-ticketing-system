@@ -15,11 +15,16 @@ export interface RateLimitOptions {
   scope: string;
   limit: number;
   windowSeconds: number;
+  /**
+   * What the budget is per. Default `ip`. `user` keys on the signed-in account (the route must sit
+   * behind a JWT guard that runs first) and falls back to the address when there is none.
+   */
+  by?: 'ip' | 'user';
 }
 
 const RATE_LIMIT_KEY = 'kte:rate-limit';
 
-/** Limits a route per client address: `@RateLimit({ scope, limit, windowSeconds })`. */
+/** Limits a route per client address (or per signed-in user, `by: 'user'`): `@RateLimit({ scope, limit, windowSeconds })`. */
 export const RateLimit = (options: RateLimitOptions): MethodDecorator & ClassDecorator =>
   SetMetadata(RATE_LIMIT_KEY, options);
 
@@ -45,9 +50,11 @@ export class RateLimitGuard implements CanActivate {
     }
     const req = context.switchToHttp().getRequest<Request>();
     const address = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
+    const userId = (req as Request & { user?: { id?: string } }).user?.id;
+    const identifier = options.by === 'user' && userId ? `user:${userId}` : address;
     const allowed = await this.limiter.hit(
       options.scope,
-      address,
+      identifier,
       options.limit,
       options.windowSeconds,
     );

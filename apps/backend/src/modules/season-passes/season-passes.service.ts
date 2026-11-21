@@ -56,6 +56,7 @@ import { aislesAfter, GridSeat, longestRun, sectorWidth } from '../seats/best-se
 import { compareRows } from '../seats/seat-order';
 import { seatUnitPrice } from '../seats/seat-pricing';
 import { SeasonPassHoldResult, SeasonPassHoldService } from '../../redis/season-pass-hold.service';
+import { ActiveSeasonService } from './active-season.service';
 import {
   PASS_SEAT_FROM_SQL,
   PASS_SEAT_SELECT_SQL,
@@ -81,8 +82,6 @@ import { isWithinValidity, validityWindow } from './season-pass-validity';
 import { SeasonPassPriceDto } from './dto/season-pass-price.dto';
 import { formatFullName } from '../../common/format-name';
 import { IncomingLoanDto, LoanPreviewDto } from './dto/season-pass-response.dto';
-
-const ACTIVE_SEASON_LABEL = '2026/2027';
 
 interface SectorFacts {
   name: string | null;
@@ -177,6 +176,8 @@ export class SeasonPassesService {
     private readonly renderer: TicketRendererService,
     // Last on purpose: the hand-built specs pass the earlier ones positionally.
     private readonly holds: SeasonPassHoldService,
+    // Also last: the active season is read from the price rows (ActiveSeasonService), never a constant.
+    private readonly activeSeason: ActiveSeasonService,
   ) {
     this.mailConfig = this.configService.getOrThrow<MailConfig>('mail');
     this.cronConfig = this.configService.getOrThrow<CronConfig>('cron');
@@ -194,12 +195,16 @@ export class SeasonPassesService {
    * match by match. Public read endpoint — no auth.
    */
   async listPrices(): Promise<SeasonPassPriceDto[]> {
+    const seasonLabel = await this.activeSeason.label();
+    if (!seasonLabel) {
+      return [];
+    }
     const facts = await this.loadSectorFacts();
     // Dearest first. The away section has no tier, so it can never have a row; a row
     // keyed by a sector code (the old per-sector rows) is ignored all the same.
     const prices = (
       await this.seasonPassPriceRepository.find({
-        where: { seasonLabel: ACTIVE_SEASON_LABEL, isActive: true },
+        where: { seasonLabel, isActive: true },
       })
     )
       .filter((row) => isPriceTier(row.section))
@@ -210,8 +215,8 @@ export class SeasonPassesService {
 
     const [fixtures, stats, sold] = await Promise.all([
       this.findSeasonHomeMatches(prices),
-      this.loadSectorSeatStats(ACTIVE_SEASON_LABEL),
-      this.loadPassesSoldBySector(ACTIVE_SEASON_LABEL),
+      this.loadSectorSeatStats(seasonLabel),
+      this.loadPassesSoldBySector(seasonLabel),
     ]);
     const now = Date.now();
     // A postponed match is listed but not counted: nobody can use the pass seat on it until it has a new date.
@@ -309,7 +314,7 @@ export class SeasonPassesService {
     }
     const [facts, stats] = await Promise.all([
       this.loadSectorFacts(),
-      this.loadSectorSeatStats(ACTIVE_SEASON_LABEL),
+      this.loadSectorSeatStats(priceRow.seasonLabel),
     ]);
     return {
       tier: priceRow.section,
@@ -347,10 +352,16 @@ export class SeasonPassesService {
 
     const rows: PassSeatRow[] = await this.dataSource.query(
       `${PASS_SEAT_SELECT_SQL} WHERE s.section = ?`,
-      [ACTIVE_SEASON_LABEL, ACTIVE_SEASON_LABEL, ACTIVE_SEASON_LABEL, ACTIVE_SEASON_LABEL, section],
+      [
+        priceRow.seasonLabel,
+        priceRow.seasonLabel,
+        priceRow.seasonLabel,
+        priceRow.seasonLabel,
+        section,
+      ],
     );
     const held = await this.holds.heldSeatIds(
-      ACTIVE_SEASON_LABEL,
+      priceRow.seasonLabel,
       rows.filter((r) => truthy(r.free)).map((r) => r.id),
     );
     const price = Number(priceRow.price);
@@ -388,9 +399,35 @@ export class SeasonPassesService {
     };
   }
 
-  private findActivePriceRow(tier: string): Promise<SeasonPassPrice | null> {
+  private async findActivePriceRow(tier: string): Promise<SeasonPassPrice | null> {
+    const seasonLabel = await this.activeSeason.label();
+    if (!seasonLabel) {
+      return null;
+    }
     return this.seasonPassPriceRepository.findOne({
-      where: { section: tier, seasonLabel: ACTIVE_SEASON_LABEL, isActive: true },
+      where: { section: tier, seasonLabel, isActive: true },
+    });
+  }
+
+  /** The active season's label (ActiveSeasonService), or 404 when no season is on sale. */
+  private async requireSeasonLabel(): Promise<string> {
+    const label = await this.activeSeason.label();
+    if (!label) {
+      throw new NotFoundException({
+        statusCode: 404,
+        message: 'Jelenleg nincs értékesített bérletszezon.',
+        code: 'no_active_season',
+      });
+    }
+    return label;
+  }
+
+  private emailNotVerifiedError(): ForbiddenException {
+    return new ForbiddenException({
+      statusCode: 403,
+      message:
+        'Előbb erősítsd meg az e-mail-címed (a regisztráció után küldött levélben lévő linkkel), csak utána fogadhatsz el kölcsönmeghívót.',
+      code: 'email_not_verified',
     });
   }
 
@@ -459,15 +496,16 @@ export class SeasonPassesService {
    * previous hold for the season is released in the same step.
    */
   async holdSeat(userId: string, seatId: string): Promise<SeasonPassHoldResponseDto> {
+    const seasonLabel = await this.requireSeasonLabel();
     const refusal = passSeatRefusal(
-      await this.loadPassSeat(this.dataSource.manager, seatId, ACTIVE_SEASON_LABEL),
+      await this.loadPassSeat(this.dataSource.manager, seatId, seasonLabel),
     );
     if (refusal) {
       throw this.seatRefusalError(refusal);
     }
     let result: SeasonPassHoldResult;
     try {
-      result = await this.holds.hold(ACTIVE_SEASON_LABEL, seatId, userId);
+      result = await this.holds.hold(seasonLabel, seatId, userId);
     } catch (error) {
       this.logger.error(
         `[season-pass-hold] hold failed seat=${seatId} user=${userId}: ${
@@ -493,8 +531,9 @@ export class SeasonPassesService {
 
   /** `DELETE /season-passes/seats/:seatId/hold?holdToken=`: compare-and-delete, idempotent. */
   async releaseSeatHold(userId: string, seatId: string, holdToken: string): Promise<void> {
+    const seasonLabel = await this.requireSeasonLabel();
     try {
-      await this.holds.release(ACTIVE_SEASON_LABEL, seatId, userId, holdToken);
+      await this.holds.release(seasonLabel, seatId, userId, holdToken);
     } catch (error) {
       this.logger.error(
         `[season-pass-hold] release failed seat=${seatId} user=${userId}: ${
@@ -515,12 +554,13 @@ export class SeasonPassesService {
 
   /** The season's home fixtures plus the loyalty reward, for the purchase page. */
   async getSeasonOverview(): Promise<SeasonOverviewDto> {
-    const prices = await this.seasonPassPriceRepository.find({
-      where: { seasonLabel: ACTIVE_SEASON_LABEL, isActive: true },
-    });
+    const seasonLabel = (await this.activeSeason.label()) ?? '';
+    const prices = seasonLabel
+      ? await this.seasonPassPriceRepository.find({ where: { seasonLabel, isActive: true } })
+      : [];
     const fixtures = await this.findSeasonHomeMatches(prices);
     return {
-      seasonLabel: ACTIVE_SEASON_LABEL,
+      seasonLabel,
       loyaltyPoints: this.loyaltyConfig.seasonPassPoints,
       homeMatches: fixtures.map((m) => ({
         id: m.id,
@@ -660,13 +700,7 @@ export class SeasonPassesService {
       throw new ForbiddenException('A vendégszektorra nem váltható bérlet.');
     }
 
-    const priceRow = await this.seasonPassPriceRepository.findOne({
-      where: {
-        section: dto.sectionId,
-        seasonLabel: ACTIVE_SEASON_LABEL,
-        isActive: true,
-      },
-    });
+    const priceRow = await this.findActivePriceRow(dto.sectionId);
     if (!priceRow) {
       throw new NotFoundException(
         `Nem található aktív bérletár ehhez az árkategóriához: ${dto.sectionId}`,
@@ -1037,6 +1071,16 @@ export class SeasonPassesService {
           message:
             'Ehhez az e-mail-címhez nem tartozik fiók. Hagyd üresen az e-mail mezőt, ha a birtokosnak nincs fiókja.',
           code: 'holder_account_not_found',
+        });
+      }
+      // A pass holder is someone the pass hands out entries to: only an address its owner has
+      // proved can be named, or anyone could register a stranger's address to receive their pass.
+      if (!account.emailVerified) {
+        throw new BadRequestException({
+          statusCode: 400,
+          message:
+            'Ehhez az e-mail-címhez tartozó fiók még nem erősítette meg a címét, ezért nem nevezhető meg bérlet birtokosaként.',
+          code: 'holder_email_not_verified',
         });
       }
       return { name: name || fullName(account), userId: account.id };
@@ -1581,6 +1625,11 @@ export class SeasonPassesService {
       if (!borrower) {
         throw new NotFoundException('Borrower user not found');
       }
+      // The invitation is addressed to an e-mail address: only whoever has proved they own it may
+      // accept (otherwise registering a stranger's address would be enough).
+      if (!borrower.emailVerified) {
+        throw this.emailNotVerifiedError();
+      }
       // An entry cannot be handed over for a match that has started, nor for one the pass does
       // not (or no longer) cover.
       if (loan.match!.kickoffAt.getTime() <= Date.now()) {
@@ -1603,13 +1652,19 @@ export class SeasonPassesService {
       const ticketRepo = manager.getRepository(Ticket);
 
       // Fetch the owner's ticket early so we can check its status before
-      // committing to the acceptance path.
+      // committing to the acceptance path. The row is LOCKED (FOR UPDATE, a current read): a scan
+      // of that entry takes the same lock, so the two are ordered. Without it the status was read
+      // from an older snapshot, a scan that committed in between was not seen, and the delete
+      // below removed a ticket that had already admitted the holder (both parties then held a
+      // valid entry). Now whoever comes second sees the other's result: a USED ticket ends the loan
+      // as OWNER_ENTERED, a deleted one makes the scan refuse.
       const ownerTicket = await ticketRepo.findOne({
         where: {
           matchId: loan.matchId,
           seatId: pass.seatId,
           source: TicketSource.SEASON_PASS,
         },
+        lock: { mode: 'pessimistic_write' },
       });
 
       // Guard: owner already entered — the exercised entry right cannot be
@@ -1689,6 +1744,10 @@ export class SeasonPassesService {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('A felhasználó nem található.');
+    }
+    // An address nobody has proved to own is not shown the invitations sent to it.
+    if (!user.emailVerified) {
+      return [];
     }
     const loans = await this.passLoanRepository.find({
       where: [

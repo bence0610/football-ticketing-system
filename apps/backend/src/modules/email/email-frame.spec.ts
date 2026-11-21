@@ -16,6 +16,7 @@ const HAS_BUTTON = new Set([
   'waitlist-notification',
   'password-reset',
   'email-change-confirm',
+  'email-verification',
 ]);
 
 describe('shared e-mail frame', () => {
@@ -41,8 +42,8 @@ describe('shared e-mail frame', () => {
     return found;
   };
 
-  it('covers all 12 templates', () => {
-    expect(new Set(fixtures.map((f) => f.template)).size).toBe(12);
+  it('covers all 13 templates', () => {
+    expect(new Set(fixtures.map((f) => f.template)).size).toBe(13);
   });
 
   describe.each([
@@ -58,6 +59,7 @@ describe('shared e-mail frame', () => {
     'email-change-confirm',
     'email-change-requested',
     'email-changed',
+    'email-verification',
   ])('%s', (template) => {
     const variants = () => fixtures.filter((f) => f.template === template);
 

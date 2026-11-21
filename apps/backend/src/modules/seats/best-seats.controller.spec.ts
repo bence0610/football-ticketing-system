@@ -1,7 +1,8 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RateLimitGuard } from '../../common/rate-limit/rate-limit.guard';
 import { SeatLockService } from '../../redis/seat-lock.service';
 import { BestSeatsService } from './best-seats.service';
 import { MatchSeatsController } from './match-seats.controller';
@@ -22,7 +23,14 @@ describe('POST /matches/:matchId/seats/best (validation and wiring)', () => {
         { provide: BestSeatsService, useValue: { findAndLock } },
       ],
     })
-      .overrideGuard(OptionalJwtAuthGuard)
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          context.switchToHttp().getRequest().user = { id: 'user-1' };
+          return true;
+        },
+      })
+      .overrideGuard(RateLimitGuard)
       .useValue({ canActivate: () => true })
       .compile();
     app = moduleRef.createNestApplication();
@@ -45,7 +53,7 @@ describe('POST /matches/:matchId/seats/best (validation and wiring)', () => {
       section: 'C/2',
       count: 4,
       allowSplit: true,
-      userId: undefined,
+      userId: 'user-1',
     });
   });
 

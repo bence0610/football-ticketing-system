@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
+import { AuthService } from '../../../../core/auth/auth.service';
 import { CartFacade } from '../../../../core/cart/cart.facade';
 import { BestSeatsRequest, BestSeatsResponse, SeatStatus } from '../../../../shared/models/seat.model';
 import { SeatsApiService } from '../../../../shared/services/seats.api.service';
@@ -38,12 +39,15 @@ describe('BestSeatsPanelComponent', () => {
   let cartItems: ReturnType<typeof signal<readonly unknown[]>>;
   let added: Array<{ seats: readonly SeatStatus[]; lock: { ownerToken: string; ttlSeconds: number } }>;
 
-  function make(over: { longestRun?: number } = {}): ComponentFixture<BestSeatsPanelComponent> {
+  function make(
+    over: { longestRun?: number; signedIn?: boolean } = {},
+  ): ComponentFixture<BestSeatsPanelComponent> {
     calls = [];
     added = [];
     cartItems = signal<readonly unknown[]>([]);
     TestBed.configureTestingModule({
       providers: [
+        { provide: AuthService, useValue: { isAuthenticated: signal(over.signedIn ?? true) } },
         {
           provide: SeatsApiService,
           useValue: {
@@ -116,6 +120,48 @@ describe('BestSeatsPanelComponent', () => {
     expect(added[0].lock).toEqual({ ownerToken: 'tok', ttlSeconds: 300 });
     expect(placed.length).toBe(1);
     expect(text(q(f, 'finder-result'))).toContain('Lefoglaltunk 2 helyet egymás mellett: 3. sor 5–6. szék');
+  });
+
+  it('asks a guest to sign in instead of calling the server (holding seats needs an account)', async () => {
+    const f = make({ signedIn: false });
+    q<HTMLButtonElement>(f, 'finder-go').click();
+    await flush(f);
+    expect(calls).toEqual([]);
+    expect(text(q(f, 'finder-result'))).toContain('jelentkezz be');
+  });
+
+  it('shows the server wording when the buyer already holds the most seats, or the hold is at its maximum', async () => {
+    for (const code of ['seat_limit_reached', 'hold_limit_reached']) {
+      TestBed.resetTestingModule();
+      const f = make();
+      reply = () => throwError(() => conflict({ code, message: `szerver: ${code}` }));
+      q<HTMLButtonElement>(f, 'finder-go').click();
+      await flush(f);
+      expect(text(q(f, 'finder-result'))).toContain(`szerver: ${code}`);
+      expect(q(f, 'finder-refusal')).toBeNull();
+    }
+  });
+
+  it('says so when the server refuses a guest (401) or limits the requests (429)', async () => {
+    const f = make();
+    reply = () => throwError(() => new HttpErrorResponse({ status: 401, error: {} }));
+    q<HTMLButtonElement>(f, 'finder-go').click();
+    await flush(f);
+    expect(text(q(f, 'finder-result'))).toContain('jelentkezz be');
+
+    TestBed.resetTestingModule();
+    const g = make();
+    reply = () =>
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 429,
+            error: { code: 'rate_limited', message: 'Túl sok kérés érkezett.' },
+          }),
+      );
+    q<HTMLButtonElement>(g, 'finder-go').click();
+    await flush(g);
+    expect(text(q(g, 'finder-result'))).toContain('Túl sok kérés érkezett.');
   });
 
   it('when no run is long enough it says so, names the longest run, and offers the two shorter runs', async () => {

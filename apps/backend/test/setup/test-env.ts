@@ -33,6 +33,7 @@ export const TEST_ENV: Readonly<Record<string, string>> = Object.freeze({
   REDIS_KEY_PREFIX: 'kte-e2e:',
 
   SEAT_LOCK_TTL_SECONDS: '300',
+  SEAT_LOCK_MAX_HOLD_SECONDS: '1200',
 
   JWT_ACCESS_SECRET: 'test-access-secret-min-16-chars',
   JWT_ACCESS_EXPIRES_IN: '15m',

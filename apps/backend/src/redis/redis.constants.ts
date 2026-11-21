@@ -6,6 +6,8 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
  */
 export const RedisKeys = {
   seatLock: (matchId: string, seatId: string): string => `seat-lock:${matchId}:${seatId}`,
+  // When the seat was FIRST locked (epoch ms): the anchor of the maximum hold, kept across extends.
+  seatLockBorn: (matchId: string, seatId: string): string => `seat-lock-born:${matchId}:${seatId}`,
   seatLockOwner: (matchId: string, userId: string): string =>
     `seat-lock-owner:${matchId}:${userId}`,
   refreshToken: (userId: string, jti: string): string => `refresh:${userId}:${jti}`,
@@ -26,6 +28,9 @@ export const RedisKeys = {
   // could open several payments at once, none of them yet counted as bought tickets.
   discountInFlight: (matchId: string, userId: string): string =>
     `discount-inflight:${matchId}:${userId}`,
+  // Short lock around counting + reserving a buyer's discounted places for one match (see
+  // PaymentsService.withDiscountMutex): value = the holder's token, compare-and-delete to release.
+  discountMutex: (matchId: string, userId: string): string => `discount-mutex:${matchId}:${userId}`,
   // Season-pass purchase — per-attempt idempotency record (TTL 300 s)
   // `holderKey` identifies who the pass is for, so buying for several holders
   // in one section yields separate attempts (and separate PaymentIntents).
