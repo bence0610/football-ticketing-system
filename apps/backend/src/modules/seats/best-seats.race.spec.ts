@@ -18,9 +18,12 @@ import { SeatsService } from './seats.service';
  * whose "free" flags are read from the real lock keys, exactly as the real
  * service does with MGET. No MySQL needed.
  *
- *   REDIS_RACE_URL=redis://localhost:6379 (default) ; skipped if unreachable.
+ *   REDIS_RACE_URL=redis://localhost:6379 (default) ; skipped locally if unreachable.
+ *   In CI (CI=true) or with REQUIRE_REDIS_RACE=1 an unreachable Redis FAILS the run:
+ *   a silently skipped race test would prove nothing.
  */
 const REDIS_URL = process.env.REDIS_RACE_URL ?? 'redis://localhost:6379';
+const REDIS_REQUIRED = process.env.CI === 'true' || process.env.REQUIRE_REDIS_RACE === '1';
 
 const MATCH = randomUUID();
 const ROWS = 4;
@@ -107,6 +110,9 @@ describe('BestSeatsService: concurrent requests (real Redis)', () => {
   const run = (name: string, fn: () => Promise<void>): void => {
     it(name, async () => {
       if (!available) {
+        if (REDIS_REQUIRED) {
+          throw new Error(`Redis is required for the race tests but unreachable at ${REDIS_URL}`);
+        }
         console.warn(`SKIPPED (no Redis at ${REDIS_URL}): ${name}`);
         return;
       }

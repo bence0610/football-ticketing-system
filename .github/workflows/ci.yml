@@ -21,6 +21,16 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     defaults:
       run:
         working-directory: apps/backend
@@ -49,6 +59,8 @@ jobs:
       - name: Unit tests
         env:
           NODE_ENV: test
+          REDIS_RACE_URL: redis://localhost:6379
+          REQUIRE_REDIS_RACE: '1'
         run: npm test -- --runInBand --passWithNoTests
 
   backend-e2e:
