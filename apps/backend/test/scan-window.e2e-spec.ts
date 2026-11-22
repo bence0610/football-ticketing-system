@@ -45,12 +45,22 @@ describe('Scan window around kickoff (E2E)', () => {
     const login = await request(server)
       .post('/api/auth/login')
       .send({ email: gate.user.email, password: gate.plainPassword });
+    // As in reality: the fan owns the ticket and fetches its QR; the steward only scans it.
+    const fanRes = await request(server)
+      .post('/api/auth/register')
+      .send({
+        email: `fan-${randomUUID().slice(0, 8)}@kte.hu`,
+        password: 'Teszt1234!',
+        firstName: 'Teszt',
+        lastName: 'Elek',
+      });
+    expect(fanRes.status).toBe(201);
     const repo = ctx.dataSource.getRepository(Ticket);
     const ticket = await repo.save(
       repo.create({
         matchId: match.id,
         seatId: seatA.id,
-        userId: gate.user.id,
+        userId: fanRes.body.user.id as string,
         status: TicketStatus.PAID,
         source: TicketSource.SINGLE,
         pricePaid: '3000.00',
@@ -61,7 +71,8 @@ describe('Scan window around kickoff (E2E)', () => {
     );
     const qr = await request(server)
       .get(`/api/tickets/${ticket.id}/qr`)
-      .set('Authorization', `Bearer ${login.body.accessToken}`);
+      .set('Authorization', `Bearer ${fanRes.body.accessToken as string}`);
+    expect(qr.status).toBe(200);
     const res = await request(server)
       .patch(`/api/tickets/${ticket.id}/scan`)
       .set('Authorization', `Bearer ${login.body.accessToken}`)
