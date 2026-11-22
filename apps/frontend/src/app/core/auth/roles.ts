@@ -4,3 +4,8 @@ import type { UserRole } from '../../shared/models/auth.model';
 export function isAdminRole(role: UserRole | null | undefined): boolean {
   return role === 'admin' || role === 'super_admin';
 }
+
+/** The dedicated steward account: it may use the gate page and nothing else. */
+export function isGateRole(role: UserRole | null | undefined): boolean {
+  return role === 'gate';
+}

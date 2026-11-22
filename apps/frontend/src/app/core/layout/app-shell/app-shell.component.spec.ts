@@ -134,6 +134,11 @@ describe('AppShellComponent', () => {
       expect(style.bottom).not.toBe('auto');
     });
 
+    it('is not shown to a gate user (the steward account has no chat)', () => {
+      expect(renderEl('/', { role: 'gate' }).querySelector('kte-chatbot-widget')).toBeNull();
+      expect(renderEl('/', { role: 'fan' }).querySelector('kte-chatbot-widget')).not.toBeNull();
+    });
+
     it('is not shown on the payment step', () => {
       expect(renderEl('/checkout').querySelector('kte-chatbot-widget')).toBeNull();
     });

@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed, fakeAsync, flush, tick } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Observable, of, throwError } from 'rxjs';
+import { AuthService } from '../../core/auth/auth.service';
 import { TicketScanResponse } from '../../core/models/ticket.models';
 import { MatchResource, MatchesService } from '../../core/services/matches.service';
 import { TicketsService } from '../../core/services/tickets.service';
@@ -65,6 +66,7 @@ describe('GatePageComponent', () => {
   let scan: jasmine.Spy<(id: string, token: string) => Observable<TicketScanResponse>>;
   let feedback: FakeFeedback;
   let cameraStarts: number;
+  let logout: jasmine.Spy;
 
   const el = (): HTMLElement => fixture.nativeElement;
   const q = (sel: string): HTMLElement | null => el().querySelector(sel);
@@ -76,6 +78,7 @@ describe('GatePageComponent', () => {
       imports: [GatePageComponent],
       providers: [
         provideNoopAnimations(),
+        { provide: AuthService, useValue: { logout } },
         { provide: TicketsService, useValue: { scan } },
         { provide: MatchesService, useValue: { list: () => of(matches) } },
         { provide: GateFeedback, useValue: feedback },
@@ -106,6 +109,7 @@ describe('GatePageComponent', () => {
     stopped = false;
     cameraFailure = null;
     cameraStarts = 0;
+    logout = jasmine.createSpy('logout').and.returnValue(of(undefined));
     feedback = new FakeFeedback();
     scan = jasmine.createSpy('scan').and.returnValue(of(ADMITTED));
     sessionStorage.removeItem('kte.gate.admitted');
@@ -129,6 +133,13 @@ describe('GatePageComponent', () => {
       create();
       await settle();
       expect(q('header.kte-shell__toolbar, kte-chatbot-widget, nav, a[href]')).toBeNull();
+    });
+
+    it('has a logout button: the only way out for a steward', async () => {
+      create();
+      await settle();
+      q('[data-testid="gate-logout"]')!.click();
+      expect(logout).toHaveBeenCalled();
     });
 
     it('asks for the camera only when the page is created', async () => {

@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { catchError, of, timeout } from 'rxjs';
+import { AuthService } from '../../core/auth/auth.service';
 import { TicketScanResponse } from '../../core/models/ticket.models';
 import { MatchResource, MatchesService } from '../../core/services/matches.service';
 import { TicketsService } from '../../core/services/tickets.service';
@@ -69,6 +70,10 @@ const CAMERA_MESSAGES: Record<CameraFailure, string> = {
               <strong>{{ admitted() }}</strong>
               <small>belépett<span class="sr"> ezen az eszközön</span></small>
             </span>
+            <button type="button" class="logout" data-testid="gate-logout" (click)="logout()">
+              <mat-icon aria-hidden="true">logout</mat-icon>
+              Kilépés
+            </button>
           </div>
           <div class="gatepick" role="group" aria-label="Ez a kapu" data-testid="gate-picker">
             <span class="gatepick__label">Ez a kapu</span>
@@ -312,6 +317,20 @@ const CAMERA_MESSAGES: Record<CameraFailure, string> = {
         align-items: center;
         justify-content: space-between;
         gap: 12px;
+      }
+      .logout {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 44px;
+        padding: 0 12px;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 8px;
+        background: transparent;
+        color: #fff;
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
       }
       .live {
         display: inline-flex;
@@ -740,6 +759,7 @@ const CAMERA_MESSAGES: Record<CameraFailure, string> = {
   ],
 })
 export class GatePageComponent {
+  private readonly auth = inject(AuthService);
   private readonly tickets = inject(TicketsService);
   private readonly matches = inject(MatchesService);
   private readonly camera = inject(GateCamera);
@@ -758,6 +778,11 @@ export class GatePageComponent {
   protected readonly checking = signal(false);
   protected readonly cameraState = signal<CameraState>('starting');
   protected readonly tokenInput = signal('');
+
+  /** The steward has no other page, so the way out is here. */
+  protected logout(): void {
+    this.auth.logout().subscribe();
+  }
 
   protected pickGate(gate: number): void {
     const next = this.myGate() === gate ? null : gate;

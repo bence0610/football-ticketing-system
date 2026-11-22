@@ -136,7 +136,7 @@ Az IP-alapú limitek tehát: jelszó-visszaállítás (kontrollerszintű `RateLi
 
 Kapcsolat: `DatabaseModule` (`type: 'mysql'`, `utf8mb4_unicode_ci`, `timezone: 'Z'`, `synchronize` = `DB_SYNCHRONIZE`, alapértelmezés `false`). A séma migrációkkal épül (`src/database/migrations`, 14 fájl, `1714050000000-InitialSchema` -> `1715600000000-EmailChangeTokens`); a migrációkat külön kell futtatni (`npm run migration:run`), az alkalmazás indításkor nem futtatja (nincs `migrationsRun`). Az e2e `globalSetup` lefuttatja őket. Minden entitás a `BaseEntity`-ből öröklődik: UUID `id`, `created_at`, `updated_at`, `version` (`@VersionColumn`).
 
-Seed (`npm run seed`, `seeds/initial.seed.ts`, idempotens): admin (`admin@kte.hu`, `super_admin`), demo szurkoló (`fan@kte.hu`), beléptető (`kapu@kte.hu`, `gate`), a hiányzó szektorok, a székek (a `stadium-layout.ts` alapján 19 szektor, 5468 szék), a korábbi szezon meccseinek lezárása, közelgő felkészülési mérkőzések és a bérletárak. A szektorsorokat a `1715400000000-StadiumLayout` migráció írja be.
+Seed (`npm run seed`, `seeds/initial.seed.ts`, idempotens): admin (`admin@kte.hu`, `super_admin`), demo szurkoló (`fan@kte.hu`), beléptető (`kapu@kte.hu`, `gate`; kizárólag a `/gate` oldalt és a beolvasást használhatja, a többi oldal a kapuhoz irányítja, a szurkolói végpontok 403-at adnak), a hiányzó szektorok, a székek (a `stadium-layout.ts` alapján 19 szektor, 5468 szék), a korábbi szezon meccseinek lezárása, közelgő felkészülési mérkőzések és a bérletárak. A szektorsorokat a `1715400000000-StadiumLayout` migráció írja be.
 
 | Tábla (entitás) | Kulcs kapcsolatok | Üzleti szabályt hordozó megszorítások |
 | --- | --- | --- |

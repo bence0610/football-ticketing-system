@@ -14,6 +14,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { AuthService } from '../../core/auth/auth.service';
+import { isGateRole } from '../../core/auth/roles';
 import { MatchesActions, selectAllMatches } from '../../state/matches';
 import { strictEmailValidator } from '../../shared/validators/email.validator';
 import { availabilityOf, upcomingHomeMatches } from '../home/logic/match-availability';
@@ -217,8 +218,11 @@ export class LoginPageComponent implements OnInit {
     this.errorMessage.set(null);
     const { email, password } = this.form.getRawValue();
     this.auth.login({ email, password }).subscribe({
-      next: () => {
-        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '/';
+      next: (response) => {
+        // The steward account has one page: any returnUrl pointing elsewhere is ignored.
+        const returnUrl = isGateRole(response?.user?.role)
+          ? '/gate'
+          : (this.route.snapshot.queryParamMap.get('returnUrl') ?? '/');
         void this.router.navigateByUrl(returnUrl);
       },
       error: (err: unknown) => {

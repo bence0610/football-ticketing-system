@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -19,6 +20,7 @@ import { EmailVerificationService } from './email-verification.service';
 import { PasswordChangeService } from './password-change.service';
 import { PasswordResetController } from './password-reset.controller';
 import { PasswordResetService } from './password-reset.service';
+import { GateLockoutInterceptor } from './interceptors/gate-lockout.interceptor';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -51,6 +53,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     OptionalJwtAuthGuard,
     RolesGuard,
     RefreshTokenStore,
+    // Global: the gate role is closed everywhere unless a route opens it (see GateAllowed).
+    { provide: APP_INTERCEPTOR, useClass: GateLockoutInterceptor },
   ],
   exports: [
     AuthService,

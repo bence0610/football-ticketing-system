@@ -85,7 +85,7 @@ const NAMED: readonly NamedSpec[] = [
     createdDaysAgo: 600,
     profileDone: false,
     purpose:
-      'Beléptető: a kapu képernyő, QR-beolvasás (BELÉPHET / MÁR FELHASZNÁLVA / LEJÁRT / ELMARADT).',
+      'Beléptető (kizárólag a kapu képernyő): QR-beolvasás (BELÉPHET / MÁR FELHASZNÁLVA / LEJÁRT / ELMARADT); belépés után a /gate-re kerül, minden más oldal és szurkolói végpont zárt számára.',
   },
   {
     key: 'ures',

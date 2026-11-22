@@ -18,6 +18,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { RateLimit, RateLimitGuard } from '../../common/rate-limit/rate-limit.guard';
 import { EmailChangeService } from '../users/email-change.service';
 import { AuthService } from './auth.service';
+import { GateAllowed } from './decorators/gate-allowed.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import {
   AuthResponseDto,
@@ -102,6 +103,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @GateAllowed()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -118,6 +120,7 @@ export class AuthController {
   }
 
   @Post('change-password')
+  @GateAllowed()
   @UseGuards(JwtAuthGuard, RateLimitGuard)
   @RateLimit({ scope: 'pwchange:ip', limit: 30, windowSeconds: 3600 })
   @ApiBearerAuth()

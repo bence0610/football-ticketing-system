@@ -185,4 +185,15 @@ describe('LoginPageComponent', () => {
     submitButton().click();
     expect(nav).toHaveBeenCalledWith('/');
   });
+
+  it('sends a gate user straight to /gate, ignoring a returnUrl that points elsewhere', async () => {
+    await create();
+    TestBed.inject(ActivatedRoute).snapshot.queryParamMap.get = () => '/admin';
+    const nav = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+    auth.login.and.returnValue(of({ user: { role: 'gate' } } as unknown as AuthResponse));
+    type('login-email', 'gate@kte.hu');
+    type('login-password', 'x');
+    submitButton().click();
+    expect(nav).toHaveBeenCalledOnceWith('/gate');
+  });
 });

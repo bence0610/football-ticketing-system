@@ -1,11 +1,16 @@
 import { Route } from '@angular/router';
 import { APP_ROUTES } from './app.routes';
 import { authGuard } from './core/auth/auth.guard';
+import { stewardOnlyGuard } from './core/auth/steward.guard';
+
+/** The AppShell route, inside the pathless wrapper that carries the steward guard. */
+function findShell(): Route | undefined {
+  return APP_ROUTES.find((r) => r.canActivateChild)?.children?.find((r) => r.component);
+}
 
 /** The children of the AppShell route, where every public and fan page lives. */
 function shellRoute(path: string): Route | undefined {
-  const shell = APP_ROUTES.find((r) => r.path === '' && r.children);
-  return shell?.children?.find((r) => r.path === path);
+  return findShell()?.children?.find((r) => r.path === path);
 }
 
 describe('APP_ROUTES (account pages)', () => {
@@ -44,12 +49,22 @@ describe('APP_ROUTES (account pages)', () => {
   });
 
   it('the account pages come before the wildcard', () => {
-    const shell = APP_ROUTES.find((r) => r.path === '' && r.children)!;
+    const shell = findShell()!;
     const paths = shell.children!.map((r) => r.path);
     const wildcard = paths.indexOf('**');
     for (const p of ['profile/details', 'profile/password', 'confirm-email/:token', 'verify-email/:token']) {
       expect(paths.indexOf(p)).toBeGreaterThan(-1);
       expect(paths.indexOf(p)).toBeLessThan(wildcard);
     }
+  });
+
+  it('one steward guard wraps the admin area and the shell; only /gate is outside it', () => {
+    const outside = APP_ROUTES.filter((r) => !r.canActivateChild).map((r) => r.path);
+    expect(outside).toEqual(['gate']);
+    const wrapper = APP_ROUTES.find((r) => r.canActivateChild)!;
+    expect(wrapper.canActivateChild).toEqual([stewardOnlyGuard]);
+    const inside = wrapper.children!.map((r) => r.path);
+    expect(inside).toContain('admin');
+    expect(findShell()).toBeDefined();
   });
 });

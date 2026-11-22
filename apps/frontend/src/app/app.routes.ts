@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { adminGuard } from './core/auth/admin.guard';
 import { authGuard, guestGuard } from './core/auth/auth.guard';
 import { gateGuard } from './core/auth/gate.guard';
+import { stewardOnlyGuard } from './core/auth/steward.guard';
 import { AppShellComponent } from './core/layout/app-shell/app-shell.component';
 
 export const APP_ROUTES: Routes = [
@@ -14,153 +15,161 @@ export const APP_ROUTES: Routes = [
     loadComponent: () => import('./features/gate/gate.page').then((m) => m.GatePageComponent),
     title: 'Beléptető',
   },
-  // The admin area has its own shell (dark sidebar, no public header or chat), so it sits beside
-  // AppShell, not inside it. The guard is the route's protection; the API checks the role again.
-  {
-    path: 'admin',
-    canActivate: [adminGuard],
-    loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
-  },
+  // Everything else sits under one pathless route that keeps the steward (role 'gate') on /gate:
+  // the guard is applied here once, so a new page cannot forget it.
   {
     path: '',
-    component: AppShellComponent,
+    canActivateChild: [stewardOnlyGuard],
     children: [
-      {
-        path: '',
-        pathMatch: 'full',
-        loadComponent: () =>
-          import('./features/home/home.page').then((m) => m.HomePageComponent),
-        title: 'KTE Jegyportál - Kezdőlap',
-      },
-      {
-        path: 'stadium',
-        loadComponent: () =>
-          import('./features/stadium/stadium.page').then((m) => m.StadiumPageComponent),
-        title: 'Jegyvásárlás - Helyválasztás',
-      },
-      {
-        path: 'cart',
-        loadComponent: () =>
-          import('./features/cart/cart.page').then((m) => m.CartPageComponent),
-        title: 'Kosár',
-      },
-      {
-        path: 'checkout',
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./features/checkout/checkout.page').then((m) => m.CheckoutPageComponent),
-        title: 'Fizetés',
-      },
-      {
-        path: 'checkout/confirmation',
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./features/checkout/confirmation.page').then((m) => m.ConfirmationPageComponent),
-        title: 'Rendelés visszaigazolva',
-      },
-      {
-        path: 'login',
-        canActivate: [guestGuard],
-        loadComponent: () =>
-          import('./features/auth/login.page').then((m) => m.LoginPageComponent),
-        title: 'Bejelentkezés',
-      },
-      {
-        path: 'register',
-        canActivate: [guestGuard],
-        loadComponent: () =>
-          import('./features/auth/register.page').then((m) => m.RegisterPageComponent),
-        title: 'Regisztráció',
-      },
-      {
-        // Reachable signed in or out: the emailed link must work in whatever session the browser has.
-        path: 'forgot-password',
-        loadComponent: () =>
-          import('./features/auth/forgot-password.page').then((m) => m.ForgotPasswordPageComponent),
-        title: 'Elfelejtett jelszó',
-      },
-      {
-        path: 'reset-password/:token',
-        loadComponent: () =>
-          import('./features/auth/reset-password.page').then((m) => m.ResetPasswordPageComponent),
-        title: 'Új jelszó beállítása',
-      },
-      {
-        // Public like reset-password: the link mailed at registration may be opened in any browser.
-        path: 'verify-email/:token',
-        loadComponent: () =>
-          import('./features/auth/verify-email.page').then((m) => m.VerifyEmailPageComponent),
-        title: 'E-mail-cím megerősítése',
-      },
-      {
-        // Public like reset-password: the link mailed to the new address may be opened
-        // in any browser, signed in (to any account) or not.
-        path: 'confirm-email/:token',
-        loadComponent: () =>
-          import('./features/auth/confirm-email.page').then((m) => m.ConfirmEmailPageComponent),
-        title: 'E-mail-cím megerősítése',
-      },
-      {
-        path: 'profile/details',
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./features/profile/account/profile-details.page').then(
-            (m) => m.ProfileDetailsPageComponent,
-          ),
-        title: 'Adataim szerkesztése',
-      },
-      {
-        path: 'profile/password',
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./features/profile/account/change-password.page').then(
-            (m) => m.ChangePasswordPageComponent,
-          ),
-        title: 'Jelszó módosítása',
-      },
-      {
-        path: 'profile',
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./features/profile/profile.page').then((m) => m.ProfilePageComponent),
-        title: 'Profil',
-      },
-      {
-        path: 'loyalty',
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./features/loyalty/loyalty-dashboard.page').then((m) => m.LoyaltyDashboardPageComponent),
-        title: 'Hűség Dashboard',
-      },
-      {
-        path: 'season-pass',
-        pathMatch: 'full',
-        loadComponent: () =>
-          import('./features/season-pass/season-pass.page').then((m) => m.SeasonPassPageComponent),
-        title: 'Bérlet vásárlás',
-      },
-      {
-        path: 'season-pass/confirmation',
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./features/season-pass/confirmation.page').then(
-            (m) => m.SeasonPassConfirmationPageComponent,
-          ),
-        title: 'Sikeres bérletvásárlás',
-      },
-      {
-        path: 'loans/accept/:token',
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./features/loans/accept-loan.page').then((m) => m.AcceptLoanPageComponent),
-        title: 'Bérletkölcsön elfogadása',
-      },
-      {
-        path: '**',
-        loadComponent: () =>
-          import('./features/not-found/not-found.page').then((m) => m.NotFoundPageComponent),
-        title: '404 - Az oldal nem található',
-      },
+    // The admin area has its own shell (dark sidebar, no public header or chat), so it sits beside
+    // AppShell, not inside it. The guard is the route's protection; the API checks the role again.
+    {
+      path: 'admin',
+      canActivate: [adminGuard],
+      loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
+    },
+    {
+      path: '',
+      component: AppShellComponent,
+      children: [
+        {
+          path: '',
+          pathMatch: 'full',
+          loadComponent: () =>
+            import('./features/home/home.page').then((m) => m.HomePageComponent),
+          title: 'KTE Jegyportál - Kezdőlap',
+        },
+        {
+          path: 'stadium',
+          loadComponent: () =>
+            import('./features/stadium/stadium.page').then((m) => m.StadiumPageComponent),
+          title: 'Jegyvásárlás - Helyválasztás',
+        },
+        {
+          path: 'cart',
+          loadComponent: () =>
+            import('./features/cart/cart.page').then((m) => m.CartPageComponent),
+          title: 'Kosár',
+        },
+        {
+          path: 'checkout',
+          canActivate: [authGuard],
+          loadComponent: () =>
+            import('./features/checkout/checkout.page').then((m) => m.CheckoutPageComponent),
+          title: 'Fizetés',
+        },
+        {
+          path: 'checkout/confirmation',
+          canActivate: [authGuard],
+          loadComponent: () =>
+            import('./features/checkout/confirmation.page').then((m) => m.ConfirmationPageComponent),
+          title: 'Rendelés visszaigazolva',
+        },
+        {
+          path: 'login',
+          canActivate: [guestGuard],
+          loadComponent: () =>
+            import('./features/auth/login.page').then((m) => m.LoginPageComponent),
+          title: 'Bejelentkezés',
+        },
+        {
+          path: 'register',
+          canActivate: [guestGuard],
+          loadComponent: () =>
+            import('./features/auth/register.page').then((m) => m.RegisterPageComponent),
+          title: 'Regisztráció',
+        },
+        {
+          // Reachable signed in or out: the emailed link must work in whatever session the browser has.
+          path: 'forgot-password',
+          loadComponent: () =>
+            import('./features/auth/forgot-password.page').then((m) => m.ForgotPasswordPageComponent),
+          title: 'Elfelejtett jelszó',
+        },
+        {
+          path: 'reset-password/:token',
+          loadComponent: () =>
+            import('./features/auth/reset-password.page').then((m) => m.ResetPasswordPageComponent),
+          title: 'Új jelszó beállítása',
+        },
+        {
+          // Public like reset-password: the link mailed at registration may be opened in any browser.
+          path: 'verify-email/:token',
+          loadComponent: () =>
+            import('./features/auth/verify-email.page').then((m) => m.VerifyEmailPageComponent),
+          title: 'E-mail-cím megerősítése',
+        },
+        {
+          // Public like reset-password: the link mailed to the new address may be opened
+          // in any browser, signed in (to any account) or not.
+          path: 'confirm-email/:token',
+          loadComponent: () =>
+            import('./features/auth/confirm-email.page').then((m) => m.ConfirmEmailPageComponent),
+          title: 'E-mail-cím megerősítése',
+        },
+        {
+          path: 'profile/details',
+          canActivate: [authGuard],
+          loadComponent: () =>
+            import('./features/profile/account/profile-details.page').then(
+              (m) => m.ProfileDetailsPageComponent,
+            ),
+          title: 'Adataim szerkesztése',
+        },
+        {
+          path: 'profile/password',
+          canActivate: [authGuard],
+          loadComponent: () =>
+            import('./features/profile/account/change-password.page').then(
+              (m) => m.ChangePasswordPageComponent,
+            ),
+          title: 'Jelszó módosítása',
+        },
+        {
+          path: 'profile',
+          canActivate: [authGuard],
+          loadComponent: () =>
+            import('./features/profile/profile.page').then((m) => m.ProfilePageComponent),
+          title: 'Profil',
+        },
+        {
+          path: 'loyalty',
+          canActivate: [authGuard],
+          loadComponent: () =>
+            import('./features/loyalty/loyalty-dashboard.page').then((m) => m.LoyaltyDashboardPageComponent),
+          title: 'Hűség Dashboard',
+        },
+        {
+          path: 'season-pass',
+          pathMatch: 'full',
+          loadComponent: () =>
+            import('./features/season-pass/season-pass.page').then((m) => m.SeasonPassPageComponent),
+          title: 'Bérlet vásárlás',
+        },
+        {
+          path: 'season-pass/confirmation',
+          canActivate: [authGuard],
+          loadComponent: () =>
+            import('./features/season-pass/confirmation.page').then(
+              (m) => m.SeasonPassConfirmationPageComponent,
+            ),
+          title: 'Sikeres bérletvásárlás',
+        },
+        {
+          path: 'loans/accept/:token',
+          canActivate: [authGuard],
+          loadComponent: () =>
+            import('./features/loans/accept-loan.page').then((m) => m.AcceptLoanPageComponent),
+          title: 'Bérletkölcsön elfogadása',
+        },
+        {
+          path: '**',
+          loadComponent: () =>
+            import('./features/not-found/not-found.page').then((m) => m.NotFoundPageComponent),
+          title: '404 - Az oldal nem található',
+        },
+      ],
+    },
     ],
   },
 ];

@@ -12,6 +12,7 @@ import { ROLES_KEY } from '../modules/auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../modules/auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../modules/auth/guards/roles.guard';
+import { gateMayUse } from '../modules/auth/interceptors/gate-lockout.interceptor';
 import { ChatbotController } from '../modules/chatbot/chatbot.controller';
 import { HealthController } from '../modules/health/health.controller';
 import { LoyaltyController } from '../modules/loyalty/loyalty.controller';
@@ -112,8 +113,17 @@ const REQUIRED_ROLES: Record<string, UserRole[]> = {
   'PATCH tickets/:id/scan': [UserRole.GATE, UserRole.ADMIN, UserRole.SUPER_ADMIN],
 };
 
+/**
+ * The only routes a gate user (the steward account) may call, besides the
+ * public ones. The role is closed by default (GateLockoutInterceptor); a route
+ * opens only through @GateAllowed or by naming UserRole.GATE in @Roles.
+ */
+const GATE_ROUTES = ['PATCH tickets/:id/scan', 'POST auth/logout', 'POST auth/change-password'];
+
 interface RouteInfo {
   key: string;
+  handler: object;
+  controller: object;
   authenticated: boolean;
   usesRolesGuard: boolean;
   roles: UserRole[];
@@ -164,6 +174,8 @@ function collectRoutes(controller: Type<unknown>): RouteInfo[] {
     ];
     routes.push({
       key: `${METHOD_NAMES[method]} ${join(base, path)}`,
+      handler,
+      controller,
       authenticated: guards.some(isRequiredJwtGuard),
       usesRolesGuard: guards.includes(RolesGuard),
       roles:
@@ -251,5 +263,26 @@ describe('backend route protection', () => {
       (r) => r.key,
     );
     expect(decorativeOnly).toEqual([]);
+  });
+
+  it('a gate user can reach exactly the steward routes: no fan endpoint is open to the gate role', () => {
+    const open = ROUTES.filter((r) => gateMayUse(r.handler, r.controller)).map((r) => r.key);
+    expect(open.sort()).toEqual([...GATE_ROUTES].sort());
+  });
+
+  it.each([
+    'POST matches/:matchId/seats/:seatId/lock',
+    'POST matches/:matchId/seats/best',
+    'POST payments/create-intent',
+    'POST season-passes/purchase',
+    'POST season-passes/:id/loans',
+    'POST waitlist',
+    'GET loyalty/me',
+    'PATCH users/me',
+    'POST users/me/email-change',
+  ])('%s is closed for the gate role', (key) => {
+    const route = ROUTES.find((r) => r.key === key);
+    expect(route).toBeDefined();
+    expect(gateMayUse(route!.handler, route!.controller)).toBe(false);
   });
 });

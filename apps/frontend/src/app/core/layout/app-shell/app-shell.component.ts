@@ -11,7 +11,7 @@ import { MatListModule } from '@angular/material/list';
 import { CommonModule } from '@angular/common';
 import { filter } from 'rxjs';
 import { AuthService } from '../../auth/auth.service';
-import { isAdminRole } from '../../auth/roles';
+import { isAdminRole, isGateRole } from '../../auth/roles';
 import { CartFacade } from '../../cart/cart.facade';
 import { ChatbotWidgetComponent } from '../../../features/chatbot/chatbot-widget.component';
 import { CrestComponent } from '../../../shared/components/crest/crest.component';
@@ -121,6 +121,8 @@ export class AppShellComponent {
     );
   });
   protected readonly showChatbot = computed(() => {
+    // The steward account has no chat (the API refuses it too).
+    if (isGateRole(this.user()?.role)) return false;
     const url = this.currentUrl();
     return !HIDDEN_CHATBOT_ROUTES.some((prefix) => url.startsWith(prefix));
   });
